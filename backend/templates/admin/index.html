@@ -1,0 +1,86 @@
+{% extends "admin/base_site.html" %}
+{% load admin_urls i18n static admin_list admin_stats %}
+
+{% block content %}
+<div class="admin-dashboard">
+  <div class="dashboard-top" style="gap: 10px;">
+    <div class="filter-card" style="flex:2 1 320px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px;">
+        <div>
+          <div style="font-size:16px; font-weight:700;">Admin Dashboard</div>
+          <div style="font-size:12px; color:var(--cb-muted);">Quick search across apps & models.</div>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <a href="/admin/dashboard/" class="legend-item legend-add" style="font-size:12px; text-decoration:none;">Analytics</a>
+          <span class="legend-add" style="font-size:12px;">Shortcuts</span>
+        </div>
+      </div>
+      <label for="app-filter" style="display:none;">{% trans "Start typing to filter..." %}</label>
+      <input type="search" id="app-filter" placeholder="{% trans 'Filter apps and models' %}">
+    </div>
+    <div class="legend" style="flex:1 1 200px; justify-content:space-between;">
+      <span class="legend-item legend-add">{% trans "Add" %}</span>
+      <span class="legend-item legend-change">{% trans "Change" %}</span>
+    </div>
+  </div>
+
+  <div style="display:grid; gap:12px;">
+    {% admin_stats_panel %}
+  </div>
+
+  {% if app_list %}
+    <div class="admin-apps-grid" id="app-grid" style="margin-top:8px;">
+      {% for app in app_list %}
+        <div class="app-{{ app.app_label }} module admin-app-card" data-app="{{ app.name|lower }}">
+          <table>
+            <caption>
+              <a href="{{ app.app_url }}" class="section" title="{% blocktrans with name=app.name %}Models in the {{ name }} application{% endblocktrans %}">{{ app.name }}</a>
+            </caption>
+            <tbody>
+            {% for model in app.models %}
+              <tr class="model-{{ model.object_name|lower }}" data-label="{{ model.name|lower }}">
+                <th scope="row"><a href="{{ model.admin_url }}">{{ model.name }}</a></th>
+
+                <td>
+                  {% if model.add_url %}
+                    <a href="{{ model.add_url }}" class="addlink">{% trans 'Add' %}</a>
+                  {% endif %}
+                </td>
+
+                <td>
+                  {% if model.admin_url %}
+                    <a href="{{ model.admin_url }}" class="changelink">{% trans 'Change' %}</a>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p>{% trans "You don't have permission to view or edit anything." %}</p>
+  {% endif %}
+</div>
+
+<script>
+  (function () {
+    const input = document.getElementById("app-filter");
+    if (!input) return;
+
+    const cards = Array.from(document.querySelectorAll(".admin-app-card"));
+
+    input.addEventListener("input", function () {
+      const q = this.value.trim().toLowerCase();
+      cards.forEach((card) => {
+        const appMatch = (card.dataset.app || "").includes(q);
+        const rowMatch = Array.from(card.querySelectorAll("tr")).some((row) =>
+          (row.dataset.label || "").includes(q)
+        );
+        card.style.display = !q || appMatch || rowMatch ? "" : "none";
+      });
+    });
+  })();
+</script>
+{% endblock %}

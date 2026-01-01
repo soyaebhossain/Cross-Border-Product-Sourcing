@@ -1,0 +1,26 @@
+<div class="admin-stats">
+  <div class="admin-stat-grid">
+    <div class="admin-stat-card">
+      <div class="admin-stat-title">Orders</div>
+      <div class="admin-stat-number">{{ orders_total }}</div>
+      <div class="admin-stat-values">
+        <span>Pending: {{ orders_pending }}</span>
+        <span>In transit: {{ orders_in_transit }}</span>
+      </div>
+    </div>
+    <div class="admin-stat-card">
+      <div class="admin-stat-title">Products</div>
+      <div class="admin-stat-number">{{ products }}</div>
+      <div class="admin-stat-values">
+        <span>Saved quotes: {{ saved_quotes }}</span>
+      </div>
+    </div>
+    <div class="admin-stat-card">
+      <div class="admin-stat-title">Seller offers</div>
+      <div class="admin-stat-number">{{ offers }}</div>
+      <div class="admin-stat-values">
+        <span>New today: —</span>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,166 @@
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background: #f5f7fb;
+  color: #0f172a;
+  font-family: "Space Grotesk", "Manrope", "Helvetica Neue", Arial, sans-serif;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+html.theme-dark body {
+  background: #0b1220;
+  color: #e2e8f0;
+}
+
+html.theme-dark header {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
+html.theme-dark nav a {
+  color: #e2e8f0;
+}
+
+html.theme-dark .bg-white {
+  background: #0f172a !important;
+  color: #e2e8f0;
+}
+
+html.theme-dark .border {
+  border-color: #1f2937 !important;
+}
+
+html.theme-dark a {
+  color: #e2e8f0;
+}
+
+/* Headings and slate text */
+html.theme-dark .text-slate-900,
+html.theme-dark .text-slate-800,
+html.theme-dark .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+
+/* Global text colors inside dark mode */
+html.theme-dark .text-gray-600,
+html.theme-dark .text-gray-500,
+html.theme-dark .text-sm.text-gray-600,
+html.theme-dark .text-xs.text-gray-500 {
+  color: #cbd5e1 !important;
+}
+
+/* Cards and panels */
+html.theme-dark .bg-slate-50,
+html.theme-dark .bg-gray-50,
+html.theme-dark .bg-white.border {
+  background: #111827 !important;
+  color: #e2e8f0 !important;
+  border-color: #1f2937 !important;
+}
+
+/* Buttons contrast in dark */
+html.theme-dark button,
+html.theme-dark .bg-black,
+html.theme-dark .bg-slate-900 {
+  color: #fff !important;
+}
+
+/* Inputs */
+html.theme-dark input,
+html.theme-dark select,
+html.theme-dark textarea {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-color: #1f2937;
+}
+
+html.theme-dark input::placeholder {
+  color: #94a3b8;
+}
+
+/* Link underline colors */
+html.theme-dark a:hover {
+  color: #f8fafc;
+}
+
+/* Footer text */
+html.theme-dark footer {
+  color: #cbd5e1;
+}
+
+html.theme-dark .account-link {
+  background: #111827;
+  color: #e2e8f0;
+  border-color: #1f2937;
+}
+
+html.theme-dark .account-link:hover {
+  background: #1f2937;
+}
+
+html.theme-dark .theme-toggle {
+  background: #111827;
+  color: #e2e8f0;
+  border-color: #1f2937;
+}
+
+/* Accent text */
+html.theme-dark .text-emerald-700 {
+  color: #34d399 !important;
+}
+
+/* Card outlines in dark */
+html.theme-dark .border-slate-100 {
+  border-color: #1f2937 !important;
+}
+
+/* Keep badge text dark even in dark mode */
+html.theme-dark .lane-badge {
+  background: inherit !important;
+  color: #0f172a !important;
+}
+
+/* Lane board custom palette */
+.lane-board {
+  background: radial-gradient(120% 120% at 20% 20%, rgba(99, 102, 241, 0.2), rgba(15, 23, 42, 0.9)), #1f2937 !important;
+  border-color: #2f3a4d !important;
+}
+
+.lane-card {
+  background: #2a3347 !important;
+  border-color: #3a455c !important;
+}
+
+.lane-badge-dark {
+  color: #ffffff !important;
+}
+
+.lane-eta-dark {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  font-weight: 700 !important;
+}
+
+/* Routes ETA pill in dark mode */
+html.theme-dark .routes-eta {
+  background: #ffffff !important;
+  color: #0f172a !important;
+}
+
+/* Routes & cost cards text color in dark */
+html.theme-dark .routes-card {
+  background: #111827 !important;
+  border-color: #1f2937 !important;
+}

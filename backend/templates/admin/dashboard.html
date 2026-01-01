@@ -1,0 +1,167 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block content %}
+<style>
+  /* Dark, consistent with admin base */
+  .dash-wrap { background:#0d1115; color:#e5ecf4; border-radius:12px; padding:12px; }
+  .dash-grid { display: grid; gap: 12px; }
+  .dash-cards { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .dash-card { background: #141a21; border: 1px solid #2b343f; border-radius: 12px; padding: 14px; box-shadow: 0 10px 20px rgba(0,0,0,0.2); }
+  .dash-title { font-weight: 700; color: #e5ecf4; }
+  .dash-sub { font-size: 12px; color: #9fb2c4; }
+  .dash-value { font-size: 20px; font-weight: 700; color: #e5ecf4; }
+  .dash-table { width: 100%; border-collapse: collapse; font-size: 13px; color: #e5ecf4; background:#0f141a; }
+  .dash-table th, .dash-table td { padding: 8px 10px; border-top: 1px solid #2b343f; }
+  .dash-table th { background: #111722; text-align: left; color:#e5ecf4; }
+  .pill { display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border-radius:999px; font-weight:600; font-size:12px; background: #1b232d; color: #e5ecf4; }
+  .bar-row { display:flex; align-items:center; gap:8px; font-size:13px; }
+  .bar-track { width:100%; height:12px; border-radius:999px; background: #e2e8f0; overflow:hidden; display:flex; }
+  .bar-segment { height:100%; }
+  .legend-dot { width:8px; height:8px; border-radius:999px; display:inline-block; }
+</style>
+
+<div class="dash-wrap dash-grid">
+  <div style="text-align:center; margin-bottom:6px;">
+    <h1 class="dash-title" style="font-size:22px;">Admin Dashboard</h1>
+    <div class="dash-sub">Live snapshot of orders and products (simple aggregates).</div>
+  </div>
+
+  <div class="dash-cards">
+    {% for k in kpis %}
+    <div class="dash-card" style="display:flex; align-items:center; justify-content:space-between;">
+      <div>
+        <div class="dash-sub">{{ k.label }}</div>
+        <div class="dash-value">{{ k.value }}</div>
+        <div class="dash-sub">{{ k.sub }}</div>
+      </div>
+      <div class="pill">{{ k.icon }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div class="dash-card">
+    <div class="dash-title" style="margin-bottom:8px;">Daily Revenue (Excl. Shipping)</div>
+    <div style="overflow-x:auto;">
+      <table class="dash-table">
+        <thead>
+          <tr>
+            <th>SL</th><th>Date</th><th style="text-align:right;">All Orders</th><th style="text-align:right;">Manual Only</th><th style="text-align:right;">Website Only</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in daily_rows %}
+          <tr>
+            <td>{{ r.sl }}</td>
+            <td>{{ r.date }}</td>
+            <td style="text-align:right;">{{ r.all }} ৳</td>
+            <td style="text-align:right;">{{ r.manual }} ৳</td>
+            <td style="text-align:right;">{{ r.web }} ৳</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="dash-card">
+    <div class="dash-title" style="margin-bottom:8px;">Item Revenues (by units sold)</div>
+    <div class="dash-cards" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+      {% for item in items %}
+      <div class="dash-card" style="box-shadow:none; border:1px solid var(--border);">
+        <div class="dash-title" style="font-size:14px;">{{ item.name }}</div>
+        <div class="dash-value" style="font-size:16px;">{{ item.rev }}</div>
+        <div class="dash-sub">Items sold: {{ item.sold }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="dash-cards" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+    <div class="dash-card">
+      <div class="dash-title" style="margin-bottom:6px;">Orders by Stage</div>
+      <div class="dash-sub" style="margin-bottom:6px;">Live counts</div>
+      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+        {% for s in stages %}
+        <div class="bar-row">
+          <span class="legend-dot" style="background:{{ s.color }}"></span>
+          <span class="dash-sub">{{ s.label }}</span>
+          <span class="dash-title" style="font-size:13px; margin-left:auto;">{{ s.count }} ({{ s.pct }}%)</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="bar-track">
+        {% for s in stages %}
+          <div class="bar-segment" style="width:{{ s.pct }}%; background:{{ s.color }};"></div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="dash-card">
+      <div class="dash-title" style="margin-bottom:6px;">Orders by Type</div>
+      <div class="dash-sub" style="margin-bottom:6px;">Manual vs website</div>
+      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+        {% for t in types %}
+        <div class="bar-row">
+          <span class="legend-dot" style="background:{{ t.color }}"></span>
+          <span class="dash-sub">{{ t.label }}</span>
+          <span class="dash-title" style="font-size:13px; margin-left:auto;">{{ t.count }} ({{ t.pct }}%)</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="bar-track">
+        {% for t in types %}
+          <div class="bar-segment" style="width:{{ t.pct }}%; background:{{ t.color }};"></div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="dash-card">
+      <div class="dash-title" style="margin-bottom:6px;">Delivery Options</div>
+      <div class="dash-sub" style="margin-bottom:6px;">Based on order delivery type</div>
+      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+        {% for d in delivery %}
+        <div class="bar-row">
+          <span class="legend-dot" style="background:{{ d.color }}"></span>
+          <span class="dash-sub">{{ d.label }}</span>
+          <span class="dash-title" style="font-size:13px; margin-left:auto;">{{ d.orders }} ({{ d.orders_pct }}%)</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="bar-track" style="margin-bottom:12px;">
+        {% for d in delivery %}
+          <div class="bar-segment" style="width:{{ d.orders_pct }}%; background:{{ d.color }};"></div>
+        {% endfor %}
+      </div>
+      <div class="dash-sub" style="margin-bottom:6px;">Products by delivery option</div>
+      <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px;">
+        {% for d in delivery %}
+        <div class="bar-row">
+          <span class="legend-dot" style="background:{{ d.color }}"></span>
+          <span class="dash-sub">{{ d.label }}</span>
+          <span class="dash-title" style="font-size:13px; margin-left:auto;">{{ d.products }} ({{ d.products_pct }}%)</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="bar-track">
+        {% for d in delivery %}
+          <div class="bar-segment" style="width:{{ d.products_pct }}%; background:{{ d.color }};"></div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="dash-card">
+    <div class="dash-title" style="margin-bottom:8px;">Orders by Country</div>
+    <div class="dash-sub" style="margin-bottom:8px;">Top 5 countries</div>
+    <div class="dash-cards" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); box-shadow:none;">
+      {% for d in districts %}
+      <div class="dash-card" style="box-shadow:none; border:1px solid var(--border);">
+        <div class="dash-title" style="font-size:14px;">{{ d.name }}</div>
+        <div class="dash-sub">Orders: {{ d.orders }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

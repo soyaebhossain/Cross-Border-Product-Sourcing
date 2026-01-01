@@ -1,0 +1,283 @@
+{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | Cross-Border Admin{% endblock %}
+
+{% block extrastyle %}
+  {{ block.super }}
+  <style>
+    :root {
+      --cb-bg: #0d1115;
+      --cb-panel: #141a21;
+      --cb-header: #4f97b6;
+      --cb-border: #2b343f;
+      --cb-text: #e5ecf4;
+      --cb-muted: #9fb2c4;
+      --cb-link: #c9e5ff;
+      --cb-hover: #1b232d;
+      --cb-add: #9edb4d;
+      --cb-change: #f0c754;
+    }
+
+    html,
+    body,
+    #container {
+      background: var(--cb-bg);
+      color: var(--cb-text);
+    }
+
+    a:link,
+    a:visited {
+      color: var(--cb-link);
+    }
+
+    #header {
+      background: #111822;
+      border-bottom: 1px solid var(--cb-border);
+    }
+
+    #header a:link,
+    #header a:visited,
+    #header #branding h1,
+    #header #branding h1 a {
+      color: #e2e8f0;
+    }
+
+    #user-tools {
+      color: #cbd5e1;
+    }
+
+    .breadcrumbs {
+      background: #111822;
+      border-bottom: 1px solid var(--cb-border);
+      color: var(--cb-muted);
+    }
+
+    .breadcrumbs a {
+      color: var(--cb-link);
+    }
+
+    #content {
+      background: transparent;
+      padding-top: 18px;
+    }
+
+    #content-main {
+      width: 100%;
+    }
+
+    /* Dashboard layout */
+    .admin-dashboard {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .dashboard-top {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .filter-card {
+      flex: 1 1 280px;
+      background: var(--cb-panel);
+      border: 1px solid var(--cb-border);
+      padding: 12px;
+      border-radius: 8px;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .filter-card label {
+      display: block;
+      font-size: 12px;
+      color: var(--cb-muted);
+      margin-bottom: 6px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .filter-card input {
+      width: 100%;
+      background: #0f141a;
+      border: 1px solid var(--cb-border);
+      border-radius: 8px;
+      padding: 10px 12px;
+      color: var(--cb-text);
+    }
+
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--cb-panel);
+      border: 1px solid var(--cb-border);
+      border-radius: 8px;
+      color: var(--cb-muted);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+    }
+
+    .legend-add {
+      color: var(--cb-add);
+    }
+
+    .legend-add::before {
+      content: "+";
+      margin-right: 6px;
+    }
+
+    .legend-change {
+      color: var(--cb-change);
+    }
+
+    .legend-change::before {
+      content: "\270E";
+      margin-right: 6px;
+    }
+
+    /* App grid */
+    .admin-apps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+    }
+
+    .admin-app-card {
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
+    }
+
+    .module {
+      background: var(--cb-panel);
+      border: 1px solid var(--cb-border);
+      box-shadow: none;
+    }
+
+    .module caption {
+      background: var(--cb-header);
+      color: #e8f4ff;
+      padding: 10px 12px;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      border-bottom: 1px solid var(--cb-border);
+    }
+
+    .module caption a {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .module table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .module tbody tr {
+      border-top: 1px solid var(--cb-border);
+      background: #0f141a;
+    }
+
+    .module tbody tr:nth-child(odd) {
+      background: #121821;
+    }
+
+    .module tbody tr:hover {
+      background: var(--cb-hover);
+    }
+
+    .module th,
+    .module td {
+      padding: 10px 12px;
+      color: var(--cb-text);
+    }
+
+    .module th a {
+      color: var(--cb-link);
+      font-weight: 600;
+    }
+
+    a.addlink {
+      color: var(--cb-add);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    a.addlink::before {
+      content: "+";
+      margin-right: 6px;
+    }
+
+    a.changelink {
+      color: var(--cb-change);
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    a.changelink::before {
+      content: "\270E";
+      margin-right: 6px;
+    }
+
+    a.addlink:hover,
+    a.changelink:hover {
+      text-decoration: underline;
+    }
+
+    /* Stats */
+    .admin-stats {
+      display: grid;
+      gap: 12px;
+    }
+
+    .admin-stat-card {
+      background: var(--cb-panel);
+      border: 1px solid var(--cb-border);
+      border-radius: 10px;
+      padding: 14px;
+      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.04);
+    }
+
+    .admin-stat-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: var(--cb-text);
+    }
+
+    .admin-stat-values {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      color: var(--cb-muted);
+      font-size: 13px;
+    }
+
+    .admin-stat-number {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--cb-link);
+    }
+
+    .admin-stat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 10px;
+    }
+  </style>
+{% endblock %}
+
+{% block branding %}
+  <h1 id="site-name"><a href="{% url 'admin:index' %}">Cross-Border Admin</a></h1>
+{% endblock %}
+
+{% block nav-global %}{% endblock %}
