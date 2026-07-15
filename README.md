@@ -1,6 +1,16 @@
 
 # Cross-Border Product Sourcing Rebuild
 
+## Vercel deployment
+
+The production web application is the Next.js project in `apps/web-next`.
+The root `vercel.json` installs and builds that application, so importing the
+repository into Vercel does not deploy the legacy root Vite application.
+
+For the cleanest monorepo setup, the Vercel project's **Root Directory** may
+also be set to `apps/web-next`; when doing that, clear any custom build and
+output settings so Vercel uses the Next.js defaults from that directory.
+
 **Welcome**: A short project introduction and quick-start checklist are in [WELCOME.md](WELCOME.md). You can also open the simple local welcome page at [public/welcome.html](public/welcome.html).
 
 The rebuild now starts from the stack you asked for:
