@@ -1,0 +1,183 @@
+product_type,category_slug,source_country,bd_availability,demand_score,avg_price_usd,min_price_usd,max_price_usd,hs_code,import_duty_pct,vat_pct,min_lead_air,max_lead_air,min_lead_sea,max_lead_sea,restriction_level,sourcing_note
+Siemens S7-1200 PLC,industrial-automation,DE/CN,2,9,320,280,420,8537.10,10,15,7,12,28,45,low,Available via CN distributors; genuine Siemens at 30-40% less than BD price
+Mitsubishi FX5U PLC,industrial-automation,JP/CN,1,9,280,240,380,8537.10,10,15,7,12,28,45,low,Best sourced from SG authorised distributors
+Delta DVP Series PLC,industrial-automation,TW/CN,3,8,180,140,260,8537.10,10,15,5,10,20,35,low,Taiwan origin; widely available on Alibaba
+ABB ACS355 VFD Drive,industrial-automation,CN/SG,2,8,420,350,550,8504.40,10,15,6,11,22,38,low,SG has genuine stock; CN has grey market
+Schneider Altivar VFD,industrial-automation,CN/SG,2,8,380,300,500,8504.40,10,15,6,11,22,38,low,Schneider authorized distributors in SG
+Keyence FS-N Series Sensor,industrial-automation,JP/CN,1,9,85,65,130,8536.90,5,15,5,9,20,35,low,Japan precision sensors; critical for QC automation
+Omron E3Z Photoelectric Sensor,industrial-automation,JP/CN,2,8,45,35,80,8543.70,5,15,5,9,20,35,low,Omron CN factory supply chain is well established
+Sick DT35 Distance Sensor,industrial-automation,DE/CN,1,8,220,180,310,8543.70,5,15,7,12,28,45,low,SICK Germany; CN assembly versions available
+Fanuc Servo Motor Alpha Series,industrial-automation,JP/CN,1,9,650,550,900,8501.52,15,15,8,14,30,50,medium,Fanuc controls subject to export licensing checks
+Yaskawa Sigma-7 Servo Drive,industrial-automation,JP/CN,1,9,580,480,780,8504.40,10,15,8,14,30,50,medium,CN distributor stock available; check authenticity
+Beckhoff EK1100 EtherCAT,industrial-automation,DE/CN,1,7,180,150,260,8537.10,10,15,7,12,28,45,low,German engineering; check firmware licensing
+Festo DSBC Pneumatic Cylinder,industrial-automation,DE/CN,2,7,65,45,110,8412.31,5,15,6,11,22,38,low,Festo CN plant; good quality
+SMC AF40-N06 Air Filter,industrial-automation,JP/CN,3,7,35,25,60,8421.39,5,15,5,9,20,35,low,SMC is widely available; BD has some stock
+Phoenix Contact Terminal Block,industrial-automation,DE/CN,2,7,15,8,35,8536.90,5,15,5,9,18,32,low,Small items; easy to ship in bulk
+IFM E50004 IO-Link Master,industrial-automation,DE/CN,1,8,280,220,380,8543.70,5,15,7,12,25,40,low,IFM Germany; CN stock available
+Cognex IS2000 Vision System,industrial-automation,US/CN,1,9,2800,2400,3800,9031.49,10,15,8,15,35,55,medium,Machine vision is scarce in BD; high demand in RMG sector
+Turck BI5U-M18-AP6X Sensor,industrial-automation,DE/CN,1,7,45,35,70,8543.70,5,15,6,10,22,38,low,Turck inductive sensors; CN distributors stocked
+Rexnord 1051 Gear Drive,industrial-automation,US/CN,1,7,380,300,520,8483.40,15,15,9,16,35,55,low,Industrial gearboxes; shipping weight consideration
+Leuze DDLS 200 Optical Sensor,industrial-automation,DE/CN,1,7,620,520,820,8543.70,5,15,7,12,28,45,low,Leuze safety sensors; check export restrictions
+Pepperl+Fuchs UB500 Sensor,industrial-automation,DE/CN,1,7,180,140,260,8543.70,5,15,6,11,22,38,low,P+F ultrasonic sensors
+Bosch Rexroth Linear Guide,industrial-automation,DE/CN,2,8,120,90,200,8466.93,10,15,7,12,28,45,low,Linear motion; essential for CNC BD factories
+Nord SK 075E Gearbox,industrial-automation,DE/CN,1,7,450,380,620,8483.40,15,15,9,16,35,55,low,NORD drives from Germany via SG
+Weidmuller Relay 8380550,industrial-automation,DE/CN,2,7,25,18,45,8536.90,5,15,5,9,18,32,low,Relays and terminal blocks are easy to ship
+Banner Engineering QS30 Sensor,industrial-automation,US/CN,2,7,85,65,130,8543.70,5,15,7,12,25,40,low,Banner Engineering sensors for automation
+Parker Hannifin Hydraulic Valve,industrial-automation,US/CN,1,7,280,220,400,8481.20,15,15,8,14,30,50,low,Hydraulic controls; critical for BD manufacturing
+Philips IntelliVue MX40 Monitor,medical-equipment,NL/CN,1,9,3800,3200,5200,9018.19,0,15,8,15,35,55,high,Medical equipment; NBR certification needed
+GE Healthcare MAC 800 ECG,medical-equipment,US/CN,1,9,1800,1500,2500,9018.11,0,15,8,15,35,55,high,ECG machines; DGDA approval required for commercial
+Mindray DC-30 Ultrasound,medical-equipment,CN,2,9,4200,3600,5800,9018.12,0,15,8,15,35,55,high,Chinese ultrasound; Mindray BD rep exists but expensive
+Omron HEM-7600T Blood Pressure,medical-equipment,JP/CN,3,9,85,65,120,9018.19,0,15,5,9,20,35,low,Consumer medical device; easier import
+Nonin 9590 Pulse Oximeter,medical-equipment,US/CN,2,9,280,220,380,9018.19,0,15,6,11,22,38,medium,Professional grade; hospital procurement
+Welch Allyn 3.5V Ophthalmoscope,medical-equipment,US/CN,1,8,320,260,440,9018.19,0,15,7,12,28,45,medium,Diagnostic tools; used in private clinics
+Siemens ADVIA Blood Analyzer,medical-equipment,DE/CN,1,9,12000,10000,16000,9027.80,0,15,10,18,40,65,high,Major lab equipment; requires installation support
+Roche COBAS e411 Analyzer,medical-equipment,CH/CN,1,9,8500,7200,12000,9027.80,0,15,10,18,40,65,high,IVD equipment; DGDA clearance critical
+Abbott i-STAT 1 Analyzer,medical-equipment,US/CN,1,8,2800,2400,3800,9027.80,0,15,8,14,35,55,high,Point-of-care; cartridges also need import
+Masimo Radical-7 Pulse Oximeter,medical-equipment,US/CN,1,9,1200,1000,1600,9018.19,0,15,7,12,28,45,medium,Gold standard SpO2; preferred in ICU
+Draeger Evita Ventilator,medical-equipment,DE/CN,1,9,18000,15000,24000,9019.20,0,15,10,18,40,65,high,Ventilators; critical shortage post-COVID
+Medtronic PB980 Ventilator,medical-equipment,US/CN,1,9,15000,12000,20000,9019.20,0,15,10,18,40,65,high,Medtronic ventilators; DGDA registration needed
+Carefusion Alaris 8015 Pump,medical-equipment,US/CN,1,8,2200,1800,3000,9018.90,0,15,8,14,32,52,high,Infusion pumps; common in ICU
+Nihon Kohden EEG Machine,medical-equipment,JP/CN,1,8,8500,7200,12000,9018.11,0,15,8,15,35,55,high,Neurological monitoring; scarce in BD
+Spacelabs 91369 Monitor,medical-equipment,US/CN,1,8,2800,2400,3800,9018.19,0,15,8,14,30,50,medium,Patient monitor; refurbished units also available
+Philips AED HeartStart FRx,medical-equipment,NL/CN,2,9,1400,1200,1800,9018.90,0,15,7,12,28,45,medium,AED defib; required by Bangladesh safety regs
+Zoll AED 3 Defibrillator,medical-equipment,US/CN,1,9,1800,1500,2400,9018.90,0,15,7,12,28,45,medium,Zoll defibrillators; hospitals procure from abroad
+Edan iM50 Patient Monitor,medical-equipment,CN,3,8,1800,1500,2400,9018.19,0,15,6,11,22,38,medium,Chinese brand; Edan has BD agents
+Contec CMS8000 Monitor,medical-equipment,CN,3,8,850,700,1200,9018.19,0,15,5,9,20,35,low,Affordable Chinese monitor; widely used in clinics
+Bionet FC1400 Fetal Monitor,medical-equipment,KR/CN,2,8,2200,1800,3000,9018.19,0,15,7,12,28,45,medium,Obstetric monitoring; Korean quality
+DJI Agras T40 Spray Drone,agricultural-tech,CN,1,10,12000,10500,14000,8806.21,25,15,8,15,35,55,high,Agricultural drones; CAA license required in BD
+DJI Agras T20P Drone,agricultural-tech,CN,1,10,7500,6500,9000,8806.21,25,15,8,15,35,55,high,Spray drone; BADC is evaluating for rice fields
+Trimble EZ-Guide 250 GPS,agricultural-tech,US/CN,1,8,1800,1500,2400,8526.91,10,15,8,14,30,50,medium,Precision agriculture GPS; tractor guidance
+John Deere JWOS GPS Guidance,agricultural-tech,US/CN,1,8,2400,2000,3200,8526.91,10,15,8,15,32,52,medium,JD authorized dealer needed for warranty
+Soil NPK IoT Sensor,agricultural-tech,CN,2,9,85,65,130,9026.80,5,15,5,9,18,32,low,Soil health monitoring; demand rising in BD
+Chlorophyll Meter SPAD-502,agricultural-tech,JP/CN,2,8,650,550,850,9027.20,5,15,6,10,22,38,low,Minolta SPAD; essential for rice yield optimization
+Grain Moisture Meter PM-8188,agricultural-tech,CN,3,9,45,35,75,9026.80,5,15,4,8,16,28,low,Post-harvest quality; large demand in grain storage
+Davis Vantage Pro2 Weather Station,agricultural-tech,US/CN,1,8,620,520,820,9015.80,5,15,6,11,22,38,low,IoT weather station; agri-climate monitoring
+Automated Drip Irrigation Controller,agricultural-tech,IL/CN,2,9,280,220,400,8424.82,5,15,5,9,20,35,low,Israel tech; available via CN OEM versions
+Smart Greenhouse Controller ZipGrow,agricultural-tech,US/CN,1,8,380,300,520,8543.70,5,15,6,11,22,38,low,Greenhouse automation; horticulture BD market growing
+LED Grow Light 600W Full Spectrum,agricultural-tech,CN,2,9,85,65,130,9405.40,5,15,4,8,18,32,low,Vertical farming lights; low cost from Shenzhen
+Hydroponic NFT Channel System,agricultural-tech,CN/TH,2,9,180,140,260,3917.29,5,15,5,9,20,35,low,Hydroponics; urban farming growing in Dhaka
+Precision Seeder Vacuum,agricultural-tech,CN,2,8,2800,2400,3800,8432.29,10,15,7,12,28,45,low,Small farm precision seeder; BARI promotes usage
+Root Zone Temperature Sensor,agricultural-tech,CN,2,7,45,35,70,9025.19,5,15,4,8,16,28,low,Precision horticulture sensor
+Plant Disease Detection Camera,agricultural-tech,CN,1,8,380,300,520,8525.80,10,15,6,10,22,38,low,AI camera for crop disease; startup adoption rising
+Poultry Environment Controller,agricultural-tech,CN,3,9,280,220,380,8537.10,5,15,5,9,20,35,low,Poultry house automation; huge BD market
+Fish Farm Water Quality Monitor,agricultural-tech,CN/TH,3,9,180,140,260,9026.80,5,15,5,9,18,32,low,Aquaculture IoT; shrimp farms in Khulna
+Aquaponics System Complete,agricultural-tech,CN,2,8,620,520,850,3917.29,10,15,6,11,22,38,low,Integrated fish-plant system
+GPS Livestock Tracker,agricultural-tech,CN,2,7,45,35,75,8526.91,10,15,5,9,18,32,low,Livestock GPS; cattle tracking in north BD
+Drone RTK Base Station,agricultural-tech,CN,1,8,1800,1500,2400,8526.91,10,15,7,12,28,45,medium,RTK precision; paired with ag drones
+Cold Storage Controller for Crops,agricultural-tech,CN,3,9,280,220,380,8537.10,5,15,5,9,20,35,low,Post-harvest cold chain management
+Growatt SPF 5000ES Solar Inverter,clean-energy-ev,CN,2,10,480,400,650,8504.40,5,15,5,9,20,35,low,Off-grid inverter; popular in rural BD
+Huawei SUN2000-10KTL Solar Inverter,clean-energy-ev,CN,2,10,620,520,820,8504.40,5,15,5,9,20,35,low,Huawei MPPT inverter; grid-tie
+SMA Sunny Boy 3.6 Inverter,clean-energy-ev,DE/CN,2,9,820,700,1100,8504.40,5,15,6,10,22,38,low,German quality; SG distributors stock it
+KSTAR Solar Hybrid Inverter 8kW,clean-energy-ev,CN,2,9,520,430,700,8504.40,5,15,5,9,20,35,low,KSTAR growing in BD; authorized dealers exist
+Deye SUN-8K-SG04LP3 Inverter,clean-energy-ev,CN,2,10,580,480,780,8504.40,5,15,5,9,20,35,low,Deye hybrid inverter; popular for load shedding
+EV Charger AC 22kW Type 2,clean-energy-ev,CN,1,10,480,400,650,8504.40,10,15,6,11,22,38,low,EV charging infra; demand surging as EVs enter BD
+EV DC Fast Charger 50kW CCS,clean-energy-ev,CN,1,10,3800,3200,5200,8504.40,15,15,7,12,28,45,medium,DC fast chargers; EV station projects by BPDB
+CATL LiFePO4 280Ah Cell,clean-energy-ev,CN,2,10,85,70,120,8507.60,5,15,5,9,20,35,low,CATL cells; battery bank assembly in BD growing
+BYD Battery Box Premium LVS,clean-energy-ev,CN,2,9,1800,1500,2400,8507.80,5,15,5,9,20,35,low,BYD residential storage; BPDB projects
+Solar Panel 550W Mono PERC,clean-energy-ev,CN,3,10,95,80,130,8541.40,5,15,4,8,18,32,low,550W panel; widely imported but price gap exists
+Solar Panel 400W Bifacial,clean-energy-ev,CN,3,10,85,70,115,8541.40,5,15,4,8,18,32,low,Bifacial bifacial technology not widely available in BD
+MPPT Solar Charge Controller 60A,clean-energy-ev,CN,2,9,65,52,90,8504.40,5,15,4,8,16,28,low,Victron/Epever quality at low cost from CN
+Victron MultiPlus-II 48/3000,clean-energy-ev,NL/CN,1,9,820,700,1100,8504.40,5,15,6,11,22,38,low,Victron inverter-charger; premium backup power
+Tesla Powerwall Alternative 10kWh,clean-energy-ev,CN,1,10,2800,2400,3800,8507.80,10,15,6,11,22,38,medium,Home energy storage; demand from solar-equipped homes
+Lithium Battery Pack 48V 200Ah,clean-energy-ev,CN,2,10,580,480,780,8507.60,5,15,5,9,20,35,low,EV-grade LiFePO4; rickshaw/auto conversion BD market
+Wind Turbine 1kW Horizontal,clean-energy-ev,CN,1,7,480,400,650,8502.31,15,15,6,11,22,38,low,Small wind; coastal and island areas of BD
+EV Conversion Kit for CNG Auto,clean-energy-ev,CN/IN,2,9,1800,1500,2400,8708.99,15,15,6,11,22,38,medium,CNG to EV conversion; BRTC evaluating
+E-Bike Motor Kit 1000W,clean-energy-ev,CN,2,9,280,220,380,8501.32,15,15,5,9,20,35,low,E-bike conversion; popular with delivery riders
+Solar Street Light 100W All-in-One,clean-energy-ev,CN,3,10,65,52,90,9405.40,5,15,4,8,16,28,low,Solar street light; rural electrification
+Heat Pump Water Heater 200L,clean-energy-ev,CN,1,8,580,480,780,8516.10,15,15,6,11,22,38,low,Energy efficient; potential for gas substitute
+Portable Power Station 1000W,clean-energy-ev,CN,2,9,380,300,520,8507.80,5,15,5,9,18,32,low,Power station; load shedding backup alternative
+EV Two-Wheeler Lithium Battery 60V,clean-energy-ev,CN,3,10,120,95,165,8507.60,5,15,4,8,16,28,low,E-bike battery; high volume import via CHN
+Bambu Lab X1 Carbon 3D Printer,3d-printing-maker,CN,1,10,1199,1050,1350,8477.59,5,15,5,9,20,35,low,FDM printer; no BD stock; engineering demand high
+Creality K1 Max 3D Printer,3d-printing-maker,CN,1,9,650,550,780,8477.59,5,15,5,9,20,35,low,Fast FDM; popular among BD Makers/engineers
+Elegoo Saturn 3 Resin Printer,3d-printing-maker,CN,1,9,380,300,520,8477.59,5,15,5,9,20,35,low,MSLA resin; jewelry/dental model making BD demand
+AnkerMake M5C 3D Printer,3d-printing-maker,CN,1,9,300,250,400,8477.59,5,15,4,8,18,32,low,Fast budget FDM; startup prototyping
+Prusa MK4 3D Printer Kit,3d-printing-maker,CZ/CN,1,9,799,700,950,8477.59,5,15,6,11,22,38,low,Prusa open-source; engineering schools
+Formlabs Form 3 SLA Printer,3d-printing-maker,US/CN,1,9,3499,3000,4200,8477.59,5,15,7,12,28,45,medium,Professional SLA; dental and engineering use
+Bambu Lab AMS Filament System,3d-printing-maker,CN,1,9,380,300,480,8477.59,5,15,5,9,20,35,low,Multi-material 3D printing
+Raspberry Pi 5 8GB,3d-printing-maker,UK/CN,1,10,80,70,95,8471.50,5,15,5,9,18,32,low,RPi 5 unavailable in BD; massive edu/IoT demand
+NVIDIA Jetson Nano 4GB,3d-printing-maker,US/CN,1,9,99,85,130,8471.50,10,15,6,10,22,38,medium,Edge AI; robotics and smart camera projects
+Arduino Mega 2560 R3 Official,3d-printing-maker,IT/CN,2,9,38,30,55,8471.50,5,15,4,8,15,28,low,Official Arduino; CN clones available cheaply
+ESP32 Dev Kit v1 Genuine,3d-printing-maker,CN,3,9,8,6,15,8471.50,5,15,4,7,14,25,low,ESP32; most popular IoT module in BD maker scene
+xTool D1 Pro 20W Laser Engraver,3d-printing-maker,CN,1,9,480,400,620,8456.10,5,15,5,9,18,32,low,Desktop laser; craft/business use
+CNC Router 3018 Pro Upgraded,3d-printing-maker,CN,1,8,180,140,260,8457.10,5,15,5,9,18,32,low,Small CNC; prototype and PCB milling
+Creality Ender 3 V3 KE,3d-printing-maker,CN,1,9,280,230,360,8477.59,5,15,4,8,16,28,low,Budget FDM; most popular entry-level printer
+PLA+ Filament 3kg Bundle,3d-printing-maker,CN,2,9,35,28,55,3916.90,5,15,4,7,15,28,low,3D printing filament; heavy item; sea freight better
+Coral USB Accelerator TPU,3d-printing-maker,US/CN,1,8,60,50,80,8471.90,10,15,5,9,18,32,medium,Google Coral Edge TPU; AI inference hardware
+Intel RealSense D435i Depth Cam,3d-printing-maker,US/CN,1,8,180,150,240,8525.80,10,15,6,10,22,38,medium,Depth camera; robotics and AR
+Luxonis OAK-D Lite Camera,3d-printing-maker,US/CN,1,8,150,125,200,8525.80,10,15,5,9,20,35,medium,Spatial AI camera
+OpenMV Cam H7 Plus,3d-printing-maker,US/CN,1,8,85,70,115,8525.80,10,15,5,9,18,32,medium,Machine vision microcontroller
+PETG Carbon Fiber Filament 1kg,3d-printing-maker,CN,1,8,45,35,70,3916.90,5,15,4,7,15,28,low,Engineering filament; prototype parts
+TPU Flexible Filament 1kg,3d-printing-maker,CN,2,8,30,22,50,3916.90,5,15,4,7,15,28,low,Flexible prints; shoe soles, gaskets
+Rigol DS1054Z Oscilloscope,scientific-instruments,CN,1,9,380,320,480,9030.20,5,15,5,9,18,32,low,100MHz DSO; most popular entry scope for BD engineers
+Siglent SDG2042X Function Gen,scientific-instruments,CN,1,9,420,350,540,9030.20,5,15,5,9,18,32,low,Arbitrary waveform generator; R&D labs
+Fluke 87V Multimeter,scientific-instruments,US/CN,2,9,280,230,380,9030.33,5,15,5,9,18,32,low,Fluke DMM; preferred by BD service technicians
+GW Instek LCR-819 Meter,scientific-instruments,TW/CN,1,8,480,400,620,9030.39,5,15,5,9,18,32,low,LCR meter; PCB repair and QC use
+Rigol DSA875 Spectrum Analyzer,scientific-instruments,CN,1,9,1800,1500,2400,9030.40,5,15,6,10,22,38,low,RF spectrum; BD telecom and research labs
+NanoVNA V2 4.4GHz VNA,scientific-instruments,CN,2,8,65,52,90,9030.40,5,15,4,8,15,28,low,Vector network analyzer; ham radio BD community
+Bench Power Supply 60V 10A,scientific-instruments,CN,2,9,85,70,120,9030.33,5,15,4,8,15,28,low,Lab power supply; electronics education
+Hakko FX-951 Soldering Station,scientific-instruments,JP/CN,2,9,120,95,165,8515.19,5,15,5,9,18,32,low,Hakko Japan; preferred by BD service centers
+T962A PCB Reflow Oven,scientific-instruments,CN,1,8,180,140,260,8419.89,5,15,5,9,18,32,low,SMD reflow; PCB assembly workshops in BD
+Analytical Balance 0.001g,scientific-instruments,CN/DE,1,8,380,300,520,9016.00,5,15,5,9,18,32,low,Lab balance; pharmaceutical and research
+Digital pH Meter HI98130,scientific-instruments,IT/CN,2,9,65,52,90,9027.80,5,15,4,8,15,28,low,HANNA pH meter; water quality, aquaculture
+UV-Vis Spectrophotometer,scientific-instruments,CN/DE,1,9,1800,1500,2400,9027.20,5,15,6,10,22,38,low,Research instrument; medical and food lab
+Trinocular Microscope 40-2000x,scientific-instruments,CN,2,8,280,220,400,9011.20,5,15,5,9,20,35,low,Biological microscope; medical colleges BD
+USB Digital Microscope 500x,scientific-instruments,CN,2,8,45,35,70,9011.80,5,15,4,7,14,25,low,Desktop inspection microscope
+Thermal Camera FLIR One Pro,scientific-instruments,US/CN,1,9,380,320,480,9025.19,10,15,5,9,20,35,low,Thermal imaging; building inspection and electrical
+Logic Analyzer Saleae 16,scientific-instruments,US/CN,1,8,480,400,620,9030.39,5,15,5,9,18,32,low,USB logic analyzer; firmware/embedded development
+JTAG Debugging Probe Segger J-Link,scientific-instruments,DE/CN,1,8,280,230,380,9030.39,5,15,5,9,18,32,low,Embedded debug tool; scarce in BD
+Environmental Chamber Mini,scientific-instruments,CN,1,7,1800,1500,2400,9025.80,10,15,6,10,22,38,low,Temperature test chamber; product compliance testing
+Gas Detector 4-in-1 Portable,scientific-instruments,CN,2,8,180,140,260,9027.80,5,15,5,9,18,32,low,Industrial gas safety; RMG and garment factories
+Sound Level Meter PCE-322A,scientific-instruments,DE/CN,2,7,120,95,165,9027.80,5,15,5,9,18,32,low,Noise measurement; factory compliance
+Lux Meter Digital IM0001,scientific-instruments,CN,3,7,25,18,45,9027.80,5,15,4,7,14,25,low,Light measurement; solar installation verification
+48V 60Ah LiFePO4 E-Rickshaw Battery,clean-energy-ev,CN,3,10,120,95,165,8507.60,5,15,4,8,16,28,low,E-bike battery; high volume import via CHN
+48V 100Ah LiFePO4 Battery Pack,clean-energy-ev,CN,2,10,220,180,300,8507.60,5,15,4,8,16,28,low,Mid-size LiFePO4 pack
+EV Charge Point OCPP Cloud Manager,clean-energy-ev,CN,1,9,320,260,420,8504.40,10,15,6,11,22,38,low,OCPP software+hardware bundle
+Solar Panel Mounting Rail 4m,clean-energy-ev,CN,2,8,25,18,40,7610.90,5,15,4,7,15,28,low,Aluminium mounting structure
+Siemens S7-1200 PLC,industrial-automation,DE/CN,2,9,320,280,420,8537.10,10,15,7,12,28,45,low,Available via CN distributors
+Mitsubishi FX5U PLC,industrial-automation,JP/CN,1,9,280,240,380,8537.10,10,15,7,12,28,45,low,Best sourced from SG
+Delta DVP32 PLC,industrial-automation,TW/CN,3,8,180,140,260,8537.10,10,15,5,10,20,35,low,Taiwan origin
+ABB VFD Drive ACS355,industrial-automation,CN/SG,2,8,420,350,550,8504.40,10,15,6,11,22,38,low,SG has genuine stock
+Schneider Altivar VFD,industrial-automation,CN/SG,2,8,380,300,500,8504.40,10,15,6,11,22,38,low,Schneider authorized SG
+Fanuc Servo Motor Alpha,industrial-automation,JP/CN,1,9,650,550,900,8501.52,15,15,8,14,30,50,medium,Fanuc servo
+Yaskawa Sigma Servo Drive,industrial-automation,JP/CN,1,9,580,480,780,8504.40,10,15,8,14,30,50,medium,CN distributor stock
+DJI Agras T40 Drone,agricultural-tech,CN,1,10,12000,10500,14000,8806.21,25,15,8,15,35,55,high,Agricultural spray drone
+DJI Agras T20P Drone,agricultural-tech,CN,1,10,7500,6500,9000,8806.21,25,15,8,15,35,55,high,Spray drone smaller
+Davis Vantage Weather Station,agricultural-tech,US/CN,1,8,620,520,820,9015.80,5,15,6,11,22,38,low,IoT weather station
+LED Grow Light 600W,agricultural-tech,CN,2,9,85,65,130,9405.40,5,15,4,8,18,32,low,Vertical farming lights
+Hydroponic NFT System,agricultural-tech,CN/TH,2,9,180,140,260,3917.29,5,15,5,9,20,35,low,Hydroponics 72-site
+Rigol Oscilloscope 100MHz,scientific-instruments,CN,1,9,380,320,480,9030.20,5,15,5,9,18,32,low,100MHz DSO 4ch
+Siglent Function Generator,scientific-instruments,CN,1,9,420,350,540,9030.20,5,15,5,9,18,32,low,AWG 40MHz
+Fluke Digital Multimeter,scientific-instruments,US/CN,2,9,280,230,380,9030.33,5,15,5,9,18,32,low,True-RMS
+Hakko FX Soldering Station,scientific-instruments,JP/CN,2,9,120,95,165,8515.19,5,15,5,9,18,32,low,70W T12 tips
+Bambu Lab 3D Printer,3d-printing-maker,CN,1,10,1199,1050,1350,8477.59,5,15,5,9,20,35,low,FDM printer
+Creality K1 3D Printer,3d-printing-maker,CN,1,9,650,550,780,8477.59,5,15,5,9,20,35,low,Fast FDM 600mm/s
+Elegoo Saturn Resin Printer,3d-printing-maker,CN,1,9,380,300,520,8477.59,5,15,5,9,20,35,low,MSLA resin printer
+Raspberry Pi 5,3d-printing-maker,UK/CN,1,10,80,70,95,8471.50,5,15,5,9,18,32,low,RPi 5 8GB
+NVIDIA Jetson Nano,3d-printing-maker,US/CN,1,9,99,85,130,8471.50,10,15,6,10,22,38,medium,Edge AI module
+xTool Laser Engraver,3d-printing-maker,CN,1,9,480,400,620,8456.10,5,15,5,9,18,32,low,20W desktop laser
+CNC Router 3018,3d-printing-maker,CN,1,8,180,140,260,8457.10,5,15,5,9,18,32,low,Small CNC mill
+PLA Filament 1kg,3d-printing-maker,CN,2,9,15,10,25,3916.90,5,15,4,7,15,28,low,3D printing filament
+Philips Patient Monitor,medical-equipment,NL/CN,1,9,3800,3200,5200,9018.19,0,15,8,15,35,55,high,NBRC cert needed
+GE ECG Machine,medical-equipment,US/CN,1,9,1800,1500,2500,9018.11,0,15,8,15,35,55,high,12-lead ECG
+Mindray Ultrasound Scanner,medical-equipment,CN,2,9,4200,3600,5800,9018.12,0,15,8,15,35,55,high,Portable ultrasound
+Omron Blood Pressure Monitor,medical-equipment,JP/CN,3,9,85,65,120,9018.19,0,15,5,9,20,35,low,Upper arm automatic
+Draeger Ventilator ICU,medical-equipment,DE/CN,1,9,18000,15000,24000,9019.20,0,15,10,18,40,65,high,ICU critical care
+Philips AED Defibrillator,medical-equipment,NL/CN,2,9,1400,1200,1800,9018.90,0,15,7,12,28,45,medium,Automated external
+Contec Patient Monitor,medical-equipment,CN,3,8,850,700,1200,9018.19,0,15,5,9,20,35,low,Affordable 7-para
+Edan Portable Monitor,medical-equipment,CN,3,8,1800,1500,2400,9018.19,0,15,6,11,22,38,medium,5-para color screen
+Samsung Galaxy S24 Ultra,phones,CN/SG,2,9,1100,950,1300,8517.12,10,15,4,8,18,32,low,Flagship Android
+Samsung Galaxy A55,phones,CN,3,9,350,300,420,8517.12,10,15,4,8,18,32,low,Mid-range Samsung
+Xiaomi Redmi Note,phones,CN,3,9,180,140,240,8517.12,10,15,4,7,16,28,low,Budget Xiaomi
+OPPO Reno Phone,phones,CN,2,8,280,220,380,8517.12,10,15,4,8,16,28,low,OPPO mid-range
+Realme Phone,phones,CN,3,8,150,120,220,8517.12,10,15,4,7,16,28,low,Budget Realme
+Motorola Edge Phone,phones,CN,2,8,450,380,580,8517.12,10,15,4,8,16,28,low,Motorola flagship
+NVIDIA RTX 4080 GPU,pc-components,CN/SG,1,9,1100,950,1350,8473.30,10,15,5,9,20,35,low,High-end GPU
+Intel Core i9 CPU,pc-components,US/CN,2,8,480,400,620,8473.30,10,15,4,8,18,32,low,Desktop processor
+Kingston DDR5 RAM,pc-components,TW/CN,2,8,65,50,95,8473.30,5,15,4,7,15,28,low,DDR5 memory module
+Samsung NVMe SSD,pc-components,KR/CN,2,9,85,70,120,8473.30,5,15,4,7,15,28,low,PCIe 4.0 NVMe
+ASUS ROG Motherboard,pc-components,TW/CN,1,8,280,220,380,8473.30,10,15,4,8,16,28,low,Gaming ATX board
+Corsair PSU 850W,pc-components,TW/CN,1,8,120,95,165,8504.40,10,15,4,8,16,28,low,80+ Gold modular
+Desk Fan Electric,electronic,CN,3,9,25,18,45,8414.51,5,15,3,6,12,22,low,Desk cooling fan
+Ceiling Fan 1200mm,electronic,CN/BD,3,9,45,35,70,8414.51,5,15,4,8,16,28,low,Ceiling fan BLDC
+Tower Fan Slim,electronic,CN,2,9,65,50,95,8414.51,5,15,4,7,14,25,low,Tower fan with remote
+Air Conditioner Split 1.5 Ton,electronic,CN/IN,2,9,420,350,550,8415.10,15,15,6,10,22,38,low,Inverter split AC
