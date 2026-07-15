@@ -1,21 +1,55 @@
-# Logs
+# Logs and debug output
 logs
 *.log
 npm-debug.log*
+pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 lerna-debug.log*
+.eslintcache
 
-node_modules
-dist
-dist-ssr
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Frontend / Node
+node_modules/
+dist/
+dist-ssr/
+build/
+.vite/
+.next/
+.turbo/
+.cache/
+coverage/
+*.tsbuildinfo
 *.local
 
-# Editor directories and files
+# Backend / Python
+__pycache__/
+*.py[cod]
+*.pyd
+.python-version
+.venv/
+venv/
+backend/.venv/
+backend/venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+*.sqlite3
+*.db
+backend/db.sqlite3
+backend/media/
+backend/static/
+backend/staticfiles/
+
+# Editors and OS metadata
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
