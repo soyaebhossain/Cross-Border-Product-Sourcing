@@ -46,7 +46,7 @@ export default function QuotePage() {
       });
       setResponse(result);
       setSaved(false);
-    } catch (err) {
+    } catch {
       setResponse(null);
       setError("Quote request failed. Please try a different product, country, or quantity.");
     } finally {
