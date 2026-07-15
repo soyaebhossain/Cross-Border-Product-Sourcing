@@ -9,6 +9,13 @@ Set the Vercel project's **Root Directory** to `apps/web-next`. The repository's
 Next.js `.next` output. Clear any dashboard-level build or output overrides so
 Vercel uses these settings instead of deploying the legacy root Vite app.
 
+## Backend deployment
+
+The root `render.yaml` is a Render Blueprint for the FastAPI catalog service
+and PostgreSQL database. Create a new Render Blueprint from this repository,
+then set Vercel's `NEXT_PUBLIC_API_BASE_URL` and `API_BASE_URL` to the generated
+Render service URL and redeploy the frontend.
+
 **Welcome**: A short project introduction and quick-start checklist are in [WELCOME.md](WELCOME.md). You can also open the simple local welcome page at [public/welcome.html](public/welcome.html).
 
 The rebuild now starts from the stack you asked for:

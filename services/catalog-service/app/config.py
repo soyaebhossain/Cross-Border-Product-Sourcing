@@ -1,6 +1,7 @@
 from pathlib import Path
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,6 +22,15 @@ class Settings(BaseSettings):
         env_prefix="CATALOG_",
         case_sensitive=False,
     )
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def use_psycopg_v3(cls, value: str) -> str:
+        if value.startswith("postgres://"):
+            return value.replace("postgres://", "postgresql+psycopg://", 1)
+        if value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+psycopg://", 1)
+        return value
 
     def resolved_legacy_sqlite_path(self) -> Path:
         if self.legacy_sqlite_path:
