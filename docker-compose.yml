@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:-cross_border}"
+      POSTGRES_USER: "${POSTGRES_USER:-postgres}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-postgres}"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-cross_border}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ./services/catalog-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      CATALOG_DATABASE_URL: "postgresql+psycopg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-cross_border}"
+      CATALOG_JWT_SECRET: "${CATALOG_JWT_SECRET:-cross-border-api-secret}"
+      CATALOG_CORS_ORIGINS: "${CATALOG_CORS_ORIGINS:-http://localhost:3000}"
+      CATALOG_LEGACY_SQLITE_PATH: "${CATALOG_LEGACY_SQLITE_PATH:-/legacy/backend/db.sqlite3}"
+      CATALOG_LEGACY_MEDIA_PATH: "${CATALOG_LEGACY_MEDIA_PATH:-/legacy/backend/media}"
+      CATALOG_SUPPLY_CHAIN_CSV_PATH: "${CATALOG_SUPPLY_CHAIN_CSV_PATH:-/data/supply_chain_data.csv}"
+    volumes:
+      - ./backend:/legacy/backend:ro
+      - ./Data:/data:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "8000:8000"
+
+  web:
+    build:
+      context: ./apps/web-next
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      API_BASE_URL: "http://api:8000"
+      NEXT_PUBLIC_API_BASE_URL: "${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then((res) => { if (!res.ok) process.exit(1); }).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
