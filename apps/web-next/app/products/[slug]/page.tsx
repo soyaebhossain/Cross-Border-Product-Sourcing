@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCheapestCountryRecommendation, getProductBySlug, resolveImageUrl } from "../../../lib/api";
 import { SourcingWorkspace } from "../../../components/sourcing-workspace";
 import { ProductImage } from "../../../components/product-image";
+import { formatBdt } from "../../../lib/format";
 
 type ProductDetailPageProps = {
   params: Promise<{ slug: string }>;
@@ -93,7 +94,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                         </div>
                         <div className="recommendation-card__price">
                           <small>Estimated total</small>
-                          <strong>BDT {item.estimated_total_bdt}</strong>
+                          <strong>{formatBdt(item.estimated_total_bdt)}</strong>
                         </div>
                       </div>
 

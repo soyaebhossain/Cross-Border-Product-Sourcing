@@ -23,6 +23,8 @@ build/
 .turbo/
 .cache/
 coverage/
+playwright-report/
+test-results/
 *.tsbuildinfo
 *.local
 
@@ -41,10 +43,21 @@ backend/venv/
 .pytype/
 *.sqlite3
 *.db
+*.sqlite3-wal
+*.sqlite3-shm
+*.db-wal
+*.db-shm
+*.pgdump
+*.dump
+*.sql
+*.manifest.json
+*.key
+*.pem
 backend/db.sqlite3
 backend/media/
 backend/static/
 backend/staticfiles/
+services/catalog-service/media/payment-proofs/
 
 # Editors and OS metadata
 .vscode/*

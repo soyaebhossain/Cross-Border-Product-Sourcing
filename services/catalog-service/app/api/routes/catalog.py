@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, status
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from starlette.responses import JSONResponse
 
 from ...db import get_session
 from ...serializers import serialize_category, serialize_country, serialize_product
@@ -12,11 +15,39 @@ from ...services.catalog import browse_products, get_product_by_slug_or_404, lis
 
 
 router = APIRouter()
+READINESS_QUERIES = (
+    "SELECT id, role, is_active FROM accounts_users LIMIT 1",
+    "SELECT id, status, expires_at FROM orders_saved_quotes LIMIT 1",
+    "SELECT id, saved_quote_id, idempotency_key FROM orders_orders LIMIT 1",
+    "SELECT id, trx_normalized, decision FROM orders_manual_payments LIMIT 1",
+    "SELECT id, request_id FROM admin_audit_events LIMIT 1",
+)
 
 
 @router.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "catalog-service"}
+
+
+@router.get("/api/ready", response_model=None)
+def readiness(session: Session = Depends(get_session)) -> dict[str, str] | JSONResponse:
+    try:
+        for statement in READINESS_QUERIES:
+            session.execute(text(statement))
+    except SQLAlchemyError:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "status": "unavailable",
+                "service": "catalog-service",
+                "database": "unavailable",
+            },
+        )
+    return {
+        "status": "ready",
+        "service": "catalog-service",
+        "database": "ready",
+    }
 
 
 @router.get("/api/categories/")

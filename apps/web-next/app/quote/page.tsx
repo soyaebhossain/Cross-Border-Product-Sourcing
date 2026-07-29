@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import type { Route } from "next";
 import { getProducts, getCountries, quoteProduct, saveQuote, type Country, type Product, type QuoteResponse } from "../../lib/api";
+import { formatBdt } from "../../lib/format";
 
 export default function QuotePage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -10,12 +13,27 @@ export default function QuotePage() {
   const [selectedVariantId, setSelectedVariantId] = useState<number | null>(null);
   const [form, setForm] = useState({ qty: 1, country: "CN", mode: "LOCAL", delivery_type: "DOOR" });
   const [response, setResponse] = useState<QuoteResponse | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [savedQuoteId, setSavedQuoteId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    getProducts().then(setProducts).catch(() => {});
+    const params = new URLSearchParams(window.location.search);
+    const requestedVariant = Number(params.get("variant")) || null;
+    const requestedQty = Number(params.get("qty")) || 1;
+    const requestedCountry = params.get("country");
+    const requestedMode = params.get("mode");
+    setForm((prev) => ({ ...prev, qty: requestedQty, country: requestedCountry || prev.country, mode: requestedMode || prev.mode }));
+    getProducts().then((items) => {
+      setProducts(items);
+      if (requestedVariant) {
+        const product = items.find((item) => item.variants.some((variant) => variant.id === requestedVariant));
+        if (product) {
+          setSelectedProductId(product.id);
+          setSelectedVariantId(requestedVariant);
+        }
+      }
+    }).catch(() => {});
     getCountries().then(setCountries).catch(() => {});
   }, []);
 
@@ -45,8 +63,8 @@ export default function QuotePage() {
         delivery_type: form.delivery_type,
       });
       setResponse(result);
-      setSaved(false);
-    } catch (err) {
+      setSavedQuoteId(null);
+    } catch {
       setResponse(null);
       setError("Quote request failed. Please try a different product, country, or quantity.");
     } finally {
@@ -57,8 +75,8 @@ export default function QuotePage() {
   const handleSave = async () => {
     if (!response || !selectedVariantId) return;
     try {
-      await saveQuote({ variant_id: selectedVariantId, country: form.country, mode: form.mode, qty: form.qty, delivery_type: form.delivery_type, response });
-      setSaved(true);
+      const savedQuote = await saveQuote({ variant_id: selectedVariantId, country: form.country, mode: form.mode, qty: form.qty, delivery_type: form.delivery_type, response });
+      setSavedQuoteId(savedQuote.id);
     } catch { setError("Login is required to save this quote."); }
   };
 
@@ -181,38 +199,49 @@ export default function QuotePage() {
             <div className="quote-summary">
               <div>
                 <strong>Total</strong>
-                <span>BDT {summary.total_bdt}</span>
+                <span>{formatBdt(summary.total_bdt)}</span>
               </div>
               <div>
                 <strong>Product cost</strong>
-                <span>BDT {summary.product_cost_bdt || summary.origin_price_bdt}</span>
+                <span>{formatBdt(summary.product_cost_bdt || summary.origin_price_bdt)}</span>
               </div>
               <div>
                 <strong>Shipping</strong>
-                <span>BDT {summary.shipping_bdt}</span>
+                <span>{formatBdt(summary.shipping_bdt)}</span>
               </div>
               <div>
                 <strong>Customs duty</strong>
-                <span>BDT {summary.customs_duty_bdt || summary.duty_vat_bdt}</span>
+                <span>{formatBdt(summary.customs_duty_bdt || summary.duty_vat_bdt)}</span>
               </div>
               <div>
                 <strong>VAT / tax</strong>
-                <span>BDT {summary.vat_tax_bdt || "0.00"}</span>
+                <span>{formatBdt(summary.vat_tax_bdt || 0)}</span>
               </div>
               <div>
                 <strong>Handling</strong>
-                <span>BDT {summary.handling_charge_bdt || summary.service_fee_bdt}</span>
+                <span>{formatBdt(summary.handling_charge_bdt || summary.service_fee_bdt)}</span>
               </div>
               <div>
                 <strong>Advance</strong>
-                <span>BDT {summary.advance_bdt}</span>
+                <span>{formatBdt(summary.advance_bdt)}</span>
               </div>
               <div>
                 <strong>Remaining</strong>
-                <span>BDT {summary.remaining_bdt}</span>
+                <span>{formatBdt(summary.remaining_bdt)}</span>
               </div>
             </div>
-            <div className="form-actions"><button type="button" className="button button--primary" onClick={handleSave} disabled={saved}>{saved ? "Quote saved" : "Save for comparison"}</button></div>
+            <div className="form-actions">
+              <button type="button" className="button button--primary" onClick={handleSave} disabled={savedQuoteId !== null}>{savedQuoteId ? "Saved to comparisons" : "Save for comparison"}</button>
+            </div>
+            {savedQuoteId ? (
+              <div className="save-success" role="status">
+                <div><strong>Quote saved successfully</strong><span>You can compare it later or continue directly to checkout.</span></div>
+                <div className="save-success__actions">
+                  <Link className="button button--ghost" href="/account/saved-quotes">View saved comparisons</Link>
+                  <Link className="button button--primary" href={`/account/saved-quotes/${savedQuoteId}/order` as Route}>Proceed to order</Link>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

@@ -3,6 +3,7 @@ import "./globals.css";
 import "./professional.css";
 import { Header } from "./Header";
 import { Footer } from "./Footer";
+import { LocaleProvider } from "../lib/locale-context";
 
 export const metadata: Metadata = {
   title: "SourceAI | AI Decision-Support Marketplace",
@@ -13,9 +14,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body>
-        <Header />
-        {children}
-        <Footer />
+        <LocaleProvider>
+          <Header />
+          {children}
+          <Footer />
+        </LocaleProvider>
       </body>
     </html>
   );

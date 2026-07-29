@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from ..models import (
     Country,
     CurrencyRate,
+    DutyRule,
     ETARule,
     Product,
     ProductVariant,
@@ -24,8 +26,13 @@ from ..serializers import decimal_str
 def get_variant_or_404(session: Session, variant_id: int) -> ProductVariant:
     variant = session.scalar(
         select(ProductVariant)
-        .options(joinedload(ProductVariant.product))
-        .where(ProductVariant.id == variant_id)
+        .options(joinedload(ProductVariant.product).joinedload(Product.category))
+        .where(
+            ProductVariant.id == variant_id,
+            ProductVariant.is_active.is_(True),
+            ProductVariant.product.has(Product.is_active.is_(True)),
+            ProductVariant.product.has(Product.category.has(is_active=True)),
+        )
     )
     if not variant:
         raise HTTPException(status_code=404, detail="Variant not found")
@@ -52,8 +59,17 @@ def get_variant_for_recommendation(
 
     product = session.scalar(
         select(Product)
-        .options(selectinload(Product.variants), joinedload(Product.category))
-        .where(Product.slug == product_slug)
+        .options(
+            selectinload(
+                Product.variants.and_(ProductVariant.is_active.is_(True))
+            ),
+            joinedload(Product.category),
+        )
+        .where(
+            Product.slug == product_slug,
+            Product.is_active.is_(True),
+            Product.category.has(is_active=True),
+        )
     )
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
@@ -66,7 +82,12 @@ def get_variant_for_recommendation(
 def to_bdt(session: Session, amount: Decimal, currency: str) -> Decimal:
     if currency.upper() == "BDT":
         return amount
-    rate = session.scalar(select(CurrencyRate).where(CurrencyRate.currency == currency.upper()))
+    rate = session.scalar(
+        select(CurrencyRate).where(
+            CurrencyRate.currency == currency.upper(),
+            CurrencyRate.is_active.is_(True),
+        )
+    )
     if not rate:
         return amount
     return amount * rate.rate_to_bdt
@@ -81,6 +102,7 @@ def shipping_cost_bdt(session: Session, country: Country, mode: str, total_weigh
             ShippingRateCard.method == method,
             ShippingRateCard.min_kg <= total_weight,
             ShippingRateCard.max_kg >= total_weight,
+            ShippingRateCard.is_active.is_(True),
         )
         .order_by(ShippingRateCard.cost_bdt.asc())
         .limit(1)
@@ -94,6 +116,7 @@ def eta_range(session: Session, country: Country, mode: str, delivery_type: str)
             ETARule.country_id == country.id,
             ETARule.mode == mode,
             ETARule.delivery_type == delivery_type,
+            ETARule.is_active.is_(True),
         )
     )
     if not rule:
@@ -102,7 +125,12 @@ def eta_range(session: Session, country: Country, mode: str, delivery_type: str)
 
 
 def service_fee_bdt(session: Session, mode: str, subtotal: Decimal) -> Decimal:
-    rule = session.scalar(select(ServiceFeeRule).where(ServiceFeeRule.mode == mode))
+    rule = session.scalar(
+        select(ServiceFeeRule).where(
+            ServiceFeeRule.mode == mode,
+            ServiceFeeRule.is_active.is_(True),
+        )
+    )
     if not rule:
         return Decimal("0.00")
     percent_fee = subtotal * (rule.percent / Decimal("100.00"))
@@ -122,6 +150,8 @@ def build_quote(session: Session, payload: QuoteRequestIn) -> dict[str, Any]:
             SellerOffer.mode == payload.mode,
             SellerOffer.stock >= payload.qty,
             SellerOffer.moq <= payload.qty,
+            SellerOffer.is_active.is_(True),
+            SellerOffer.seller.has(is_active=True),
         )
     ).all()
 
@@ -139,7 +169,28 @@ def build_quote(session: Session, payload: QuoteRequestIn) -> dict[str, Any]:
     total_weight = Decimal(variant.weight_kg) * Decimal(payload.qty)
     shipping_bdt = shipping_cost_bdt(session, country, payload.mode, total_weight)
     subtotal = origin_bdt + shipping_bdt
-    customs_duty = subtotal * Decimal("0.05")
+    now = datetime.now(timezone.utc)
+    duty_rule = session.scalar(
+        select(DutyRule)
+        .where(
+            DutyRule.country_id == country.id,
+            DutyRule.is_active.is_(True),
+            DutyRule.effective_from.is_(None) | (DutyRule.effective_from <= now),
+            DutyRule.effective_to.is_(None) | (DutyRule.effective_to > now),
+            (
+                (DutyRule.category_id == variant.product.category_id)
+                | DutyRule.category_id.is_(None)
+            ),
+        )
+        .order_by(DutyRule.category_id.desc().nullslast(), DutyRule.effective_from.desc())
+        .limit(1)
+    )
+    customs_duty = (
+        subtotal * (Decimal(duty_rule.percent) / Decimal("100"))
+        + Decimal(duty_rule.fixed_bdt)
+        if duty_rule
+        else subtotal * Decimal("0.05")
+    )
     vat_tax = subtotal * Decimal("0.05")
     handling_charge = service_fee_bdt(session, payload.mode, subtotal)
     other_import_cost = Decimal("0.00")
@@ -292,7 +343,11 @@ def build_country_recommendations(
             selected_offer = session.scalar(
                 select(SellerOffer)
                 .options(joinedload(SellerOffer.seller), joinedload(SellerOffer.country))
-                .where(SellerOffer.id == selected_offer_id)
+                .where(
+                    SellerOffer.id == selected_offer_id,
+                    SellerOffer.is_active.is_(True),
+                    SellerOffer.seller.has(is_active=True),
+                )
             )
             if not selected_offer:
                 continue

@@ -4,54 +4,59 @@ import base64
 import hashlib
 import hmac
 import secrets
-import sqlite3
+import struct
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from urllib.parse import quote
 
 import jwt
+from cryptography.fernet import Fernet, InvalidToken
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .db import get_session
-from .models import AccountUser
+from .models import AccountUser, AuthChallenge, RefreshSession, SocialIdentity
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login/", auto_error=False)
-ACCESS_TOKEN_MINUTES = 60
-REFRESH_TOKEN_DAYS = 14
-ALLOWED_ROLES = {"customer", "seller", "operator", "admin"}
+ALLOWED_ROLES = {"customer", "operator", "admin"}
+PRIVILEGED_ROLES = {"operator", "admin"}
+RECOVERY_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+
+
+class AccountLockedError(Exception):
+    def __init__(self, retry_after: int) -> None:
+        self.retry_after = max(1, retry_after)
+        super().__init__("Account is temporarily locked")
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _encode_token(user: dict[str, Any], token_type: str, expires_delta: timedelta) -> str:
-    settings = get_settings()
-    payload = {
-        "sub": str(user["id"]),
-        "role": user.get("role") or "customer",
-        "type": token_type,
-        "exp": _now() + expires_delta,
-        "iat": _now(),
-    }
-    return jwt.encode(payload, settings.jwt_secret, algorithm="HS256")
+def _as_utc(value: datetime) -> datetime:
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
 
 
-def build_token_response(user: dict[str, Any]) -> dict[str, Any]:
-    access = _encode_token(user, "access", timedelta(minutes=ACCESS_TOKEN_MINUTES))
-    refresh = _encode_token(user, "refresh", timedelta(days=REFRESH_TOKEN_DAYS))
+def _token_hash(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()
+
+
+def _user_to_dict(user: AccountUser) -> dict[str, Any]:
     return {
-        "access": access,
-        "refresh": refresh,
-        "access_token": access,
-        "refresh_token": refresh,
-        "token_type": "bearer",
-        "user": serialize_user(user),
-        "roles": [user.get("role") or "customer"],
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "phone": user.phone,
+        "password_hash": user.password_hash,
+        "role": user.role,
+        "is_active": user.is_active,
+        "auth_version": user.auth_version,
+        "mfa_enabled": user.mfa_enabled,
     }
 
 
@@ -62,13 +67,14 @@ def serialize_user(user: dict[str, Any]) -> dict[str, Any]:
         "email": user.get("email"),
         "phone": user.get("phone"),
         "role": user.get("role") or "customer",
+        "mfa_enabled": bool(user.get("mfa_enabled")),
     }
 
 
 def make_password(password: str, iterations: int = 1_200_000) -> str:
     salt = secrets.token_urlsafe(12)
-    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), iterations)
-    return f"pbkdf2_sha256${iterations}${salt}${base64.b64encode(dk).decode()}"
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), iterations)
+    return f"pbkdf2_sha256${iterations}${salt}${base64.b64encode(digest).decode()}"
 
 
 def check_password(password: str, encoded: str | None) -> bool:
@@ -76,198 +82,623 @@ def check_password(password: str, encoded: str | None) -> bool:
         return False
     try:
         algorithm, iterations_raw, salt, digest = encoded.split("$", 3)
-    except ValueError:
+        iterations = int(iterations_raw)
+    except (TypeError, ValueError):
         return False
-    if algorithm != "pbkdf2_sha256":
+    if algorithm != "pbkdf2_sha256" or iterations < 100_000 or iterations > 2_000_000:
         return False
-    iterations = int(iterations_raw)
-    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), iterations)
-    calculated = base64.b64encode(dk).decode()
+    calculated = base64.b64encode(
+        hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), iterations)
+    ).decode()
     return hmac.compare_digest(calculated, digest)
 
 
-def _role_from_legacy(row: sqlite3.Row) -> str:
-    role = row["role"] if "role" in row.keys() else None
-    if role:
-        return role
-    if row["is_superuser"] or row["is_staff"]:
-        return "admin"
-    return "customer"
+def validate_password_strength(password: str, identifiers: tuple[str | None, ...] = ()) -> None:
+    settings = get_settings()
+    errors: list[str] = []
+    if len(password) < settings.password_min_characters:
+        errors.append(f"at least {settings.password_min_characters} characters")
+    if len(password) > settings.password_max_characters:
+        errors.append(f"at most {settings.password_max_characters} characters")
+    if not any(character.islower() for character in password):
+        errors.append("a lowercase letter")
+    if not any(character.isupper() for character in password):
+        errors.append("an uppercase letter")
+    if not any(character.isdigit() for character in password):
+        errors.append("a number")
+    if not any(not character.isalnum() for character in password):
+        errors.append("a symbol")
+    normalized_password = password.casefold()
+    for identifier in identifiers:
+        candidate = (identifier or "").strip().casefold()
+        local_part = candidate.split("@", 1)[0]
+        if len(local_part) >= 4 and local_part in normalized_password:
+            errors.append("no username/email fragments")
+            break
+    if normalized_password in {
+        "password123!",
+        "admin123456!",
+        "qwerty123456!",
+        "changeme123!",
+    }:
+        errors.append("a non-common password")
+    if errors:
+        raise ValueError("Password must contain " + ", ".join(dict.fromkeys(errors)))
 
 
-def _legacy_user_by_identifier(identifier: str) -> dict[str, Any] | None:
-    legacy_path = get_settings().resolved_legacy_sqlite_path()
-    if not legacy_path.exists():
-        return None
-    query = """
-        SELECT id, username, email, phone, password, role, is_superuser, is_staff, is_active
-        FROM accounts_user
-        WHERE username = ? OR email = ? OR phone = ?
-        LIMIT 1
-    """
-    with sqlite3.connect(legacy_path) as conn:
-        conn.row_factory = sqlite3.Row
-        row = conn.execute(query, (identifier, identifier, identifier)).fetchone()
-    if row is None or not row["is_active"]:
-        return None
-    return {
-        "id": row["id"],
-        "username": row["username"],
-        "email": row["email"],
-        "phone": row["phone"],
-        "password_hash": row["password"],
-        "role": _role_from_legacy(row),
-    }
-
-
-def _legacy_max_user_id() -> int:
-    legacy_path = get_settings().resolved_legacy_sqlite_path()
-    if not legacy_path.exists():
-        return 0
-    with sqlite3.connect(legacy_path) as conn:
-        row = conn.execute("SELECT MAX(id) FROM accounts_user").fetchone()
-    return int(row[0] or 0)
-
-
-def _local_user_to_dict(user: AccountUser) -> dict[str, Any]:
-    return {
-        "id": user.id,
-        "username": user.username,
-        "email": user.email,
-        "phone": user.phone,
-        "password_hash": user.password_hash,
-        "role": user.role,
-    }
+def _find_user_by_identifier(session: Session, identifier: str, *, for_update: bool = False) -> AccountUser | None:
+    normalized = identifier.strip()
+    statement = select(AccountUser).where(
+        or_(
+            func.lower(AccountUser.username) == normalized.casefold(),
+            func.lower(AccountUser.email) == normalized.casefold(),
+            AccountUser.phone == normalized,
+        )
+    )
+    if for_update:
+        statement = statement.with_for_update()
+    return session.scalar(statement)
 
 
 def authenticate_user(session: Session, identifier: str, password: str) -> dict[str, Any] | None:
-    legacy_user = _legacy_user_by_identifier(identifier)
-    if legacy_user and check_password(password, legacy_user["password_hash"]):
-        return legacy_user
+    settings = get_settings()
+    user = _find_user_by_identifier(session, identifier, for_update=True)
+    if user is None or not user.is_active:
+        # Bound work for nonexistent/disabled accounts without revealing which
+        # identifier exists. The per-IP and per-account request limits still
+        # provide the primary CPU-exhaustion protection.
+        hashlib.pbkdf2_hmac("sha256", password.encode(), b"sourceai-dummy", 100_000)
+        return None
 
-    user = session.scalar(
-        select(AccountUser).where(
-            or_(
-                AccountUser.username == identifier,
-                AccountUser.email == identifier,
-                AccountUser.phone == identifier,
-            )
-        )
-    )
-    if user and user.is_active and check_password(password, user.password_hash):
-        return _local_user_to_dict(user)
-    return None
+    now = _now()
+    if user.locked_until and _as_utc(user.locked_until) > now:
+        check_password(password, user.password_hash)
+        retry_after = int((_as_utc(user.locked_until) - now).total_seconds())
+        raise AccountLockedError(retry_after)
+    if user.locked_until:
+        user.locked_until = None
+        user.failed_login_attempts = 0
+
+    if not check_password(password, user.password_hash):
+        user.failed_login_attempts += 1
+        user.last_failed_login_at = now
+        if user.failed_login_attempts >= settings.login_failure_limit:
+            user.locked_until = now + timedelta(seconds=settings.login_lockout_seconds)
+        session.commit()
+        if user.locked_until:
+            raise AccountLockedError(settings.login_lockout_seconds)
+        return None
+
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    user.last_login_at = now
+    session.commit()
+    session.refresh(user)
+    return _user_to_dict(user)
 
 
-def create_user(session: Session, *, username: str | None, email: str | None, phone: str | None, password: str, role: str) -> dict[str, Any]:
+def create_user(
+    session: Session,
+    *,
+    username: str | None,
+    email: str | None,
+    phone: str | None,
+    password: str,
+    role: str,
+) -> dict[str, Any]:
+    try:
+        validate_password_strength(password, (username, email, phone))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     normalized_role = role if role in ALLOWED_ROLES else "customer"
-    identifier = username or email or phone
+    identifier = (username or email or phone or "").strip()
     if not identifier:
         raise HTTPException(status_code=400, detail="username, email, or phone required")
-    if email and _legacy_user_by_identifier(email):
-        raise HTTPException(status_code=400, detail="Account already exists")
-    if phone and _legacy_user_by_identifier(phone):
-        raise HTTPException(status_code=400, detail="Account already exists")
-    if username and _legacy_user_by_identifier(username):
-        raise HTTPException(status_code=400, detail="Account already exists")
 
-    checks = [AccountUser.username == identifier]
+    checks = [func.lower(AccountUser.username) == identifier.casefold()]
     if email:
-        checks.append(AccountUser.email == email)
+        checks.append(func.lower(AccountUser.email) == email.strip().casefold())
     if phone:
-        checks.append(AccountUser.phone == phone)
-    existing = session.scalar(select(AccountUser).where(or_(*checks)))
-    if existing:
+        checks.append(AccountUser.phone == phone.strip())
+    if session.scalar(select(AccountUser).where(or_(*checks))):
         raise HTTPException(status_code=400, detail="Account already exists")
 
-    next_id = max(session.scalar(select(func.max(AccountUser.id))) or 0, _legacy_max_user_id() + 100_000) + 1
     user = AccountUser(
-        id=next_id,
         username=identifier,
-        email=email,
-        phone=phone,
+        email=email.strip().casefold() if email else None,
+        phone=phone.strip() if phone else None,
         password_hash=make_password(password),
         role=normalized_role,
-        is_staff=normalized_role in {"admin", "operator"},
+        is_staff=normalized_role in PRIVILEGED_ROLES,
         is_superuser=normalized_role == "admin",
     )
     session.add(user)
     session.commit()
     session.refresh(user)
-    return _local_user_to_dict(user)
+    return _user_to_dict(user)
 
 
-def refresh_access_token(refresh_token: str) -> dict[str, Any]:
-    settings = get_settings()
-    try:
-        payload = jwt.decode(refresh_token, settings.jwt_secret, algorithms=["HS256"])
-    except jwt.PyJWTError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token") from exc
-    if payload.get("type") != "refresh":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-    user = {
-        "id": int(payload["sub"]),
-        "username": None,
-        "email": None,
-        "phone": None,
-        "role": payload.get("role") or "customer",
+def get_or_create_social_user(
+    session: Session,
+    *,
+    provider: str,
+    provider_id: str,
+    email: str,
+    name: str | None = None,
+    avatar_url: str | None = None,
+) -> dict[str, Any]:
+    identity = session.scalar(
+        select(SocialIdentity).where(
+            SocialIdentity.provider == provider,
+            SocialIdentity.provider_subject == provider_id,
+        )
+    )
+    if identity:
+        user = session.get(AccountUser, identity.user_id)
+        if not user or not user.is_active:
+            raise HTTPException(status_code=403, detail="Linked account is unavailable")
+        if user.role in PRIVILEGED_ROLES:
+            raise HTTPException(status_code=403, detail="Privileged accounts must use password sign-in")
+        return _user_to_dict(user)
+
+    normalized_email = email.strip().casefold()
+    if session.scalar(select(AccountUser).where(func.lower(AccountUser.email) == normalized_email)):
+        raise HTTPException(
+            status_code=409,
+            detail="An existing account uses this email. Sign in first before linking Google.",
+        )
+    created = create_user(
+        session,
+        username=normalized_email,
+        email=normalized_email,
+        phone=None,
+        password=f"{secrets.token_urlsafe(32)}aA1!",
+        role="customer",
+    )
+    user = session.get(AccountUser, created["id"])
+    if not user:
+        raise HTTPException(status_code=500, detail="Social account could not be created")
+    session.add(
+        SocialIdentity(
+            user_id=user.id,
+            provider=provider,
+            provider_subject=provider_id,
+            email=normalized_email,
+            display_name=name,
+            avatar_url=avatar_url,
+        )
+    )
+    session.commit()
+    return _user_to_dict(user)
+
+
+def _encode_token(
+    user: dict[str, Any],
+    token_type: str,
+    expires_delta: timedelta,
+    *,
+    persistent: bool,
+    extra: dict[str, Any] | None = None,
+) -> str:
+    now = _now()
+    payload: dict[str, Any] = {
+        "sub": str(user["id"]),
+        "role": user.get("role") or "customer",
+        "type": token_type,
+        "remember": persistent,
+        "ver": int(user.get("auth_version") or 1),
+        "exp": now + expires_delta,
+        "iat": now,
     }
-    return build_token_response(user)
+    if extra:
+        payload.update(extra)
+    return jwt.encode(payload, get_settings().jwt_secret, algorithm="HS256")
 
 
-def get_current_user(request: Request, token: str | None = Depends(oauth2_scheme)) -> dict[str, Any]:
+def build_token_response(
+    user: dict[str, Any],
+    *,
+    session: Session | None = None,
+    persistent: bool = True,
+    family_id: str | None = None,
+) -> dict[str, Any]:
+    settings = get_settings()
+    refresh_id = secrets.token_urlsafe(32)
+    refresh_family = family_id or secrets.token_urlsafe(32)
+    access = _encode_token(
+        user,
+        "access",
+        timedelta(minutes=settings.access_token_minutes),
+        persistent=persistent,
+        extra={"jti": secrets.token_urlsafe(24)},
+    )
+    refresh = _encode_token(
+        user,
+        "refresh",
+        timedelta(days=settings.refresh_token_days),
+        persistent=persistent,
+        extra={"jti": refresh_id, "family": refresh_family},
+    )
+    if session is not None:
+        session.add(
+            RefreshSession(
+                id=refresh_id,
+                user_id=int(user["id"]),
+                family_id=refresh_family,
+                token_hash=_token_hash(refresh),
+                remember=persistent,
+                expires_at=_now() + timedelta(days=settings.refresh_token_days),
+            )
+        )
+        session.commit()
+    return {
+        "access": access,
+        "refresh": refresh,
+        "access_token": access,
+        "refresh_token": refresh,
+        "token_type": "bearer",
+        "user": serialize_user(user),
+        "roles": [user.get("role") or "customer"],
+        "persistent": persistent,
+    }
+
+
+def _decode_token(token: str, expected_type: str) -> dict[str, Any]:
+    try:
+        payload = jwt.decode(token, get_settings().jwt_secret, algorithms=["HS256"])
+    except jwt.PyJWTError as exc:
+        raise HTTPException(status_code=401, detail=f"Invalid {expected_type} token") from exc
+    if payload.get("type") != expected_type:
+        raise HTTPException(status_code=401, detail=f"Invalid {expected_type} token")
+    return payload
+
+
+def _active_local_user(session: Session, user_id: int) -> AccountUser | None:
+    user = session.get(AccountUser, user_id)
+    return user if user and user.is_active else None
+
+
+def refresh_access_token(refresh_token: str, session: Session) -> dict[str, Any]:
+    payload = _decode_token(refresh_token, "refresh")
+    try:
+        user_id = int(payload["sub"])
+        refresh_id = str(payload["jti"])
+        family_id = str(payload["family"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=401, detail="Invalid refresh token") from exc
+
+    stored = session.scalar(
+        select(RefreshSession)
+        .where(RefreshSession.id == refresh_id)
+        .with_for_update()
+    )
+    now = _now()
+    if stored is None or not hmac.compare_digest(stored.token_hash, _token_hash(refresh_token)):
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
+    if stored.revoked_at is not None:
+        if stored.replaced_by_id:
+            session.execute(
+                update(RefreshSession)
+                .where(
+                    RefreshSession.family_id == stored.family_id,
+                    RefreshSession.revoked_at.is_(None),
+                )
+                .values(revoked_at=now, revoke_reason="replay-detected")
+            )
+            session.commit()
+        raise HTTPException(status_code=401, detail="Refresh token has already been used")
+    if _as_utc(stored.expires_at) <= now or stored.family_id != family_id:
+        stored.revoked_at = now
+        stored.revoke_reason = "expired"
+        session.commit()
+        raise HTTPException(status_code=401, detail="Refresh token expired")
+
+    user = _active_local_user(session, user_id)
+    if user is None or int(payload.get("ver") or 0) != user.auth_version:
+        stored.revoked_at = now
+        stored.revoke_reason = "account-changed"
+        session.commit()
+        raise HTTPException(status_code=401, detail="Account is unavailable")
+
+    replacement_id = secrets.token_urlsafe(32)
+    stored.revoked_at = now
+    stored.revoke_reason = "rotated"
+    stored.last_used_at = now
+    stored.replaced_by_id = replacement_id
+    user_dict = _user_to_dict(user)
+    settings = get_settings()
+    access = _encode_token(
+        user_dict,
+        "access",
+        timedelta(minutes=settings.access_token_minutes),
+        persistent=stored.remember,
+        extra={"jti": secrets.token_urlsafe(24)},
+    )
+    refresh = _encode_token(
+        user_dict,
+        "refresh",
+        timedelta(days=settings.refresh_token_days),
+        persistent=stored.remember,
+        extra={"jti": replacement_id, "family": family_id},
+    )
+    session.add(
+        RefreshSession(
+            id=replacement_id,
+            user_id=user.id,
+            family_id=family_id,
+            token_hash=_token_hash(refresh),
+            remember=stored.remember,
+            expires_at=now + timedelta(days=settings.refresh_token_days),
+        )
+    )
+    session.commit()
+    return {
+        "access": access,
+        "refresh": refresh,
+        "access_token": access,
+        "refresh_token": refresh,
+        "token_type": "bearer",
+        "user": serialize_user(user_dict),
+        "roles": [user.role],
+        "persistent": stored.remember,
+    }
+
+
+def revoke_refresh_token(session: Session, refresh_token: str | None, *, reason: str = "logout") -> None:
+    if not refresh_token:
+        return
+    try:
+        payload = jwt.decode(
+            refresh_token,
+            get_settings().jwt_secret,
+            algorithms=["HS256"],
+            options={"verify_exp": False},
+        )
+        refresh_id = str(payload["jti"])
+    except (jwt.PyJWTError, KeyError, TypeError):
+        return
+    stored = session.get(RefreshSession, refresh_id)
+    if stored and hmac.compare_digest(stored.token_hash, _token_hash(refresh_token)) and stored.revoked_at is None:
+        stored.revoked_at = _now()
+        stored.revoke_reason = reason
+        session.commit()
+
+
+def revoke_all_user_sessions(session: Session, user_id: int, *, reason: str) -> None:
+    session.execute(
+        update(RefreshSession)
+        .where(RefreshSession.user_id == user_id, RefreshSession.revoked_at.is_(None))
+        .values(revoked_at=_now(), revoke_reason=reason)
+    )
+    session.commit()
+
+
+def create_mfa_challenge(
+    session: Session,
+    user: dict[str, Any],
+    *,
+    purpose: str,
+    persistent: bool,
+) -> str:
+    settings = get_settings()
+    challenge_id = secrets.token_urlsafe(32)
+    expiry = _now() + timedelta(seconds=settings.mfa_challenge_seconds)
+    session.add(
+        AuthChallenge(
+            id=challenge_id,
+            user_id=int(user["id"]),
+            purpose=purpose,
+            remember=persistent,
+            expires_at=expiry,
+        )
+    )
+    session.commit()
+    return _encode_token(
+        user,
+        "mfa_challenge",
+        timedelta(seconds=settings.mfa_challenge_seconds),
+        persistent=persistent,
+        extra={"jti": challenge_id, "purpose": purpose},
+    )
+
+
+def _load_mfa_challenge(
+    session: Session,
+    token: str,
+    *,
+    purpose: str,
+) -> tuple[AuthChallenge, AccountUser]:
+    payload = _decode_token(token, "mfa_challenge")
+    if payload.get("purpose") != purpose:
+        raise HTTPException(status_code=401, detail="Invalid MFA challenge")
+    try:
+        user_id = int(payload["sub"])
+        challenge_id = str(payload["jti"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=401, detail="Invalid MFA challenge") from exc
+    challenge = session.get(AuthChallenge, challenge_id)
+    user = _active_local_user(session, user_id)
+    now = _now()
+    if (
+        challenge is None
+        or user is None
+        or challenge.user_id != user_id
+        or challenge.purpose != purpose
+        or challenge.consumed_at is not None
+        or _as_utc(challenge.expires_at) <= now
+        or int(payload.get("ver") or 0) != user.auth_version
+    ):
+        raise HTTPException(status_code=401, detail="MFA challenge expired or already used")
+    return challenge, user
+
+
+def _fernet() -> Fernet:
+    try:
+        return Fernet(get_settings().resolved_mfa_encryption_key())
+    except (TypeError, ValueError) as exc:
+        raise RuntimeError("MFA encryption key is invalid") from exc
+
+
+def _new_totp_secret() -> str:
+    return base64.b32encode(secrets.token_bytes(20)).decode().rstrip("=")
+
+
+def _decrypt_totp_secret(encrypted: str | None) -> str:
+    if not encrypted:
+        raise HTTPException(status_code=409, detail="MFA enrollment has not started")
+    try:
+        return _fernet().decrypt(encrypted.encode()).decode()
+    except (InvalidToken, UnicodeDecodeError) as exc:
+        raise HTTPException(status_code=500, detail="Stored MFA credential is unavailable") from exc
+
+
+def _totp(secret: str, counter: int) -> str:
+    padded = secret + ("=" * ((8 - len(secret) % 8) % 8))
+    key = base64.b32decode(padded, casefold=True)
+    digest = hmac.new(key, struct.pack(">Q", counter), hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    value = (struct.unpack(">I", digest[offset : offset + 4])[0] & 0x7FFFFFFF) % 1_000_000
+    return f"{value:06d}"
+
+
+def verify_totp(secret: str, code: str, *, timestamp: float | None = None, window: int = 1) -> bool:
+    normalized = "".join(character for character in code if character.isdigit())
+    if len(normalized) != 6:
+        return False
+    counter = int((timestamp if timestamp is not None else time.time()) // 30)
+    return any(hmac.compare_digest(_totp(secret, counter + offset), normalized) for offset in range(-window, window + 1))
+
+
+def _recovery_hash(code: str) -> str:
+    normalized = "".join(character for character in code.upper() if character.isalnum())
+    return hmac.new(
+        get_settings().resolved_mfa_encryption_key(),
+        normalized.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _new_recovery_codes(count: int = 10) -> list[str]:
+    codes: list[str] = []
+    for _ in range(count):
+        raw = "".join(secrets.choice(RECOVERY_ALPHABET) for _ in range(15))
+        codes.append(f"{raw[:5]}-{raw[5:10]}-{raw[10:]}")
+    return codes
+
+
+def begin_mfa_enrollment(session: Session, challenge_token: str) -> dict[str, str]:
+    _, user = _load_mfa_challenge(session, challenge_token, purpose="enroll")
+    if user.mfa_enabled:
+        raise HTTPException(status_code=409, detail="MFA is already enabled")
+    if user.mfa_secret_encrypted:
+        secret = _decrypt_totp_secret(user.mfa_secret_encrypted)
+    else:
+        secret = _new_totp_secret()
+        user.mfa_secret_encrypted = _fernet().encrypt(secret.encode()).decode()
+        user.mfa_recovery_hashes = []
+        session.commit()
+    label = quote(f"{get_settings().mfa_issuer}:{user.username}", safe="")
+    issuer = quote(get_settings().mfa_issuer, safe="")
+    uri = f"otpauth://totp/{label}?secret={secret}&issuer={issuer}&algorithm=SHA1&digits=6&period=30"
+    return {"secret": secret, "otpauth_uri": uri}
+
+
+def _record_mfa_failure(session: Session, challenge: AuthChallenge, user: AccountUser) -> None:
+    settings = get_settings()
+    challenge.failed_attempts += 1
+    if challenge.failed_attempts >= settings.mfa_challenge_attempt_limit:
+        now = _now()
+        challenge.consumed_at = now
+        user.failed_login_attempts = settings.login_failure_limit
+        user.locked_until = now + timedelta(seconds=settings.login_lockout_seconds)
+        user.last_failed_login_at = now
+    session.commit()
+
+
+def confirm_mfa_enrollment(
+    session: Session,
+    challenge_token: str,
+    code: str,
+) -> tuple[dict[str, Any], list[str], bool]:
+    challenge, user = _load_mfa_challenge(session, challenge_token, purpose="enroll")
+    secret = _decrypt_totp_secret(user.mfa_secret_encrypted)
+    if not verify_totp(secret, code):
+        _record_mfa_failure(session, challenge, user)
+        raise HTTPException(status_code=401, detail="Invalid authentication code")
+    recovery_codes = _new_recovery_codes()
+    user.mfa_recovery_hashes = [_recovery_hash(item) for item in recovery_codes]
+    user.mfa_enabled = True
+    user.mfa_enrolled_at = _now()
+    user.auth_version += 1
+    challenge.consumed_at = _now()
+    session.commit()
+    session.refresh(user)
+    return _user_to_dict(user), recovery_codes, challenge.remember
+
+
+def verify_mfa_login(
+    session: Session,
+    challenge_token: str,
+    *,
+    code: str | None,
+    recovery_code: str | None,
+) -> tuple[dict[str, Any], bool, bool]:
+    challenge, user = _load_mfa_challenge(session, challenge_token, purpose="login")
+    if not user.mfa_enabled:
+        raise HTTPException(status_code=409, detail="MFA is not enabled")
+    secret = _decrypt_totp_secret(user.mfa_secret_encrypted)
+    used_recovery = False
+    valid = bool(code and verify_totp(secret, code))
+    if not valid and recovery_code:
+        candidate = _recovery_hash(recovery_code)
+        stored_hashes = list(user.mfa_recovery_hashes or [])
+        match = next((item for item in stored_hashes if hmac.compare_digest(item, candidate)), None)
+        if match:
+            stored_hashes.remove(match)
+            user.mfa_recovery_hashes = stored_hashes
+            valid = True
+            used_recovery = True
+    if not valid:
+        _record_mfa_failure(session, challenge, user)
+        raise HTTPException(status_code=401, detail="Invalid authentication code")
+    challenge.consumed_at = _now()
+    session.commit()
+    session.refresh(user)
+    return _user_to_dict(user), challenge.remember, used_recovery
+
+
+def get_current_user(
+    request: Request,
+    token: str | None = Depends(oauth2_scheme),
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
     token = token or request.cookies.get("sourceai_access")
     if not token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
-    settings = get_settings()
+        raise HTTPException(status_code=401, detail="Authentication required")
+    payload = _decode_token(token, "access")
     try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"])
-    except jwt.PyJWTError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid access token") from exc
+        user_id = int(payload["sub"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise HTTPException(status_code=401, detail="Missing user in token") from exc
+    user = _active_local_user(session, user_id)
+    if user is None or int(payload.get("ver") or 0) != user.auth_version:
+        raise HTTPException(status_code=401, detail="Account is unavailable")
+    return {"sub": user.id, "role": user.role}
 
-    if payload.get("type") not in {None, "access"}:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid access token")
-    user_id = payload.get("sub")
-    role = payload.get("role")
-    if user_id is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing user in token")
 
-    return {
-        "sub": int(user_id),
-        "role": role or "customer",
-    }
+def get_current_privileged_user(
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    if current_user["role"] not in PRIVILEGED_ROLES:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin or operator access required")
+    return current_user
 
 
 def get_current_user_detail(
     current_user: dict[str, Any] = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
-    user = session.get(AccountUser, current_user["sub"])
-    if user:
-        return serialize_user(_local_user_to_dict(user))
-
-    legacy_path = get_settings().resolved_legacy_sqlite_path()
-    if legacy_path.exists():
-        with sqlite3.connect(legacy_path) as conn:
-            conn.row_factory = sqlite3.Row
-            row = conn.execute(
-                "SELECT id, username, email, phone, role, is_superuser, is_staff, is_active FROM accounts_user WHERE id = ? LIMIT 1",
-                (current_user["sub"],),
-            ).fetchone()
-        if row and row["is_active"]:
-            return serialize_user(
-                {
-                    "id": row["id"],
-                    "username": row["username"],
-                    "email": row["email"],
-                    "phone": row["phone"],
-                    "role": _role_from_legacy(row),
-                }
-            )
-    return {
-        "id": current_user["sub"],
-        "username": None,
-        "email": None,
-        "phone": None,
-        "role": current_user["role"],
-    }
+    user = _active_local_user(session, current_user["sub"])
+    if user is None:
+        raise HTTPException(status_code=401, detail="Account is unavailable")
+    return serialize_user(_user_to_dict(user))

@@ -12,5 +12,7 @@ function fallbackDataUrl(name: string, category?: string) {
 export function ProductImage({ src, name, category, className }: { src?: string | null; name: string; category?: string; className?: string }) {
   const fallback = fallbackDataUrl(name, category); const preferred = src || fallback; const [current, setCurrent] = useState(preferred);
   useEffect(() => setCurrent(preferred), [preferred]);
+  // Remote supplier URLs and inline generated fallbacks are intentionally rendered without a Next image loader.
+  // eslint-disable-next-line @next/next/no-img-element
   return <img className={className} src={current} alt={name} loading="lazy" decoding="async" onError={() => { if (current !== fallback) setCurrent(fallback); }} />;
 }

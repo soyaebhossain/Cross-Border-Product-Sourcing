@@ -341,6 +341,200 @@ def _ensure_sellers_and_offers(session: Session, countries: dict[str, Country]) 
     session.add_all(offers)
 
 
+def _ensure_medical_catalog(session: Session, countries: dict[str, Country]) -> None:
+    category_slug = "medical-products-accessories"
+    category = session.scalar(select(Category).where(Category.slug == category_slug))
+    if not category:
+        category = Category(name="Medical Products & Accessories", slug=category_slug)
+        session.add(category)
+        session.flush()
+
+    product_names = [
+        "Digital Clinical Thermometer",
+        "Infrared Forehead Thermometer",
+        "Fingertip Pulse Oximeter",
+        "Automatic Blood Pressure Monitor",
+        "Aneroid Blood Pressure Kit",
+        "Dual-Head Stethoscope",
+        "Blood Glucose Monitoring Kit",
+        "Glucose Test Strip Pack",
+        "Portable Compressor Nebulizer",
+        "Personal Steam Inhaler",
+        "Comprehensive First Aid Kit",
+        "Cotton Bandage Roll",
+        "Adhesive Bandage Assortment",
+        "Sterile Gauze Pad Pack",
+        "Medical Adhesive Tape",
+        "Elastic Crepe Bandage",
+        "Adjustable Knee Support",
+        "Compression Ankle Support",
+        "Wrist Support Brace",
+        "Lumbar Support Belt",
+        "Soft Cervical Collar",
+        "Adjustable Arm Sling",
+        "Aluminum Underarm Crutches",
+        "Height-Adjustable Walking Cane",
+        "Foldable Walking Frame",
+        "Lightweight Manual Wheelchair",
+        "Adjustable Shower Chair",
+        "Portable Commode Chair",
+        "Safety Bed Rail",
+        "Anti-Decubitus Air Mattress",
+        "Reusable Hot and Cold Pack",
+        "Electric Heating Pad",
+        "Reusable Ice Bag",
+        "Disposable Adult Face Mask",
+        "Disposable Child Face Mask",
+        "Protective Face Shield",
+        "Nitrile Examination Gloves",
+        "Latex Examination Gloves",
+        "Touchless Sanitizer Dispenser",
+        "Weekly Pill Organizer",
+        "Lockable Medicine Storage Box",
+        "Tablet Cutter",
+        "Tablet Crusher",
+        "Hearing Aid Battery Pack",
+        "Thermometer Probe Cover Pack",
+        "Manual Nasal Aspirator",
+        "Digital Baby Weighing Scale",
+        "Digital Body Weight Scale",
+        "Medical Measuring Tape",
+        "Reusable Diagnostic Penlight",
+        "Neurological Reflex Hammer",
+        "Medical Tuning Fork Set",
+        "Portable Otoscope Set",
+        "Portable Ophthalmoscope Set",
+        "LED Examination Light",
+        "Portable Suction Machine",
+        "Oxygen Mask Kit",
+        "Oxygen Nasal Cannula",
+        "Handheld Incentive Spirometer",
+        "Peak Flow Meter",
+    ]
+
+    existing_products = {product.slug: product for product in session.scalars(select(Product)).all()}
+    variants_by_sku = {
+        variant.sku: variant
+        for variant in session.scalars(select(ProductVariant).where(ProductVariant.sku.like("MED-%"))).all()
+    }
+    medical_variants: list[tuple[int, ProductVariant]] = []
+
+    for index, name in enumerate(product_names, start=1):
+        slug = _slugify(name)
+        product = existing_products.get(slug)
+        description = (
+            f"{name} for healthcare, home-care, clinic, and institutional sourcing comparison. "
+            "Buyer should verify applicable registration, certification, and local regulatory requirements before purchase."
+        )
+        if not product:
+            product = Product(
+                name=name,
+                slug=slug,
+                model=f"MED-{index:03d}",
+                description=description,
+                image=None,
+                category=category,
+            )
+            session.add(product)
+            session.flush()
+            existing_products[slug] = product
+        else:
+            product.name = name
+            product.model = f"MED-{index:03d}"
+            product.description = description
+            product.category = category
+
+        sku = f"MED-{index:03d}-STD"
+        variant = variants_by_sku.get(sku)
+        weight = (Decimal("0.08") + Decimal(index % 12) * Decimal("0.12")).quantize(Decimal("0.001"))
+        length = Decimal(8 + (index % 8) * 3)
+        width = Decimal(6 + (index % 6) * 2)
+        height = Decimal(3 + (index % 5) * 2)
+        if not variant:
+            variant = ProductVariant(
+                product=product,
+                sku=sku,
+                variant_name="Standard",
+                weight_kg=weight,
+                length_cm=length,
+                width_cm=width,
+                height_cm=height,
+            )
+            session.add(variant)
+            session.flush()
+            variants_by_sku[sku] = variant
+        else:
+            variant.product = product
+            variant.variant_name = "Standard"
+            variant.weight_kg = weight
+            variant.length_cm = length
+            variant.width_cm = width
+            variant.height_cm = height
+        medical_variants.append((index, variant))
+
+    seller_specs = [
+        ("Shenzhen Medical Supply Hub", "CN", "4.78"),
+        ("India Care Instruments", "IN", "4.66"),
+        ("Singapore Clinical Supply", "SG", "4.84"),
+    ]
+    sellers_by_key = {
+        (seller.name, seller.country.code): seller
+        for seller in session.scalars(select(Seller)).all()
+    }
+    for seller_name, country_code, rating in seller_specs:
+        key = (seller_name, country_code)
+        if key not in sellers_by_key:
+            sellers_by_key[key] = Seller(
+                country=countries[country_code],
+                name=seller_name,
+                rating=Decimal(rating),
+                note="Medical-accessory sourcing supplier; buyer verification required for regulated items.",
+            )
+            session.add(sellers_by_key[key])
+    session.flush()
+
+    existing_offers = {
+        (offer.variant_id, offer.country_id, offer.seller_id, offer.mode): offer
+        for offer in session.scalars(select(SellerOffer)).all()
+    }
+    offer_specs = [
+        ("CN", "Shenzhen Medical Supply Hub", "LOCAL", Decimal("1.00"), 1),
+        ("CN", "Shenzhen Medical Supply Hub", "BULK", Decimal("0.86"), 10),
+        ("IN", "India Care Instruments", "LOCAL", Decimal("0.96"), 1),
+        ("SG", "Singapore Clinical Supply", "LOCAL", Decimal("1.14"), 1),
+    ]
+    for index, variant in medical_variants:
+        base_price = (
+            Decimal("3.50")
+            + Decimal(index) * Decimal("1.85")
+            + Decimal(variant.weight_kg) * Decimal("8.00")
+        ).quantize(Decimal("0.01"))
+        for country_code, seller_name, mode, multiplier, moq in offer_specs:
+            country = countries[country_code]
+            seller = sellers_by_key[(seller_name, country_code)]
+            key = (variant.id, country.id, seller.id, mode)
+            offer = existing_offers.get(key)
+            price = (base_price * multiplier).quantize(Decimal("0.01"))
+            if not offer:
+                offer = SellerOffer(
+                    variant=variant,
+                    country=country,
+                    seller=seller,
+                    mode=mode,
+                    price_origin=price,
+                    currency="USD",
+                    stock=150 + index * 8,
+                    moq=moq,
+                )
+                session.add(offer)
+                existing_offers[key] = offer
+            else:
+                offer.price_origin = price
+                offer.currency = "USD"
+                offer.stock = 150 + index * 8
+                offer.moq = moq
+
+
 def _import_legacy_catalog(session: Session, sqlite_path: Path) -> bool:
     """Idempotently sync the legacy catalog, preferring its populated image_url field."""
     if not sqlite_path.exists():
@@ -631,6 +825,7 @@ def seed_database(
     session.flush()
     countries = _ensure_reference_data(session)
     _ensure_sellers_and_offers(session, countries)
+    _ensure_medical_catalog(session, countries)
     if legacy_sqlite_path:
         _sync_legacy_offers(session, legacy_sqlite_path)
     if supply_chain_csv_path:

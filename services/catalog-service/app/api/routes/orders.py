@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Header, Response, status
 from sqlalchemy.orm import Session
 
 from ...auth import get_current_user
@@ -46,6 +46,15 @@ def saved_quotes(
     ]
 
 
+@router.get("/api/quote/saved/{quote_id}/")
+def saved_quote_detail(
+    quote_id: int,
+    session: Session = Depends(get_session),
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    return serialize_saved_quote(get_saved_quote_or_404(session, quote_id, current_user))
+
+
 @router.delete("/api/quote/saved/{quote_id}/", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
 def delete_saved_quote(quote_id: int, session: Session = Depends(get_session),
                        current_user: dict[str, Any] = Depends(get_current_user)) -> Response:
@@ -86,9 +95,20 @@ def create_manual_order(
     payload: CreateOrderIn,
     session: Session = Depends(get_session),
     current_user: dict[str, Any] = Depends(get_current_user),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=80),
 ) -> dict[str, Any]:
-    order = create_manual_order_record(session, payload, current_user)
-    return {"order_id": order.id, "status": order.status}
+    order, replayed = create_manual_order_record(
+        session,
+        payload,
+        current_user,
+        idempotency_key=idempotency_key,
+    )
+    return {
+        "order_id": order.id,
+        "status": order.status,
+        "saved_quote_id": order.saved_quote_id,
+        "idempotent_replay": replayed,
+    }
 
 
 @router.get("/api/orders/me/")

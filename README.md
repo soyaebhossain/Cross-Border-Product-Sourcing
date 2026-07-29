@@ -1,95 +1,135 @@
+# SourceAI cross-border sourcing
 
-# Cross-Border Product Sourcing Rebuild
+SourceAI is a Next.js storefront and role-aware control center backed by
+FastAPI, SQLAlchemy, Alembic, and PostgreSQL. The retired Vite and Django
+applications are not part of the active tree.
 
-**Welcome**: A short project introduction and quick-start checklist are in [WELCOME.md](WELCOME.md). You can also open the simple local welcome page at [public/welcome.html](public/welcome.html).
+## Active applications
 
-The rebuild now starts from the stack you asked for:
+- `apps/web-next` — customer storefront, account area, admin control center,
+  English/Bangla UI, and browser end-to-end tests.
+- `services/catalog-service` — catalog, sourcing, identity, quotes, orders,
+  payments, audited administration, analytics, and customer APIs.
+- `docker-compose.yml` — Next.js, FastAPI, and PostgreSQL development stack.
+- `gateway/nginx.conf` — reverse-proxy baseline; production TLS belongs at the
+  managed edge/load balancer.
 
-- `services/catalog-service`: FastAPI backend for catalog and sourcing flows
-- `apps/web-next`: Next.js storefront for the new frontend
-- `postgres`: primary database for the rebuild
-- `docker-compose.yml`: Docker entrypoint for `FastAPI + Next.js + PostgreSQL`
+The current development catalog contains 14 categories and 410 products,
+including Medical Products & Accessories. China, India, Singapore, and
+Thailand are available sourcing origins. Runtime database files are ignored
+and must never be committed.
 
-The legacy Django app under `backend/` is still present. The FastAPI service can import catalog data from that legacy SQLite database and serve the legacy uploaded media files so the rebuild starts with your real products instead of placeholder data.
+## Run locally on Windows
 
-## Current Rebuild Scope
+Install the backend and frontend dependencies once:
 
-Implemented in the new stack:
+```powershell
+cd services/catalog-service
+py -3.13 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+cd ..\..\apps\web-next
+npm ci
+cd ..\..
+```
 
-- `GET /api/categories/`
-- `GET /api/countries/`
-- `GET /api/products/`
-- `GET /api/products/{slug}/`
-- `POST /api/quote/`
-- `POST /api/quote/recommend/`
-- `POST /api/recommendations/cheapest-country/`
-- `POST /api/quote/save/`
-- `GET /api/quote/saved/`
-- `POST /api/orders/create-manual/`
-- `GET /api/orders/me/`
-- `GET /api/orders/{id}/`
-- `POST /api/orders/{id}/status/`
-- `GET /media/...` for legacy uploaded product images
-- Next.js home page with category and product listing
-- Next.js product detail page with cheapest-country recommendation panel
-- Heuristic hybrid sourcing recommendation response with cost, ETA, quality, and reliability ranking
-- Itemized total landed cost (product, shipping, customs, VAT, handling, and other import cost)
-- Buyer-weighted 0-100 sourcing score with supplier reliability, Low/Medium/High risk, advantages, and weaknesses
-- Side-by-side saved quotation comparison
-- Research analytics dashboard at `/research` and CSV dataset export at `/api/research/export.csv`
-- Evaluation-readiness placeholders for NDCG/Precision@K, MAE/RMSE, accuracy/F1, and UX measures
+Start or safely restart only this worktree's processes:
 
-### Decision methodology
+```powershell
+.\start-dev.ps1 -Restart
+```
 
-Recommendation weights accept `price`, `quality`, `delivery`, `reliability`, and `risk` as either fractions or percentages. The heuristic normalizes the weights and combines normalized landed cost, ETA, seller rating/stock reliability, and risk into a higher-is-better score out of 100. Reliability currently uses seller rating and stock coverage because confirmed order, dispute, response-time, and delivery-accuracy history are not yet available. Risk explicitly reports those data limitations and should be recalibrated after labelled outcomes are collected.
+- Web: `http://localhost:3000`
+- API: `http://localhost:8001`
+- API docs in development: `http://localhost:8001/docs`
+- Readiness: `http://localhost:8001/api/ready`
 
-### Security and integrity checks
+The launcher refuses to stop an unrelated process that owns either port. The
+read-only smoke check is:
 
-- Credential login uses HTTP-only access/refresh cookies; public registration always creates a customer account.
-- Legacy catalog sync is idempotent by product/variant business keys and migrates the complete seller-offer set.
-- Run `uv run --python 3.13 python scripts/smoke_rebuild_security.py` from the repository root while the API is running to verify catalog counts, duplicate prevention, real offer filters, forced-customer registration, and cookie login.
+```powershell
+.\services\catalog-service\.venv\Scripts\python.exe scripts\smoke_rebuild.py
+```
 
-On first boot, FastAPI tries to import categories, products, and variants from `backend/db.sqlite3`. If that file is unavailable, it falls back to demo catalog data.
+## Secure first admin
 
-## Run With Docker
+There are no hard-coded or auto-seeded production admin credentials. Apply the
+schema and provision an administrator with a password entered through
+`getpass`:
 
-1. Copy `.env.example` to `.env` if you want to override defaults.
-2. Start the new stack:
+```powershell
+cd services/catalog-service
+.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe scripts\provision_admin.py --username owner --email owner@example.com
+```
+
+The first privileged login must enroll TOTP MFA and returns one-time recovery
+codes. Store those codes outside the repository. Admin and customer routing is
+role-separated; `/research`, research analytics, and CSV research export are
+admin-only.
+
+## Run with Docker and PostgreSQL
+
+Copy `.env.example` to `.env`, replace every development placeholder, then:
 
 ```bash
 docker compose up --build
 ```
 
-3. Use these URLs:
+The API container runs `alembic upgrade head` before startup. Production mode
+fails closed when JWT, database, cookie, origin, MFA, payment-proof,
+notification-transport, or monitoring settings are unsafe. Do not expose
+PostgreSQL or the API directly to the public internet.
 
-- Next.js app: `http://localhost:3000`
-- FastAPI API: `http://localhost:8000`
-- FastAPI docs: `http://localhost:8000/docs`
-- PostgreSQL: `localhost:5432`
+## Verification
 
-The Docker setup mounts `./backend` read-only into the API container so the FastAPI service can import the old Django catalog and serve `backend/media`.
+Backend:
 
-## Local Dev Notes
+```powershell
+cd services/catalog-service
+.\.venv\Scripts\python.exe -m ruff check app scripts tests migrations
+.\.venv\Scripts\python.exe -m pytest -q
+.\.venv\Scripts\python.exe -m alembic heads
+```
 
-- One-shot local launcher: `run-rebuild-local.cmd`
-- Smoke test: `python scripts/smoke_rebuild.py`
-- Next.js local helper: `apps/web-next/run-local.cmd`
-- FastAPI local helper: `services/catalog-service/run-local.cmd`
+Frontend:
 
-The default local pairing is:
+```powershell
+cd apps/web-next
+npm run lint
+npx tsc --noEmit
+npm run build
+npx playwright install chromium
+npm run test:e2e:public
+```
 
-- Next.js on `3001`
-- FastAPI on `8001`
+Role-protected Playwright tests intentionally require explicitly provisioned
+test accounts; see `docs/frontend-e2e.md`. CI provisions only a disposable
+`CATALOG_ENVIRONMENT=test` fixture and runs both public and role-isolation
+browser checks. CI also runs static, migration, API, security, payment, RBAC,
+build, dependency-audit, Compose, and container checks.
 
-## Supply Chain AI Dataset
+## Operations
 
-`Data/supply_chain_data.csv` is imported automatically by the FastAPI startup seed layer. Rows are exposed as catalog products such as `Haircare SKU0`, with dataset-backed suppliers, stock levels, MOQ, origin prices, inspection-derived supplier quality, and recommendation offers.
+- Launch status, evidence, known gaps, and external go-live gates:
+  `docs/launch-acceptance-checklist.md`
+- Security, secret rotation, identity provisioning, backup, and restore:
+  `docs/production-security-runbook.md`
+- Admin API and metric contracts:
+  `docs/admin-operations-backend.md`
+- Dashboard metric definitions:
+  `docs/dashboard-metric-contract.md`
+- Customer accounts, invoices, notifications, support, disputes, and provider
+  worker operations: `docs/customer-automation-runbook.md`
+- Browser acceptance layers and protected role-test prerequisites:
+  `docs/frontend-e2e.md`
 
-Local dev uses `CATALOG_SUPPLY_CHAIN_CSV_PATH=..\..\Data\supply_chain_data.csv` from `services/catalog-service/run-local.cmd`. Docker mounts `./Data` read-only and uses `/data/supply_chain_data.csv`.
+Create checksummed SQLite or PostgreSQL backups with
+`services/catalog-service/scripts/backup_database.py`, and verify them in an
+isolated restore with `verify_restore.py`. A successful backup is not accepted
+until restore verification passes.
 
-## Suggested Next Phases
-
-1. Move auth into FastAPI and add Next.js session flow.
-2. Replace `create_all()` with Alembic migrations.
-3. Migrate quote/order/admin UI from the old frontend into Next.js route by route.
-4. Replace generated offer heuristics with real sourcing and pricing rules from the legacy system.
+Production still requires environment-owned work: rotate real credentials in a
+secret manager, coordinate any Git-history purge, provision managed
+PostgreSQL/Redis, configure HTTPS and monitoring alerts, provide
+email/SMS/WhatsApp vendor credentials, and schedule automated backup/restore
+drills.
