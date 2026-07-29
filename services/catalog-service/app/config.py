@@ -4,6 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -84,6 +85,15 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
     )
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def use_psycopg_v3(cls, value: str) -> str:
+        if value.startswith("postgres://"):
+            return value.replace("postgres://", "postgresql+psycopg://", 1)
+        if value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+psycopg://", 1)
+        return value
 
     def resolved_media_path(self) -> Path:
         if self.media_path:

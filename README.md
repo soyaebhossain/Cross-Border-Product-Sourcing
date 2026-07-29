@@ -67,6 +67,22 @@ codes. Store those codes outside the repository. Admin and customer routing is
 role-separated; `/research`, research analytics, and CSV research export are
 admin-only.
 
+## Hosted deployment
+
+- Configure the Vercel project root as `apps/web-next`; that directory contains
+  the Next.js deployment config. Set both `NEXT_PUBLIC_API_BASE_URL` and
+  `API_BASE_URL` to the public API origin.
+- `render.yaml` builds the maintained non-root FastAPI image, applies Alembic
+  migrations before startup, and checks `/api/ready`. Before syncing the
+  Blueprint, provide the `sync: false` MFA, monitoring, and payment-proof
+  settings from a secrets manager.
+- Run `python -m scripts.dispatch_notifications --poll-seconds 10` as exactly
+  one separately managed worker when automated email/SMS/WhatsApp delivery is
+  enabled.
+- Use sibling custom domains for the web and API services in production, then
+  update the exact frontend URL and CORS allowlist. Provider preview domains
+  are not the final authenticated-cookie topology.
+
 ## Run with Docker and PostgreSQL
 
 Copy `.env.example` to `.env`, replace every development placeholder, then:

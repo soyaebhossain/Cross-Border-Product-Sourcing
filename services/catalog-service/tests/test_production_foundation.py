@@ -69,6 +69,21 @@ def _settings(**overrides) -> Settings:
     return Settings(**values)
 
 
+def test_provider_postgres_urls_use_the_installed_psycopg_v3_driver() -> None:
+    assert (
+        _settings(
+            database_url="postgres://sourceai:unique-password@db.example.com:5432/cross_border"
+        ).database_url
+        == "postgresql+psycopg://sourceai:unique-password@db.example.com:5432/cross_border"
+    )
+    assert (
+        _settings(
+            database_url="postgresql://sourceai:unique-password@db.example.com:5432/cross_border"
+        ).database_url
+        == "postgresql+psycopg://sourceai:unique-password@db.example.com:5432/cross_border"
+    )
+
+
 def test_request_log_is_correlated_structured_and_redacted(caplog) -> None:
     logger = logging.getLogger("test.catalog.request")
     logger.handlers.clear()

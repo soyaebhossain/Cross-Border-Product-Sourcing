@@ -1,0 +1,42 @@
+databases:
+  - name: cross-border-product-sourcing-db
+    databaseName: cross_border
+    user: cross_border
+
+services:
+  - type: web
+    name: cross-border-product-sourcing-api
+    runtime: docker
+    dockerfilePath: ./services/catalog-service/Dockerfile
+    dockerContext: ./services/catalog-service
+    healthCheckPath: /api/ready
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: CATALOG_ENVIRONMENT
+        value: production
+      - key: CATALOG_DATABASE_URL
+        fromDatabase:
+          name: cross-border-product-sourcing-db
+          property: connectionString
+      - key: CATALOG_JWT_SECRET
+        generateValue: true
+      - key: CATALOG_MFA_ENCRYPTION_KEY
+        sync: false
+      - key: CATALOG_PRIVILEGED_MFA_REQUIRED
+        value: "true"
+      - key: CATALOG_FRONTEND_URL
+        value: https://cross-border-product-sourcing.vercel.app
+      - key: CATALOG_CORS_ORIGINS
+        value: https://cross-border-product-sourcing.vercel.app
+      - key: CATALOG_SECURE_COOKIES
+        value: "true"
+      - key: CATALOG_MEDIA_PATH
+        value: /app/media
+      - key: CATALOG_REQUEST_LOG_LEVEL
+        value: INFO
+      - key: CATALOG_ERROR_MONITORING_ENVIRONMENT
+        value: production
+      - key: CATALOG_ERROR_MONITORING_DSN
+        sync: false
+      - key: CATALOG_PAYMENT_PROOF_ALLOWED_HOSTS
+        sync: false
