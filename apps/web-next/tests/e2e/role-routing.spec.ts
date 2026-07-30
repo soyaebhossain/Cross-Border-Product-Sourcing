@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8001";
+const apiBase = process.env.E2E_API_BASE_URL || process.env.API_BASE_URL || "http://127.0.0.1:8001";
 const customerIdentifier = process.env.E2E_CUSTOMER_IDENTIFIER;
 const customerPassword = process.env.E2E_CUSTOMER_PASSWORD;
 const adminIdentifier = process.env.E2E_ADMIN_IDENTIFIER;
@@ -18,6 +18,21 @@ test.describe("@roles live role-routing contract", () => {
   test.beforeEach(async ({ request }) => {
     const health = await request.get(`${apiBase}/api/health`);
     test.skip(!health.ok(), `Live backend is required at ${apiBase}`);
+  });
+
+  test("catalog requests remain on the storefront origin", async ({ page, baseURL }) => {
+    const storefrontOrigin = new URL(baseURL!).origin;
+    const apiRequests: string[] = [];
+    page.on("request", request => {
+      if (new URL(request.url()).pathname.startsWith("/api/")) {
+        apiRequests.push(request.url());
+      }
+    });
+
+    await page.goto("/products");
+    await expect(page.getByText("410 products", { exact: true })).toBeVisible();
+    expect(apiRequests.length).toBeGreaterThan(0);
+    expect(apiRequests.every(url => new URL(url).origin === storefrontOrigin)).toBe(true);
   });
 
   test("customer lands in customer account and is kept out of admin", async ({ page }) => {

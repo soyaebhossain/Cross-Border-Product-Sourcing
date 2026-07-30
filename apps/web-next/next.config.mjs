@@ -1,12 +1,38 @@
 import path from "node:path";
 
 const isProduction = process.env.NODE_ENV === "production";
-let apiOrigin = "";
-try {
-  apiOrigin = new URL(process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8001").origin;
-} catch {
-  apiOrigin = "";
+const productionApiOrigin = "https://cross-border-product-sourcing-api.onrender.com";
+
+function normalizedApiOrigin(value) {
+  if (!value) return "";
+  const parsed = new URL(value);
+  const localHttpHosts = new Set(["api", "localhost", "127.0.0.1", "::1"]);
+  const permitsHttp = parsed.protocol === "http:"
+    && (!isProduction || localHttpHosts.has(parsed.hostname));
+  if (
+    (parsed.protocol !== "https:" && !permitsHttp)
+    || parsed.username
+    || parsed.password
+    || parsed.search
+    || parsed.hash
+    || !["", "/"].includes(parsed.pathname)
+  ) {
+    throw new Error("API base URL must be a root HTTP(S) origin without credentials, query, or fragment");
+  }
+  return parsed.origin;
 }
+
+const defaultApiOrigin = process.env.VERCEL_ENV === "production"
+  ? productionApiOrigin
+  : isProduction
+    ? ""
+    : "http://localhost:8001";
+const apiProxyOrigin = normalizedApiOrigin(
+  process.env.API_BASE_URL
+    || process.env.NEXT_PUBLIC_API_BASE_URL
+    || defaultApiOrigin,
+);
+const publicApiOrigin = normalizedApiOrigin(process.env.NEXT_PUBLIC_API_BASE_URL || "");
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -18,7 +44,7 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: http: https:",
-  `connect-src 'self'${apiOrigin ? ` ${apiOrigin}` : ""}`,
+  `connect-src 'self'${publicApiOrigin ? ` ${publicApiOrigin}` : ""}`,
   "frame-src https://accounts.google.com",
 ].join("; ");
 
@@ -42,6 +68,24 @@ const nextConfig = {
   typedRoutes: true,
   outputFileTracingRoot: path.join(process.cwd(), "../.."),
   poweredByHeader: false,
+  skipTrailingSlashRedirect: true,
+  async rewrites() {
+    if (!apiProxyOrigin) return [];
+    return [
+      {
+        source: "/api/:path*/",
+        destination: `${apiProxyOrigin}/api/:path*/`,
+      },
+      {
+        source: "/api/:path*",
+        destination: `${apiProxyOrigin}/api/:path*`,
+      },
+      {
+        source: "/media/:path*",
+        destination: `${apiProxyOrigin}/media/:path*`,
+      },
+    ];
+  },
   async headers() {
     return [
       {

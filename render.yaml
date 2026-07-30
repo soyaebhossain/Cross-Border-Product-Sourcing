@@ -2,11 +2,17 @@ databases:
   - name: cross-border-product-sourcing-db
     databaseName: cross_border
     user: cross_border
+    plan: basic-256mb
+    diskSizeGB: 5
+    region: singapore
 
 services:
   - type: web
     name: cross-border-product-sourcing-api
     runtime: docker
+    plan: starter
+    region: singapore
+    numInstances: 1
     dockerfilePath: ./services/catalog-service/Dockerfile
     dockerContext: ./services/catalog-service
     healthCheckPath: /api/ready
@@ -14,6 +20,8 @@ services:
     envVars:
       - key: CATALOG_ENVIRONMENT
         value: production
+      - key: PORT
+        value: "8000"
       - key: CATALOG_DATABASE_URL
         fromDatabase:
           name: cross-border-product-sourcing-db

@@ -61,6 +61,18 @@ def _current_totp(secret: str) -> str:
     return auth._totp(secret, int(time.time() // 30))
 
 
+def test_social_callback_uses_the_configured_frontend_origin(monkeypatch) -> None:
+    monkeypatch.setattr(
+        auth_routes.settings,
+        "frontend_url",
+        "https://cross-border-product-sourcing.vercel.app/",
+    )
+    assert auth_routes._social_callback_uri("google") == (
+        "https://cross-border-product-sourcing.vercel.app"
+        "/api/auth/social/google/callback/"
+    )
+
+
 def test_failed_passwords_persist_and_lock_the_account(
     session: Session,
     settings: Settings,

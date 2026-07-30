@@ -219,13 +219,23 @@ export type AiInsights = {
   recommendations: string[];
 };
 
-const publicApiBase = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8001";
-const serverApiBase = process.env.API_BASE_URL || publicApiBase;
+const productionApiBase = process.env.VERCEL_ENV === "production"
+  ? "https://cross-border-product-sourcing-api.onrender.com"
+  : "";
+const publicApiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
+const serverApiBase = (
+  process.env.API_BASE_URL
+  || productionApiBase
+  || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "")
+).replace(/\/+$/, "");
 let refreshRequest: Promise<boolean> | null = null;
 
 function getRequestBase() {
   if (typeof window === "undefined") {
-    return process.env.NODE_ENV === "development" ? publicApiBase : serverApiBase;
+    if (!serverApiBase) {
+      throw new Error("API_BASE_URL is required for server-side API requests");
+    }
+    return serverApiBase;
   }
   return publicApiBase;
 }

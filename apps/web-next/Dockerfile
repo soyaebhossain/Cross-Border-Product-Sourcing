@@ -6,8 +6,8 @@ RUN npm ci
 
 FROM dependencies AS builder
 
-ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+ARG API_BASE_URL=http://api:8000
+ENV API_BASE_URL=${API_BASE_URL}
 
 COPY . .
 RUN npm run build
@@ -17,6 +17,7 @@ FROM node:22-alpine AS runtime
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV API_BASE_URL=http://api:8000
 WORKDIR /app
 
 COPY --from=builder --chown=node:node /app/package.json /app/package-lock.json ./

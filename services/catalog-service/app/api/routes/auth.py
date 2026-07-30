@@ -72,6 +72,13 @@ def _request_uses_secure_cookies(request: Request) -> bool:
     return settings.cookie_secure_for_scheme(request.url.scheme)
 
 
+def _social_callback_uri(provider: str) -> str:
+    return (
+        f"{settings.frontend_url.rstrip('/')}"
+        f"/api/auth/social/{provider}/callback/"
+    )
+
+
 async def _bounded_body(request: Request) -> bytes:
     content_length = request.headers.get("content-length")
     if content_length:
@@ -383,7 +390,7 @@ def social_start(provider: str, request: Request) -> Response:
     state = secrets.token_urlsafe(32)
     code_verifier = secrets.token_urlsafe(64)
     code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode()).digest()).rstrip(b"=").decode()
-    redirect_uri = str(request.url_for("social_callback", provider=provider))
+    redirect_uri = _social_callback_uri(provider)
     try:
         auth_url = google_authorization_url(redirect_uri=redirect_uri, state=state, code_challenge=code_challenge)
     except SocialAuthError as exc:
@@ -428,7 +435,7 @@ def social_callback(
         return RedirectResponse(f"{frontend_login}?social_error=invalid_state", status_code=303)
     if provider != "google":
         return RedirectResponse(f"{frontend_login}?social_error=unsupported_provider", status_code=303)
-    redirect_uri = str(request.url_for("social_callback", provider=provider))
+    redirect_uri = _social_callback_uri(provider)
     try:
         profile = exchange_google_code(code=code, redirect_uri=redirect_uri, code_verifier=code_verifier)
         user = get_or_create_social_user(

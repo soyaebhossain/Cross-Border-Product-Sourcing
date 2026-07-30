@@ -70,12 +70,19 @@ admin-only.
 ## Hosted deployment
 
 - Configure the Vercel project root as `apps/web-next`; that directory contains
-  the Next.js deployment config. Set both `NEXT_PUBLIC_API_BASE_URL` and
-  `API_BASE_URL` to the public API origin.
+  the Next.js deployment config. Browser traffic uses same-origin `/api` and
+  `/media` routes, while server rendering and the fixed reverse proxy use the
+  HTTPS API origin. Production Vercel deployments target the maintained Render
+  service; non-production deployments require an explicit `API_BASE_URL` and
+  must never proxy mutations into the production database.
 - `render.yaml` builds the maintained non-root FastAPI image, applies Alembic
   migrations before startup, and checks `/api/ready`. Before syncing the
   Blueprint, provide the `sync: false` MFA, monitoring, and payment-proof
   settings from a secrets manager.
+- Migrations intentionally create an empty catalog. Transfer only the
+  PII-free catalog scope into the new PostgreSQL database with
+  `scripts/migrate_catalog_to_postgres.py`; never upload a legacy SQLite user
+  database to a hosting provider.
 - Run `python -m scripts.dispatch_notifications --poll-seconds 10` as exactly
   one separately managed worker when automated email/SMS/WhatsApp delivery is
   enabled.

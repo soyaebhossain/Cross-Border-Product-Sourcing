@@ -8,12 +8,17 @@ The Playwright suite has two explicit layers:
 Role-routing tests are skipped with a visible reason unless all required values are provided:
 
 ```text
-NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001
+API_BASE_URL=http://127.0.0.1:8001
+E2E_API_BASE_URL=http://127.0.0.1:8001
 E2E_CUSTOMER_IDENTIFIER=...
 E2E_CUSTOMER_PASSWORD=...
 E2E_ADMIN_IDENTIFIER=...
 E2E_ADMIN_PASSWORD=...
 ```
+
+Browser requests remain on the Playwright storefront origin and reach the
+test API through Next.js rewrites. `E2E_API_BASE_URL` is used only by the test
+runner's direct backend readiness check.
 
 Accounts must be provisioned specifically for the test environment. The
 test-only helper refuses every environment except `CATALOG_ENVIRONMENT=test`

@@ -1,6 +1,6 @@
 import { requestJson, requestVoid } from "./api";
 
-const customerApiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8001").replace(/\/+$/, "");
+const customerApiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
 
 export type Paged<T> = { items: T[]; total: number; limit: number; offset: number };
 

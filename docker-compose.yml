@@ -105,13 +105,12 @@ services:
     build:
       context: ./apps/web-next
       args:
-        NEXT_PUBLIC_API_BASE_URL: "${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}"
+        API_BASE_URL: "http://api:8000"
     depends_on:
       api:
         condition: service_healthy
     environment:
       API_BASE_URL: "http://api:8000"
-      NEXT_PUBLIC_API_BASE_URL: "${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then((res) => { if (!res.ok) process.exit(1); }).catch(() => process.exit(1))"]
       interval: 15s

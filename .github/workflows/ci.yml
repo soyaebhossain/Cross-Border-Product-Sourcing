@@ -75,8 +75,8 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:8001
       API_BASE_URL: http://127.0.0.1:8001
+      E2E_API_BASE_URL: http://127.0.0.1:8001
       CATALOG_ENVIRONMENT: test
       CATALOG_DATABASE_URL: sqlite:///./e2e.sqlite3
       CATALOG_JWT_SECRET: ci-e2e-long-random-secret-not-for-production
