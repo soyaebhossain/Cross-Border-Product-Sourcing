@@ -3,6 +3,7 @@ import "./globals.css";
 import "./professional.css";
 import { Header } from "./Header";
 import { Footer } from "./Footer";
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 export const metadata: Metadata = {
   title: "SourceAI | AI Decision-Support Marketplace",
@@ -16,6 +17,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
         <Header />
         {children}
         <Footer />
+        <SpeedInsights />
       </body>
     </html>
   );
