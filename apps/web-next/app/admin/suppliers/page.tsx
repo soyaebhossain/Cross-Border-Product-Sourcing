@@ -6,7 +6,7 @@ import { AdminArchiveAction } from "../../../components/admin-archive-action";
 import { AdminDataPage, type AdminColumn } from "../../../components/admin-data-page";
 import { AdminModal } from "../../../components/admin-modal";
 import { bulkArchiveAdminEntities, createAdminSupplier, getAdminSupplier, updateAdminSupplier } from "../../../lib/admin-api";
-import { getCountries, type AdminSupplierRow, type Country } from "../../../lib/api";
+import { getLiveCountries, type AdminSupplierRow, type Country } from "../../../lib/api";
 import { useLocale } from "../../../lib/locale-context";
 
 function countryName(country: AdminSupplierRow["country"]) { return typeof country === "string" ? country : country?.name || country?.code || "—"; }
@@ -24,7 +24,7 @@ export default function AdminSuppliersPage() {
   const [error, setError] = useState("");
   const { locale } = useLocale();
   const bn = locale === "bn";
-  useEffect(() => { getCountries().then(setCountries).catch(() => setCountries([])); }, [version]);
+  useEffect(() => { getLiveCountries().then(setCountries).catch(() => setCountries([])); }, [version]);
   const openNew = () => { setEditingId("new"); setName(""); setCountryId(countries[0] ? String(countries[0].id) : ""); setRating("4.00"); setSupplierNote(""); setAuditNote(""); setError(""); };
   const openEdit = async (row: AdminSupplierRow) => {
     setSaving(true); setError("");

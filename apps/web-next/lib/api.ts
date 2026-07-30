@@ -25,6 +25,7 @@ export type Product = {
   variants: ProductVariant[];
   default_variant_id: number | null;
   market?: { min_price?: number; currency?: string; max_rating?: number; min_delivery_days?: number; risk_level?: string; supplier_count?: number; countries?: string[]; recommended_score?: number };
+  catalog_source?: "snapshot";
 };
 
 export type Country = {
@@ -222,10 +223,13 @@ export type AiInsights = {
 const productionApiBase = process.env.VERCEL_ENV === "production"
   ? "https://cross-border-product-sourcing-api.onrender.com"
   : "";
-const publicApiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(/\/+$/, "");
+// Browser traffic is always same-origin. This also prevents a stale Vercel
+// NEXT_PUBLIC_API_BASE_URL value from sending cookies or catalog requests to an
+// obsolete host.
+const publicApiBase = "";
 const serverApiBase = (
-  process.env.API_BASE_URL
-  || productionApiBase
+  productionApiBase
+  || process.env.API_BASE_URL
   || (process.env.NODE_ENV === "development" ? "http://localhost:8001" : "")
 ).replace(/\/+$/, "");
 let refreshRequest: Promise<boolean> | null = null;
@@ -398,24 +402,93 @@ export async function logoutSession() {
   await fetch(`${getRequestBase()}/api/auth/logout/`, { method: "POST", credentials: "include" });
 }
 
-export function getProducts(query?: string) {
+const catalogSnapshotFallbackEnabled =
+  process.env.NEXT_PUBLIC_CATALOG_SNAPSHOT_FALLBACK !== "0";
+
+export async function getProducts(query?: string) {
   const path = query ? `/api/products/?q=${encodeURIComponent(query)}` : "/api/products/";
-  return fetchJson<Product[]>(path);
+  let liveProducts: Product[] | null = null;
+  let liveError: unknown;
+  try {
+    liveProducts = await fetchJson<Product[]>(path);
+  } catch (error) {
+    liveError = error;
+  }
+  if (!catalogSnapshotFallbackEnabled) {
+    if (liveProducts) return liveProducts;
+    throw liveError;
+  }
+  const { getSnapshotProducts } = await import("./public-catalog");
+  const snapshotProducts = getSnapshotProducts(query);
+  return liveProducts && liveProducts.length >= snapshotProducts.length
+    ? liveProducts
+    : snapshotProducts;
 }
 
-export type ProductPage = { items: Product[]; total: number; page: number; page_size: number; pages: number };
-export function browseProducts(input: { q?: string; category?: string; page?: number; pageSize?: number; sort?: string; country?: string; maxPrice?: number; maxDelivery?: number; minRating?: number; risk?: string }) {
+export type ProductPage = { items: Product[]; total: number; page: number; page_size: number; pages: number; catalog_source?: "snapshot" };
+export async function browseProducts(input: { q?: string; category?: string; page?: number; pageSize?: number; sort?: string; country?: string; maxPrice?: number; maxDelivery?: number; minRating?: number; risk?: string }) {
   const params = new URLSearchParams({ q: input.q || "", category: input.category || "", page: String(input.page || 1), page_size: String(input.pageSize || 24), sort: input.sort || "name", country: input.country || "", risk: input.risk || "" });
   if (input.maxPrice !== undefined) params.set("max_price", String(input.maxPrice)); if (input.maxDelivery !== undefined) params.set("max_delivery", String(input.maxDelivery)); if (input.minRating !== undefined) params.set("min_rating", String(input.minRating));
-  return fetchJson<ProductPage>(`/api/catalog/browse/?${params.toString()}`);
+  let livePage: ProductPage | null = null;
+  let liveError: unknown;
+  try {
+    livePage = await fetchJson<ProductPage>(`/api/catalog/browse/?${params.toString()}`);
+  } catch (error) {
+    liveError = error;
+  }
+  if (!catalogSnapshotFallbackEnabled) {
+    if (livePage) return livePage;
+    throw liveError;
+  }
+  const { browseSnapshotProducts } = await import("./public-catalog");
+  const snapshotPage = browseSnapshotProducts(input);
+  return livePage && livePage.total >= snapshotPage.total ? livePage : snapshotPage;
 }
 
-export function getCategories() {
+export function getLiveCategories() {
   return fetchJson<Category[]>("/api/categories/");
 }
 
-export function getCountries() {
+export async function getCategories() {
+  let liveCategories: Category[] | null = null;
+  let liveError: unknown;
+  try {
+    liveCategories = await getLiveCategories();
+  } catch (error) {
+    liveError = error;
+  }
+  if (!catalogSnapshotFallbackEnabled) {
+    if (liveCategories) return liveCategories;
+    throw liveError;
+  }
+  const { getSnapshotCategories } = await import("./public-catalog");
+  const snapshotCategories = getSnapshotCategories();
+  return liveCategories && liveCategories.length >= snapshotCategories.length
+    ? liveCategories
+    : snapshotCategories;
+}
+
+export function getLiveCountries() {
   return fetchJson<Country[]>("/api/countries/");
+}
+
+export async function getCountries() {
+  let liveCountries: Country[] | null = null;
+  let liveError: unknown;
+  try {
+    liveCountries = await getLiveCountries();
+  } catch (error) {
+    liveError = error;
+  }
+  if (!catalogSnapshotFallbackEnabled) {
+    if (liveCountries) return liveCountries;
+    throw liveError;
+  }
+  const { getSnapshotCountries } = await import("./public-catalog");
+  const snapshotCountries = getSnapshotCountries();
+  return liveCountries && liveCountries.length >= snapshotCountries.length
+    ? liveCountries
+    : snapshotCountries;
 }
 
 export function getAiInsights(q = "") {
@@ -423,8 +496,14 @@ export function getAiInsights(q = "") {
   return fetchJson<AiInsights>(`/api/ai/insights/${query}`);
 }
 
-export function getProductBySlug(slug: string) {
-  return fetchJson<Product>(`/api/products/${slug}/`);
+export async function getProductBySlug(slug: string) {
+  try {
+    return await fetchJson<Product>(`/api/products/${slug}/`);
+  } catch (error) {
+    if (!catalogSnapshotFallbackEnabled) throw error;
+    const { getSnapshotProductBySlug } = await import("./public-catalog");
+    return getSnapshotProductBySlug(slug);
+  }
 }
 
 export function quoteProduct(payload: {

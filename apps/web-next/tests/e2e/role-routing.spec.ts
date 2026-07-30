@@ -37,6 +37,7 @@ test.describe("@roles live role-routing contract", () => {
     const catalog = (await catalogResponse.json()) as { total: number };
     expect(catalog.total).toBeGreaterThan(0);
     await expect(page.getByText(`${catalog.total} products`, { exact: true })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: "Catalog preview" })).toHaveCount(0);
     expect(apiRequests.length).toBeGreaterThan(0);
     expect(apiRequests.every(url => new URL(url).origin === storefrontOrigin)).toBe(true);
   });

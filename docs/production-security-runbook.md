@@ -210,6 +210,23 @@ historical customer/order/payment data must also move, do not broaden this
 script: design and review a separate PII/financial migration with legal,
 security and reconciliation owners.
 
+### Temporary public catalog snapshot
+
+Before the production API is ready, regenerate the read-only storefront
+snapshot from the migrated SQLite source:
+
+```shell
+python scripts/export_public_catalog_snapshot.py --source /approved/catalog.sqlite3
+```
+
+The exporter uses a fixed public-field allowlist, excludes free text and
+third-party images, and never reads accounts, quotes, orders, payments,
+customer, support or audit data. Keep
+`NEXT_PUBLIC_CATALOG_SNAPSHOT_FALLBACK=1` only during cutover. After
+`/api/ready` returns 200 and the live browse API reports all 410 imported
+products, set it to `0` and redeploy Vercel; live catalog data will then be the
+only source.
+
 ## Backup and restore
 
 - Create a consistent SQLite or PostgreSQL custom-format backup plus checksum

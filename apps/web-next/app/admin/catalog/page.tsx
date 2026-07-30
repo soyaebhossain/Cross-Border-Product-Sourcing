@@ -6,7 +6,7 @@ import { AdminArchiveAction } from "../../../components/admin-archive-action";
 import { AdminDataPage, type AdminColumn } from "../../../components/admin-data-page";
 import { AdminModal } from "../../../components/admin-modal";
 import { bulkArchiveAdminEntities, createAdminProduct, getAdminProduct, updateAdminProduct } from "../../../lib/admin-api";
-import { getCategories, type AdminProductRow, type Category } from "../../../lib/api";
+import { getLiveCategories, type AdminProductRow, type Category } from "../../../lib/api";
 import { useLocale } from "../../../lib/locale-context";
 
 type Fields = { name: string; slug: string; category_id: string; model: string; description: string; image: string };
@@ -24,7 +24,7 @@ export default function AdminCatalogPage() {
   const [error, setError] = useState("");
   const { locale } = useLocale();
   const bn = locale === "bn";
-  useEffect(() => { getCategories().then(setCategories).catch(() => setCategories([])); }, [version]);
+  useEffect(() => { getLiveCategories().then(setCategories).catch(() => setCategories([])); }, [version]);
   const set = (key: keyof Fields, value: string) => setFields(current => ({ ...current, [key]: value }));
   const openNew = () => { setEditingId("new"); setFields({ ...blank, category_id: categories[0] ? String(categories[0].id) : "" }); setNote(""); setError(""); };
   const openEdit = async (row: AdminProductRow) => {

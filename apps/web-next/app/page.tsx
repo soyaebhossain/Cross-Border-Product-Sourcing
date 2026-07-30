@@ -26,6 +26,12 @@ export default async function HomePage() {
 
   return (
     <main className="market-shell">
+      {catalog?.catalog_source === "snapshot" ? (
+        <div className="catalog-preview-notice" role="status">
+          <strong>Catalog preview</strong>
+          <span>Products are available to browse. Live quotes and ordering are temporarily unavailable.</span>
+        </div>
+      ) : null}
       <section className="market-hero">
         <div className="hero-copy">
           <span className="hero-pill">AI-assisted cross-border sourcing</span>

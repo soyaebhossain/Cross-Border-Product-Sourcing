@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { getProducts, getCountries, quoteProduct, saveQuote, type Country, type Product, type QuoteResponse } from "../../lib/api";
+import { getProducts, getLiveCountries, quoteProduct, saveQuote, type Country, type Product, type QuoteResponse } from "../../lib/api";
 import { formatBdt } from "../../lib/format";
 
 export default function QuotePage() {
@@ -16,6 +16,7 @@ export default function QuotePage() {
   const [savedQuoteId, setSavedQuoteId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [catalogPreview, setCatalogPreview] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -26,6 +27,7 @@ export default function QuotePage() {
     setForm((prev) => ({ ...prev, qty: requestedQty, country: requestedCountry || prev.country, mode: requestedMode || prev.mode }));
     getProducts().then((items) => {
       setProducts(items);
+      setCatalogPreview(items.some(item => item.catalog_source === "snapshot"));
       if (requestedVariant) {
         const product = items.find((item) => item.variants.some((variant) => variant.id === requestedVariant));
         if (product) {
@@ -34,7 +36,7 @@ export default function QuotePage() {
         }
       }
     }).catch(() => {});
-    getCountries().then(setCountries).catch(() => {});
+    getLiveCountries().then(setCountries).catch(() => {});
   }, []);
 
   const selectedProduct = products.find((product) => product.id === selectedProductId);
@@ -88,6 +90,12 @@ export default function QuotePage() {
   return (
     <main className="shell shell--narrow">
       <div className="section">
+        {catalogPreview ? (
+          <div className="catalog-preview-notice" role="status">
+            <strong>Catalog preview</strong>
+            <span>Products are available to browse, but live quote, save and order actions are temporarily unavailable.</span>
+          </div>
+        ) : null}
         <div className="section__header">
           <div>
             <p className="eyebrow">Quote</p>
@@ -181,8 +189,8 @@ export default function QuotePage() {
           </div>
 
           <div className="form-actions">
-            <button type="submit" className="button button--primary" disabled={loading}>
-              {loading ? "Requesting quote…" : "Request quote"}
+            <button type="submit" className="button button--primary" disabled={loading || catalogPreview}>
+              {catalogPreview ? "Request quote unavailable" : loading ? "Requesting quote…" : "Request quote"}
             </button>
             {error ? <div className="form-error">{error}</div> : null}
           </div>

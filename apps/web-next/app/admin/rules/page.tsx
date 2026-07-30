@@ -8,7 +8,7 @@ import {
   saveAdminSetting,
   type AdminSettings,
 } from "../../../lib/admin-api";
-import { getCategories, getCountries, type Category, type Country } from "../../../lib/api";
+import { getLiveCategories, getLiveCountries, type Category, type Country } from "../../../lib/api";
 import { formatAmount, formatDateTime } from "../../../lib/format";
 import { useLocale } from "../../../lib/locale-context";
 
@@ -96,7 +96,7 @@ export default function AdminRulesPage() {
     setLoading(true);
     setError("");
     try {
-      const [nextSettings, nextCountries, nextCategories] = await Promise.all([getAdminSettings(), getCountries(), getCategories()]);
+      const [nextSettings, nextCountries, nextCategories] = await Promise.all([getAdminSettings(), getLiveCountries(), getLiveCategories()]);
       setSettings(nextSettings);
       setCountries(nextCountries);
       setCategories(nextCategories);

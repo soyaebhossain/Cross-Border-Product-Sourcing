@@ -16,7 +16,7 @@ import {
   type AdminSupplier,
   type AdminVariant,
 } from "../../../../lib/admin-api";
-import { getAdminList, getCountries, type AdminSupplierRow, type Country } from "../../../../lib/api";
+import { getAdminList, getLiveCountries, type AdminSupplierRow, type Country } from "../../../../lib/api";
 import { formatAmount, formatDateTime } from "../../../../lib/format";
 import { useLocale } from "../../../../lib/locale-context";
 
@@ -36,7 +36,7 @@ export default function AdminOffersPage() {
   const { locale, intlLocale } = useLocale();
   const bn = locale === "bn";
   useEffect(() => {
-    Promise.all([getAdminList<AdminSupplierRow>("suppliers", { page_size: 100 }), listAdminVariants({ page_size: 100, active: true }), getCountries()])
+    Promise.all([getAdminList<AdminSupplierRow>("suppliers", { page_size: 100 }), listAdminVariants({ page_size: 100, active: true }), getLiveCountries()])
       .then(async ([supplierPage, variantPage, countryRows]) => {
         const details = await Promise.all(supplierPage.items.filter(item => item.is_active !== false).map(item => getAdminSupplier(item.id)));
         setSuppliers(details); setVariants(variantPage.items); setCountries(countryRows);

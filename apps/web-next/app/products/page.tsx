@@ -48,9 +48,16 @@ export default function ProductsPage() {
   const activeFilters = useMemo(() => [category, country, maxPrice, delivery, rating, risk].filter(Boolean).length, [category, country, maxPrice, delivery, rating, risk]);
   const toggle = (id: number) => setCompare(value => value.includes(id) ? value.filter(item => item !== id) : value.length < 3 ? [...value, id] : value);
   const reset = () => { setCategory(""); setCountry(""); setMaxPrice(""); setDelivery(""); setRating(""); setRisk(""); setSort("recommended"); setPage(1); };
+  const catalogPreview = data?.catalog_source === "snapshot";
 
   return <main className="market-shell">
-    <section className="catalog-heading"><div><span className="market-kicker">Global sourcing catalog</span><h1>Find the right product and supplier</h1><p>Compare verified offers by landed cost, delivery, reliability and sourcing risk.</p></div><Link href="/quote" className="market-button">Request a quote</Link></section>
+    {catalogPreview ? (
+      <div className="catalog-preview-notice" role="status">
+        <strong>Catalog preview</strong>
+        <span>Search and product details are available. Live quotes and ordering are temporarily unavailable.</span>
+      </div>
+    ) : null}
+    <section className="catalog-heading"><div><span className="market-kicker">Global sourcing catalog</span><h1>Find the right product and supplier</h1><p>Compare verified offers by landed cost, delivery, reliability and sourcing risk.</p></div>{catalogPreview ? <button type="button" className="market-button" disabled>Quote unavailable</button> : <Link href="/quote" className="market-button">Request a quote</Link>}</section>
     <button className="mobile-filter-toggle" onClick={() => setFiltersOpen(value => !value)}>{filtersOpen ? "Hide filters" : `Filters${activeFilters ? ` (${activeFilters})` : ""}`}</button>
     <div className="catalog-layout">
       <aside className={filtersOpen ? "filter-panel filter-panel--open" : "filter-panel"}><div className="filter-title"><strong>Refine results</strong>{activeFilters ? <span>{activeFilters} active</span> : null}</div>
@@ -68,6 +75,6 @@ export default function ProductsPage() {
         {data && data.pages > 1 ? <div className="pagination"><button disabled={page === 1} onClick={() => setPage(value => value - 1)}>Previous</button><span>Page {page} of {data.pages}</span><button disabled={page === data.pages} onClick={() => setPage(value => value + 1)}>Next</button></div> : null}
       </section>
     </div>
-    {compare.length ? <div className="compare-dock"><span><strong>{compare.length}</strong> selected</span><button onClick={() => setCompare([])}>Clear</button><Link href={`/quote?products=${compare.join(",")}`}>Compare sourcing</Link></div> : null}
+    {compare.length ? <div className="compare-dock"><span><strong>{compare.length}</strong> selected</span><button onClick={() => setCompare([])}>Clear</button>{catalogPreview ? <button type="button" className="compare-unavailable" disabled>Compare unavailable</button> : <Link href={`/quote?products=${compare.join(",")}`}>Compare sourcing</Link>}</div> : null}
   </main>;
 }

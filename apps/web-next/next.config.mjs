@@ -1,6 +1,7 @@
 import path from "node:path";
 
 const isProduction = process.env.NODE_ENV === "production";
+const isVercelProduction = process.env.VERCEL_ENV === "production";
 const productionApiOrigin = "https://cross-border-product-sourcing-api.onrender.com";
 
 function normalizedApiOrigin(value) {
@@ -22,17 +23,14 @@ function normalizedApiOrigin(value) {
   return parsed.origin;
 }
 
-const defaultApiOrigin = process.env.VERCEL_ENV === "production"
+const defaultApiOrigin = isVercelProduction
   ? productionApiOrigin
   : isProduction
     ? ""
     : "http://localhost:8001";
 const apiProxyOrigin = normalizedApiOrigin(
-  process.env.API_BASE_URL
-    || process.env.NEXT_PUBLIC_API_BASE_URL
-    || defaultApiOrigin,
+  isVercelProduction ? productionApiOrigin : process.env.API_BASE_URL || defaultApiOrigin,
 );
-const publicApiOrigin = normalizedApiOrigin(process.env.NEXT_PUBLIC_API_BASE_URL || "");
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -44,7 +42,7 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' data: https://fonts.gstatic.com",
   "img-src 'self' data: blob: http: https:",
-  `connect-src 'self'${publicApiOrigin ? ` ${publicApiOrigin}` : ""}`,
+  "connect-src 'self'",
   "frame-src https://accounts.google.com",
 ].join("; ");
 

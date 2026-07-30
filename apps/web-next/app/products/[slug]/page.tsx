@@ -16,7 +16,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     const product = await getProductBySlug(slug);
     const image = resolveImageUrl(product.image);
     const primaryVariantId = product.default_variant_id ?? product.variants[0]?.id;
-    const recommendation = primaryVariantId
+    const catalogPreview = product.catalog_source === "snapshot";
+    const recommendation = primaryVariantId && !catalogPreview
       ? await getCheapestCountryRecommendation({
           variant_id: primaryVariantId,
           qty: 1,
@@ -30,6 +31,12 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         <Link href="/" className="back-link">
           Back to catalog
         </Link>
+        {catalogPreview ? (
+          <div className="catalog-preview-notice" role="status">
+            <strong>Catalog preview</strong>
+            <span>This product is available to browse. Live recommendations, quotes and ordering are temporarily unavailable.</span>
+          </div>
+        ) : null}
 
         <section className="detail">
           <div className="detail__media">
@@ -129,7 +136,16 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             </section>
           </div>
         </section>
-        {primaryVariantId ? <SourcingWorkspace variantId={primaryVariantId} /> : null}
+        {primaryVariantId && !catalogPreview ? <SourcingWorkspace variantId={primaryVariantId} /> : catalogPreview ? (
+          <section className="workspace catalog-preview-workspace">
+            <div>
+              <span className="market-kicker">Live sourcing temporarily unavailable</span>
+              <h2>Quote and order services are starting</h2>
+              <p>You can review the catalog now. Supplier recommendations, saved quotes and checkout will be enabled when the secure service is online.</p>
+            </div>
+            <button className="market-button" type="button" disabled>Request quote unavailable</button>
+          </section>
+        ) : null}
       </main>
     );
   } catch {

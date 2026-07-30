@@ -32,7 +32,7 @@ export function ProductCard({ product, selectable, selected, onSelect }: Product
         <span className={`risk-text risk-text--${market.risk_level?.toLowerCase()}`}>{market.risk_level} risk</span>
       </div> : null}
       <p className="summary">{product.description || "Supplier offer ready for landed-cost and risk comparison."}</p>
-      <div className="meta-row"><span>{product.variants.length} variant{product.variants.length === 1 ? "" : "s"}</span><Link className="card-action" href={`/products/${product.slug}`}>Compare sourcing <span aria-hidden>→</span></Link></div>
+      <div className="meta-row"><span>{product.variants.length} variant{product.variants.length === 1 ? "" : "s"}</span><Link className="card-action" href={`/products/${product.slug}`}>{product.catalog_source === "snapshot" ? "View product" : "Compare sourcing"} <span aria-hidden>→</span></Link></div>
     </div>
     <div className="product-card__visual"><ProductImage src={image} name={product.name} category={product.category.name} /></div>
   </article>;
