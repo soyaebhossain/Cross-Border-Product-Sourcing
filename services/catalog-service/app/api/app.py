@@ -59,6 +59,7 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title=runtime_settings.app_name,
         version="0.1.0",
+        redirect_slashes=False,
         docs_url=None if runtime_settings.is_production else "/docs",
         redoc_url=None if runtime_settings.is_production else "/redoc",
         openapi_url=None if runtime_settings.is_production else "/openapi.json",

@@ -4,6 +4,8 @@ databases:
     user: cross_border
     plan: basic-256mb
     diskSizeGB: 5
+    postgresMajorVersion: "16"
+    ipAllowList: []
     region: singapore
 
 services:

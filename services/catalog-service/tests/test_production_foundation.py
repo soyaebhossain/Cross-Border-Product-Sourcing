@@ -8,6 +8,7 @@ from types import SimpleNamespace
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
+from fastapi.testclient import TestClient
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -184,3 +185,18 @@ def test_production_lifespan_never_bootstraps_schema_or_seed(monkeypatch) -> Non
     asyncio.run(run_lifespan())
     assert calls == []
     assert app.router.on_startup == []
+
+
+def test_noncanonical_api_paths_do_not_redirect_to_backend_origin() -> None:
+    app = app_module.create_app(_settings())
+    client = TestClient(app, follow_redirects=False)
+
+    responses = [
+        client.get("/api/categories"),
+        client.get("/api/health/"),
+        client.post("/api/auth/login", json={}),
+    ]
+
+    for response in responses:
+        assert response.status_code == 404
+        assert "location" not in response.headers

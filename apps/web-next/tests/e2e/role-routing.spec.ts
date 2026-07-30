@@ -29,10 +29,29 @@ test.describe("@roles live role-routing contract", () => {
       }
     });
 
-    await page.goto("/products");
-    await expect(page.getByText("410 products", { exact: true })).toBeVisible();
+    const [catalogResponse] = await Promise.all([
+      page.waitForResponse(response => new URL(response.url()).pathname === "/api/catalog/browse/"),
+      page.goto("/products"),
+    ]);
+    expect(catalogResponse.ok()).toBe(true);
+    const catalog = (await catalogResponse.json()) as { total: number };
+    expect(catalog.total).toBeGreaterThan(0);
+    await expect(page.getByText(`${catalog.total} products`, { exact: true })).toBeVisible();
     expect(apiRequests.length).toBeGreaterThan(0);
     expect(apiRequests.every(url => new URL(url).origin === storefrontOrigin)).toBe(true);
+  });
+
+  test("noncanonical API paths never redirect away from the storefront", async ({ request }) => {
+    const responses = await Promise.all([
+      request.get("/api/categories", { maxRedirects: 0 }),
+      request.get("/api/health/", { maxRedirects: 0 }),
+      request.post("/api/auth/login", { data: {}, maxRedirects: 0 }),
+    ]);
+
+    for (const response of responses) {
+      expect(response.status()).toBe(404);
+      expect(response.headers().location).toBeUndefined();
+    }
   });
 
   test("customer lands in customer account and is kept out of admin", async ({ page }) => {
