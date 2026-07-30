@@ -46,6 +46,9 @@ test("@public read-only catalog snapshot supports browse, search and detail", as
   await page.goto("/");
   await expect(page.getByRole("status").filter({ hasText: "Catalog preview" })).toBeVisible();
   await expect(page.getByRole("link", { name: /Browse all 610/ })).toBeVisible();
+  await expect(page.locator(".compact-grid .product-card")).toHaveCount(8);
+  await expect(page.locator(".compact-grid .product-image img[data-nimg]")).toHaveCount(8);
+  await expect(page.locator(".compact-grid .product-image--fallback")).toHaveCount(0);
   const categoryCards = page.locator(".category-strip > a");
   await expect(categoryCards).toHaveCount(12);
   for (const categoryName of [
@@ -91,9 +94,21 @@ test("@public read-only catalog snapshot supports browse, search and detail", as
   await expect(page).toHaveURL(/\/products\?q=iPhone%2014$/);
   await expect(page.getByText("1 products", { exact: true })).toBeVisible();
   const productCard = page.getByRole("article").filter({ hasText: "iPhone 14" });
+  await expect(productCard.locator(".product-image img[data-nimg]")).toBeVisible();
+  await expect(productCard.locator(".product-image__badge")).toContainText(
+    /Reference image|Illustrative preview/,
+  );
   await productCard.getByRole("link", { name: /View product/ }).click();
 
   await expect(page.getByRole("heading", { name: "iPhone 14", exact: true })).toBeVisible();
+  const productGallery = page.getByRole("region", {
+    name: "iPhone 14 product images",
+  });
+  await expect(productGallery).toBeVisible();
+  await expect(productGallery.getByText("1 image", { exact: true })).toBeVisible();
+  await expect(productGallery.locator(".product-image__badge")).toContainText(
+    /Reference image|Illustrative preview/,
+  );
   await expect(page.getByRole("button", { name: "Request quote unavailable" })).toBeDisabled();
 
   await page.goto("/quote");

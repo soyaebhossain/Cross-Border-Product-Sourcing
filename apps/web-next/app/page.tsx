@@ -6,9 +6,29 @@ import { browseProducts, getCategories } from "../lib/api";
 
 export default async function HomePage() {
   const [catalog, categories] = await Promise.all([
-    browseProducts({ pageSize: 8 }).catch(() => null),
+    browseProducts({ pageSize: 60 }).catch(() => null),
     getCategories().catch(() => []),
   ]);
+  const popularProducts = (() => {
+    if (!catalog) return [];
+    const selected = [];
+    const selectedIds = new Set<number>();
+    const representedCategories = new Set<string>();
+
+    for (const product of catalog.items) {
+      if (!product.image || representedCategories.has(product.category.slug)) continue;
+      selected.push(product);
+      selectedIds.add(product.id);
+      representedCategories.add(product.category.slug);
+      if (selected.length === 8) return selected;
+    }
+    for (const product of catalog.items) {
+      if (selectedIds.has(product.id)) continue;
+      selected.push(product);
+      if (selected.length === 8) break;
+    }
+    return selected;
+  })();
   const featuredCategorySlugs = [
     "mobile-accessories",
     "laptop-pc-accessories",
@@ -82,7 +102,7 @@ export default async function HomePage() {
           <div><span className="market-kicker">Live catalog</span><h2>Popular products</h2></div>
           <Link href="/products">{catalog ? `Browse all ${catalog.total}` : "Browse catalog"} →</Link>
         </div>
-        {catalog?.items.length ? <div className="compact-grid">{catalog.items.map((product) => <ProductCard key={product.id} product={product} />)}</div> : <div className="market-empty">Catalog is starting. Please refresh shortly.</div>}
+        {popularProducts.length ? <div className="compact-grid">{popularProducts.map((product, index) => <ProductCard key={product.id} product={product} imagePriority={index < 4} />)}</div> : <div className="market-empty">Catalog is starting. Please refresh shortly.</div>}
       </section>
 
       <section className="decision-banner">

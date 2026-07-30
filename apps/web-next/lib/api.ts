@@ -14,6 +14,35 @@ export type ProductVariant = {
   height_cm: string;
 };
 
+export type ProductMediaKind = "supplier" | "reference" | "illustrative";
+
+export type ProductMedia = {
+  id?: number | string;
+  src?: string | null;
+  url?: string | null;
+  image?: string | null;
+  alt?: string | null;
+  kind?: ProductMediaKind | string | null;
+  source?: ProductMediaKind | string | null;
+  verified?: boolean | null;
+  is_primary?: boolean | null;
+};
+
+export type ProductImageMetadata = {
+  url?: string | null;
+  alt?: string | null;
+  kind?: ProductMediaKind | "owned" | "external" | "fallback" | string | null;
+  credit?: string | null;
+};
+
+export type ResolvedProductMedia = {
+  key: string;
+  src: string | null;
+  alt: string;
+  kind: ProductMediaKind;
+  verified: boolean;
+};
+
 export type Product = {
   id: number;
   name: string;
@@ -21,6 +50,11 @@ export type Product = {
   model: string | null;
   description: string | null;
   image: string | null;
+  image_alt?: string | null;
+  image_source?: ProductMediaKind | string | null;
+  image_verified?: boolean | null;
+  images?: ProductMedia[] | null;
+  image_metadata?: ProductImageMetadata | null;
   category: Category;
   variants: ProductVariant[];
   default_variant_id: number | null;
@@ -319,11 +353,80 @@ function getRequestBase() {
 }
 
 export function resolveImageUrl(src: string | null | undefined) {
-  if (!src) return null;
-  if (/^https?:\/\/(?:www\.)?loremflickr\.com\//i.test(src)) return null;
-  if (/^https?:\/\//i.test(src) || src.startsWith("//")) return src;
-  const normalized = src.startsWith("/") ? src : `/${src}`;
+  const value = src?.trim();
+  if (!value) return null;
+  if (/^https?:\/\/(?:www\.)?loremflickr\.com\//i.test(value)) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  if (value.startsWith("//")) return `https:${value}`;
+  if (value.startsWith("products/")) return `${publicApiBase}/media/${value}`;
+  const normalized = value.startsWith("/") ? value : `/${value}`;
   return `${publicApiBase}${normalized}`;
+}
+
+function resolveMediaKind(
+  value: string | null | undefined,
+  hasImage: boolean,
+): ProductMediaKind {
+  const normalized = value?.trim().toLowerCase() || "";
+  if (normalized.includes("supplier")) return "supplier";
+  if (
+    normalized.includes("illustrat")
+    || normalized.includes("generated")
+    || normalized.includes("fallback")
+  ) {
+    return "illustrative";
+  }
+  if (normalized.includes("reference") || normalized.includes("catalog")) {
+    return "reference";
+  }
+  return hasImage ? "reference" : "illustrative";
+}
+
+export function getProductMedia(product: Product): ResolvedProductMedia[] {
+  const suppliedMedia = Array.isArray(product.images)
+    ? product.images
+        .map((item, index) => ({ item, index }))
+        .sort((a, b) => Number(Boolean(b.item.is_primary)) - Number(Boolean(a.item.is_primary)))
+    : [];
+  const candidates = [
+    ...suppliedMedia.map(({ item, index }) => ({
+        key: String(item.id ?? index),
+        rawSrc: item.src ?? item.url ?? item.image,
+        alt: item.alt,
+        kind: item.kind ?? item.source,
+        verified: item.verified,
+      })),
+    {
+      key: "primary",
+      rawSrc: product.image_metadata?.url ?? product.image,
+      alt: product.image_metadata?.alt ?? product.image_alt,
+      kind: product.image_metadata?.kind ?? product.image_source,
+      verified: product.image_verified,
+    },
+  ];
+  const seen = new Set<string>();
+  const media = candidates.flatMap((candidate) => {
+    const src = resolveImageUrl(candidate.rawSrc);
+    if (!src || seen.has(src)) return [];
+    seen.add(src);
+    return [{
+      key: `${candidate.key}-${src}`,
+      src,
+      alt: candidate.alt?.trim() || product.name,
+      kind: resolveMediaKind(candidate.kind, true),
+      verified: Boolean(candidate.verified),
+    } satisfies ResolvedProductMedia];
+  });
+
+  return media.length
+    ? media
+    : [{
+        key: "illustrative-fallback",
+        src: null,
+        alt: product.name,
+        kind: "illustrative",
+        verified: false,
+      }];
 }
 
 async function fetchJson<T>(path: string): Promise<T> {

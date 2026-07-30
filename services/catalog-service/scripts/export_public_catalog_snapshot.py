@@ -55,7 +55,8 @@ BANNED_PUBLIC_KEYS = {
 }
 EMAIL_PATTERN = re.compile(r"\b[^@\s]+@[^@\s]+\.[^@\s]+\b")
 LOCAL_IMAGE_PATTERN = re.compile(
-    r"^products/[A-Za-z0-9][A-Za-z0-9._-]*\.(?:avif|gif|jpe?g|png|webp)$",
+    r"^products/(?:[A-Za-z0-9][A-Za-z0-9_-]*/)*"
+    r"[A-Za-z0-9][A-Za-z0-9._-]*\.(?:avif|gif|jpe?g|png|webp)$",
     re.IGNORECASE,
 )
 
@@ -72,6 +73,26 @@ def _public_image_path(value: str | None) -> str | None:
     if not normalized or not LOCAL_IMAGE_PATTERN.fullmatch(normalized):
         return None
     return f"/media/{normalized}"
+
+
+def _public_image_metadata(
+    product_name: str,
+    image_url: str | None,
+) -> dict[str, str | None]:
+    kind = (
+        "fallback"
+        if not image_url
+        else "illustrative"
+        if "/illustrative/" in image_url
+        else "owned"
+    )
+    return {
+        "url": image_url,
+        "alt": product_name,
+        "kind": kind,
+        # The database currently has no verified credit/provenance column.
+        "credit": None,
+    }
 
 
 def _required_tables(connection: sqlite3.Connection) -> None:
@@ -266,6 +287,7 @@ def build_public_catalog_snapshot(
     for row in product_source_rows:
         product_id = int(row["id"])
         variants = variant_rows[product_id]
+        image_url = _public_image_path(row["image"])
         products.append(
             {
                 "id": product_id,
@@ -275,7 +297,11 @@ def build_public_catalog_snapshot(
                 # Free-text descriptions are intentionally excluded because they
                 # are not constrained against personal or customer information.
                 "description": None,
-                "image": _public_image_path(row["image"]),
+                "image": image_url,
+                "image_metadata": _public_image_metadata(
+                    str(row["name"]),
+                    image_url,
+                ),
                 "category": category_by_id[int(row["category_id"])],
                 "variants": variants,
                 "default_variant_id": variants[0]["id"] if variants else None,
@@ -294,7 +320,7 @@ def build_public_catalog_snapshot(
         )
     ]
     snapshot = {
-        "schema_version": 1,
+        "schema_version": 2,
         "source_revision": str(revision_row["version_num"]),
         "counts": {
             "categories": len(categories),
@@ -330,6 +356,9 @@ def validate_public_catalog_snapshot(
     *,
     minimum_products: int = 350,
 ) -> None:
+    schema_version = snapshot.get("schema_version")
+    if schema_version not in {1, 2}:
+        raise RuntimeError("Snapshot schema version is unsupported")
     products = snapshot.get("products")
     categories = snapshot.get("categories")
     countries = snapshot.get("countries")
@@ -366,6 +395,26 @@ def validate_public_catalog_snapshot(
         for product in products
     ):
         raise RuntimeError("Snapshot image paths must reference owned local media")
+    if schema_version >= 2:
+        for product in products:
+            metadata = product.get("image_metadata")
+            if (
+                not isinstance(metadata, dict)
+                or metadata.get("url") != product.get("image")
+                or metadata.get("alt") != product.get("name")
+                or metadata.get("kind") not in {"owned", "illustrative", "fallback"}
+                or metadata.get("credit") is not None
+            ):
+                raise RuntimeError("Snapshot image metadata is missing or inconsistent")
+            expected_kind = (
+                "fallback"
+                if not product.get("image")
+                else "illustrative"
+                if "/illustrative/" in str(product["image"])
+                else "owned"
+            )
+            if metadata["kind"] != expected_kind:
+                raise RuntimeError("Snapshot image metadata kind is inconsistent")
 
     _walk_public_payload(snapshot)
 

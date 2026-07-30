@@ -26,6 +26,29 @@ def normalize_image_path(src: str | None) -> str | None:
     return f"{settings.media_url_path}/{src.lstrip('/')}"
 
 
+def serialize_image_metadata(product_name: str, image_url: str | None) -> dict[str, str | None]:
+    """Expose a stable, backward-compatible media contract.
+
+    Alt text is derived from the product record because the current catalog
+    schema has no separate image metadata columns. Credit remains explicitly
+    nullable until provenance is stored and verified.
+    """
+    if not image_url:
+        kind = "fallback"
+    elif "/illustrative/" in image_url:
+        kind = "illustrative"
+    elif image_url.startswith(("http://", "https://", "//")):
+        kind = "external"
+    else:
+        kind = "owned"
+    return {
+        "url": image_url,
+        "alt": product_name,
+        "kind": kind,
+        "credit": None,
+    }
+
+
 def serialize_category(category: Category) -> dict[str, Any]:
     return {
         "id": category.id,
@@ -56,13 +79,15 @@ def serialize_variant(variant: ProductVariant) -> dict[str, Any]:
 
 def serialize_product(product: Product) -> dict[str, Any]:
     variants = [serialize_variant(variant) for variant in product.variants]
+    image_url = normalize_image_path(product.image)
     return {
         "id": product.id,
         "name": product.name,
         "slug": product.slug,
         "model": product.model,
         "description": product.description,
-        "image": normalize_image_path(product.image),
+        "image": image_url,
+        "image_metadata": serialize_image_metadata(product.name, image_url),
         "category": serialize_category(product.category),
         "variants": variants,
         "default_variant_id": variants[0]["id"] if variants else None,

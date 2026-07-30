@@ -27,6 +27,11 @@ from .models import (
 _GENERAL_GOODS_MANIFEST_PATH = (
     Path(__file__).resolve().parent / "seed_data" / "general_goods_v1.json"
 )
+_OWNED_PRODUCT_IMAGE_PATTERN = re.compile(
+    r"^products/(?:[A-Za-z0-9][A-Za-z0-9_-]*/)*"
+    r"[A-Za-z0-9][A-Za-z0-9._-]*\.(?:avif|gif|jpe?g|png|webp)$",
+    re.IGNORECASE,
+)
 
 
 def _slugify(value: str) -> str:
@@ -66,6 +71,35 @@ def _nonnegative_manifest_decimal(value: Any, label: str) -> Decimal:
     if parsed < 0:
         raise RuntimeError(f"{label} must not be negative")
     return parsed
+
+
+def _owned_product_image_path(value: Any, label: str) -> str | None:
+    """Return the canonical database value for an owned product asset.
+
+    Seed manifests are intentionally limited to project-owned media. Remote
+    hotlinks are mutable, can leak visitor requests to third parties, and make
+    deterministic public snapshots impossible.
+    """
+    if value is None:
+        return None
+    normalized = str(value).strip().replace("\\", "/").lstrip("/")
+    if normalized.startswith("media/"):
+        normalized = normalized.removeprefix("media/")
+    if not normalized:
+        return None
+    if len(normalized) > 500 or not _OWNED_PRODUCT_IMAGE_PATTERN.fullmatch(normalized):
+        raise RuntimeError(
+            f"{label} must be an owned relative product image path such as "
+            "products/example.webp"
+        )
+    return normalized
+
+
+def _merge_seed_image(current: str | None, proposed: str | None) -> str | None:
+    """Fill an empty image without overwriting an operator-managed value."""
+    if current and current.strip():
+        return current
+    return proposed
 
 
 def _load_general_goods_manifest(path: Path | None = None) -> dict[str, Any]:
@@ -248,6 +282,7 @@ def _load_general_goods_manifest(path: Path | None = None) -> dict[str, Any]:
                 raise RuntimeError(f"{sku} requires three supported, unique origin codes")
             if not str(product.get("spec_caveat") or "").strip():
                 raise RuntimeError(f"{sku} requires a specification caveat")
+            _owned_product_image_path(product.get("image"), f"{sku} image")
             product_slugs.add(product_slug)
             product_models.add(model)
             product_skus.add(sku)
@@ -1109,6 +1144,7 @@ def _ensure_general_goods_catalog(
             "Displayed prices and availability are indicative demo values, not live supplier quotations. "
             f"{str(product_spec['spec_caveat']).strip()}"
         )
+        seed_image = _owned_product_image_path(product_spec.get("image"), f"{model} image")
         product = product_by_slug or product_by_model
         if not product:
             product = Product(
@@ -1116,7 +1152,7 @@ def _ensure_general_goods_catalog(
                 slug=slug,
                 model=model,
                 description=description,
-                image=None,
+                image=seed_image,
                 category=category,
             )
             session.add(product)
@@ -1126,6 +1162,7 @@ def _ensure_general_goods_catalog(
             product.name = str(product_spec["name"])
             product.description = description
             product.category = category
+            product.image = _merge_seed_image(product.image, seed_image)
         seeded_products.append((product_spec, product))
     session.flush()
 
@@ -1293,7 +1330,7 @@ def _import_legacy_catalog(session: Session, sqlite_path: Path) -> bool:
             product.name = row["name"]
             product.model = row["model"]
             product.description = row["description"]
-            product.image = image
+            product.image = _merge_seed_image(product.image, image)
             product.category = category_map[row["category_id"]]
         product_map[row["id"]] = product
 

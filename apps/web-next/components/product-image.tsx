@@ -1,5 +1,7 @@
 "use client";
+import Image from "next/image";
 import { useEffect, useState } from "react";
+import { resolveImageUrl, type ProductMediaKind, type ResolvedProductMedia } from "../lib/api";
 
 type CategoryVisual = {
   accent: string;
@@ -252,10 +254,157 @@ function fallbackDataUrl(category?: string) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
-export function ProductImage({ src, name, category, className }: { src?: string | null; name: string; category?: string; className?: string }) {
-  const fallback = fallbackDataUrl(category); const preferred = src || fallback; const [current, setCurrent] = useState(preferred);
-  useEffect(() => setCurrent(preferred), [preferred]);
-  // Remote supplier URLs and inline generated fallbacks are intentionally rendered without a Next image loader.
-  // eslint-disable-next-line @next/next/no-img-element
-  return <img className={className} src={current} alt={name} loading="lazy" decoding="async" onError={() => { if (current !== fallback) setCurrent(fallback); }} />;
+type ProductImageProps = {
+  src?: string | null;
+  name: string;
+  category?: string;
+  alt?: string | null;
+  sourceKind?: ProductMediaKind;
+  verified?: boolean;
+  className?: string;
+  sizes?: string;
+  priority?: boolean;
+  showLabel?: boolean;
+};
+
+function imageLabel(kind: ProductMediaKind, verified: boolean) {
+  if (kind === "illustrative") return "Illustrative preview";
+  if (kind === "supplier") {
+    return verified ? "Verified supplier photo" : "Supplier photo";
+  }
+  return "Reference image";
+}
+
+export function ProductImage({
+  src,
+  name,
+  category,
+  alt,
+  sourceKind = src ? "reference" : "illustrative",
+  verified = false,
+  className,
+  sizes = "(max-width: 620px) 112px, (max-width: 960px) 50vw, 25vw",
+  priority = false,
+  showLabel = true,
+}: ProductImageProps) {
+  const fallback = fallbackDataUrl(category);
+  const preferred = resolveImageUrl(src);
+  const [failed, setFailed] = useState(!preferred);
+
+  useEffect(() => {
+    setFailed(!preferred);
+  }, [preferred]);
+
+  const usingFallback = !preferred || failed;
+  const current = usingFallback ? fallback : preferred;
+  const currentKind = usingFallback ? "illustrative" : sourceKind;
+  const label = imageLabel(currentKind, !usingFallback && verified);
+  const isExternal = /^https?:\/\//i.test(current);
+
+  return (
+    <div
+      className={[
+        "product-image",
+        usingFallback ? "product-image--fallback" : "",
+        className,
+      ].filter(Boolean).join(" ")}
+      data-image-kind={currentKind}
+    >
+      <Image
+        className="product-image__asset"
+        src={current}
+        alt={usingFallback
+          ? `${category || "Product"} illustrative preview for ${name}`
+          : alt?.trim() || name}
+        fill
+        sizes={sizes}
+        priority={priority}
+        unoptimized={isExternal || current.startsWith("data:")}
+        onError={() => {
+          if (!usingFallback) {
+            setFailed(true);
+          }
+        }}
+      />
+      {showLabel ? (
+        <span className={`product-image__badge product-image__badge--${currentKind}`}>
+          <span aria-hidden />
+          {label}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+type ProductGalleryProps = {
+  media: ResolvedProductMedia[];
+  name: string;
+  category?: string;
+};
+
+export function ProductGallery({ media, name, category }: ProductGalleryProps) {
+  const safeMedia = media.length
+    ? media
+    : [{
+        key: "illustrative-fallback",
+        src: null,
+        alt: name,
+        kind: "illustrative" as const,
+        verified: false,
+      }];
+  const signature = safeMedia.map((item) => item.key).join("|");
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [signature]);
+
+  const selected = safeMedia[Math.min(selectedIndex, safeMedia.length - 1)];
+
+  return (
+    <section className="product-gallery" aria-label={`${name} product images`}>
+      <div className="product-gallery__stage">
+        <ProductImage
+          key={selected.key}
+          src={selected.src}
+          name={name}
+          category={category}
+          alt={selected.alt}
+          sourceKind={selected.kind}
+          verified={selected.verified}
+          sizes="(max-width: 900px) calc(100vw - 48px), 430px"
+          priority
+        />
+      </div>
+      <div className="product-gallery__footer">
+        <span>{safeMedia.length} image{safeMedia.length === 1 ? "" : "s"}</span>
+        <span>Photos are labeled by source</span>
+      </div>
+      {safeMedia.length > 1 ? (
+        <div className="product-gallery__thumbs" aria-label="Choose a product image">
+          {safeMedia.map((item, index) => (
+            <button
+              className={index === selectedIndex ? "product-gallery__thumb product-gallery__thumb--active" : "product-gallery__thumb"}
+              type="button"
+              key={item.key}
+              aria-label={`Show image ${index + 1} of ${safeMedia.length}`}
+              aria-pressed={index === selectedIndex}
+              onClick={() => setSelectedIndex(index)}
+            >
+              <ProductImage
+                src={item.src}
+                name={name}
+                category={category}
+                alt={item.alt}
+                sourceKind={item.kind}
+                verified={item.verified}
+                sizes="72px"
+                showLabel={false}
+              />
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </section>
+  );
 }
