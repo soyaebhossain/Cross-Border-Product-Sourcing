@@ -14,13 +14,14 @@ applications are not part of the active tree.
 - `gateway/nginx.conf` — reverse-proxy baseline; production TLS belongs at the
   managed edge/load balancer.
 
-The current development catalog contains 15 categories and 470 products,
-including Medical Products & Accessories and Jewelry, Gems & Precious Metals.
-China, India, Singapore, and Thailand are available sourcing origins. Precious
-metal and gemstone seed prices are indicative demo values; purity, weight,
-grade, hallmark, certification, origin, and import requirements require
-independent verification. Runtime database files are ignored and must never be
-committed.
+The current development catalog contains 27 categories and 610 products. It
+includes Medical Products & Accessories, Jewelry, Gems & Precious Metals, ten
+priority everyday-goods segments, plus travel/luggage and pet-care accessories.
+China, India, Malaysia, Singapore, Thailand, Turkey, and Vietnam are available
+sourcing origins. Seeded prices and routes are indicative demo values; material,
+electrical, food-contact, purity, grade, certification, origin, HS
+classification, and import requirements require independent verification.
+Runtime database files are ignored and must never be committed.
 
 ## Run locally on Windows
 
@@ -92,7 +93,9 @@ and complete MFA enrollment instead.
   `/media` routes, while server rendering and the fixed reverse proxy use the
   HTTPS API origin. Production Vercel deployments target the maintained Render
   service; non-production deployments require an explicit `API_BASE_URL` and
-  must never proxy mutations into the production database.
+  must never proxy mutations into the production database. Every frontend build
+  runs `verify:deployment` first and fails if the repository build configuration
+  selects Vite or contains a Vite dependency/configuration file.
 - `render.yaml` builds the maintained non-root FastAPI image, applies Alembic
   migrations before startup, and checks `/api/ready`. Before syncing the
   Blueprint, provide the `sync: false` MFA, monitoring, and payment-proof

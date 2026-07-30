@@ -320,6 +320,7 @@ function getRequestBase() {
 
 export function resolveImageUrl(src: string | null | undefined) {
   if (!src) return null;
+  if (/^https?:\/\/(?:www\.)?loremflickr\.com\//i.test(src)) return null;
   if (/^https?:\/\//i.test(src) || src.startsWith("//")) return src;
   const normalized = src.startsWith("/") ? src : `/${src}`;
   return `${publicApiBase}${normalized}`;

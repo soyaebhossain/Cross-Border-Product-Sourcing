@@ -19,6 +19,7 @@ dist/
 dist-ssr/
 build/
 .vite/
+.vercel/
 .next/
 .turbo/
 .cache/

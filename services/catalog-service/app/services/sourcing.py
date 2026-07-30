@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import ROUND_CEILING, Decimal
 from typing import Any
 
 from fastapi import HTTPException
@@ -107,7 +107,32 @@ def shipping_cost_bdt(session: Session, country: Country, mode: str, total_weigh
         .order_by(ShippingRateCard.cost_bdt.asc())
         .limit(1)
     )
-    return card.cost_bdt if card else Decimal("0.00")
+    if card:
+        return Decimal(card.cost_bdt)
+
+    largest_card = session.scalar(
+        select(ShippingRateCard)
+        .where(
+            ShippingRateCard.country_id == country.id,
+            ShippingRateCard.method == method,
+            ShippingRateCard.is_active.is_(True),
+        )
+        .order_by(ShippingRateCard.max_kg.desc())
+        .limit(1)
+    )
+    if not largest_card or Decimal(largest_card.max_kg) <= 0:
+        raise HTTPException(
+            status_code=422,
+            detail=f"No {method} shipping rate is configured for {country.code}",
+        )
+
+    # Quantities above the largest configured band must never receive free
+    # shipping. Reuse the largest band in conservative whole-band blocks until
+    # an administrator publishes a dedicated heavy-freight rate.
+    band_count = (
+        total_weight / Decimal(largest_card.max_kg)
+    ).to_integral_value(rounding=ROUND_CEILING)
+    return Decimal(largest_card.cost_bdt) * max(band_count, Decimal("1"))
 
 
 def eta_range(session: Session, country: Country, mode: str, delivery_type: str) -> tuple[int, int]:

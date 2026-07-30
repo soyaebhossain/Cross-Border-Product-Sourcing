@@ -224,7 +224,7 @@ Before executing:
 5. run:
 
    ```shell
-   python scripts/migrate_catalog_to_postgres.py --execute --minimum-products 470
+   python scripts/migrate_catalog_to_postgres.py --execute --minimum-products 610
    ```
 
 The command refuses a non-SQLite source, non-PostgreSQL target, source without
@@ -254,7 +254,7 @@ The exporter uses a fixed public-field allowlist, excludes free text and
 third-party images, and never reads accounts, quotes, orders, payments,
 customer, support or audit data. Keep
 `NEXT_PUBLIC_CATALOG_SNAPSHOT_FALLBACK=1` only during cutover. After
-`/api/ready` returns 200 and the live browse API reports all 470 imported
+`/api/ready` returns 200 and the live browse API reports all 610 imported
 products, set it to `0` and redeploy Vercel; live catalog data will then be the
 only source.
 

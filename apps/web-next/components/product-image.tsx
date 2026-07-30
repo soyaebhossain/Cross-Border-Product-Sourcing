@@ -11,6 +11,124 @@ function categoryVisual(category?: string): CategoryVisual {
   const value = (category || "").toLowerCase();
 
   if (
+    (value.includes("mobile") || value.includes("phone")) &&
+    value.includes("accessor")
+  ) {
+    return {
+      accent: "#1d4ed8",
+      soft: "#dbeafe",
+      icon:
+        '<rect x="18" y="7" width="53" height="106" rx="10"/><path d="M37 22h16M39 97h12M88 62v13m18-13v13M83 75h28v15c0 12-8 21-19 21h-1c-11 0-19-9-19-21V75h11"/>',
+    };
+  }
+
+  if (
+    (value.includes("laptop") || value.includes("pc")) &&
+    value.includes("accessor")
+  ) {
+    return {
+      accent: "#4338ca",
+      soft: "#e0e7ff",
+      icon:
+        '<path d="M17 16h86v62H17ZM6 98h108l-11-20H17Z"/><path d="M38 37h44M38 52h26M91 36v24"/>',
+    };
+  }
+
+  if (value.includes("education") || value.includes("academic")) {
+    return {
+      accent: "#7e22ce",
+      soft: "#f3e8ff",
+      icon:
+        '<path d="m8 41 52-29 52 29-52 29Z"/><path d="M27 57v26c19 15 47 15 66 0V57M108 47v39"/>',
+    };
+  }
+
+  if (value.includes("creator") || value.includes("content tool")) {
+    return {
+      accent: "#be123c",
+      soft: "#ffe4e6",
+      icon:
+        '<rect x="8" y="30" width="104" height="76" rx="14"/><path d="m35 30 11-18h29l11 18M51 50l27 18-27 18Z"/>',
+    };
+  }
+
+  if (value.includes("packaging") || value.includes("e-commerce")) {
+    return {
+      accent: "#b45309",
+      soft: "#fef3c7",
+      icon:
+        '<path d="m12 39 48-27 48 27-48 28Z"/><path d="M12 39v55l48 26 48-26V39M60 67v53M39 25l47 28v25l-13-7-13 7"/>',
+    };
+  }
+
+  if (
+    value.includes("organization") ||
+    value.includes("organizer") ||
+    value.includes("storage")
+  ) {
+    return {
+      accent: "#0f766e",
+      soft: "#ccfbf1",
+      icon:
+        '<rect x="10" y="9" width="100" height="102" rx="10"/><path d="M10 43h100M10 77h100M47 26h26M47 60h26M47 94h26"/>',
+    };
+  }
+
+  if (value.includes("fashion")) {
+    return {
+      accent: "#a21caf",
+      soft: "#fae8ff",
+      icon:
+        '<path d="M18 40h84l10 72H8Z"/><path d="M39 40v-8c0-15 9-24 21-24s21 9 21 24v8M31 65h58"/>',
+    };
+  }
+
+  if (value.includes("beauty") && (value.includes("tool") || value.includes("accessor"))) {
+    return {
+      accent: "#be185d",
+      soft: "#fce7f3",
+      icon:
+        '<circle cx="40" cy="39" r="27"/><path d="M40 66v46M24 112h32M90 13l17 17-31 57-20 8 7-21ZM80 23l17 17"/>',
+    };
+  }
+
+  if (value.includes("kitchen")) {
+    return {
+      accent: "#c2410c",
+      soft: "#ffedd5",
+      icon:
+        '<path d="M27 8v30M13 8v26c0 13 28 13 28 0V8M27 47v65"/><path d="M84 8c-13 0-21 14-21 30s8 26 21 26 21-10 21-26S97 8 84 8ZM84 64v48"/>',
+    };
+  }
+
+  if (value.includes("office") || value.includes("desk accessor")) {
+    return {
+      accent: "#475569",
+      soft: "#e2e8f0",
+      icon:
+        '<path d="M21 8h57l21 21v83H21ZM78 8v25h21"/><path d="M39 55h43M39 76h43M39 97h27"/>',
+    };
+  }
+
+  if (value.includes("travel") || value.includes("luggage")) {
+    return {
+      accent: "#0369a1",
+      soft: "#e0f2fe",
+      icon:
+        '<path d="M40 26V10h40v16M22 26h76v86H22ZM43 48v42M77 48v42M40 112v8M80 112v8"/>',
+    };
+  }
+
+  if (value.includes("pet care") || value.includes("pet accessor")) {
+    return {
+      accent: "#047857",
+      soft: "#d1fae5",
+      icon:
+        '<circle cx="24" cy="37" r="12"/><circle cx="49" cy="20" r="12"/><circle cx="78" cy="22" r="12"/><circle cx="100" cy="44" r="12"/><path d="M26 91c0-21 15-38 34-38s34 17 34 38c0 13-11 19-22 14l-12-7-12 7c-11 5-22-1-22-14Z"/>',
+    };
+  }
+
+  if (
     value.includes("jewel") ||
     value.includes("precious") ||
     value.includes("gem") ||

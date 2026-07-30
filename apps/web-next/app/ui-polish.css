@@ -68,7 +68,7 @@ button:disabled {
 
 .global-search > .search-icon {
   display: grid;
-  flex: 0 0 42px;
+  flex: 0 0 38px;
   padding: 0;
   place-items: center;
 }
@@ -79,7 +79,7 @@ button:disabled {
 }
 
 .global-search button {
-  min-width: 96px;
+  min-width: 88px;
 }
 
 .global-search button svg {

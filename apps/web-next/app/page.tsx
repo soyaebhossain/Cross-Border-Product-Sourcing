@@ -10,19 +10,24 @@ export default async function HomePage() {
     getCategories().catch(() => []),
   ]);
   const featuredCategorySlugs = [
+    "mobile-accessories",
+    "laptop-pc-accessories",
+    "educational-academic-tools",
+    "creator-content-tools",
+    "ecommerce-packaging-supplies",
+    "home-organization-storage",
+    "fashion-accessories",
+    "beauty-tools-accessories",
+    "kitchen-utility-tools",
+    "office-desk-accessories",
     "jewelry-gems-precious-metals",
     "medical-products-accessories",
   ];
-  const pinnedCategories = featuredCategorySlugs.flatMap((slug) => {
+  const priorityCategories = featuredCategorySlugs.flatMap((slug) => {
     const category = categories.find((item) => item.slug === slug);
     return category ? [category] : [];
   });
-  const featuredCategories = [
-    ...categories
-      .filter((category) => !featuredCategorySlugs.includes(category.slug))
-      .slice(0, Math.max(0, 9 - pinnedCategories.length)),
-    ...pinnedCategories,
-  ];
+  const featuredCategories = priorityCategories;
 
   const lanes = [
     { code: "CN", name: "China → Bangladesh", eta: "7–14 days", badge: "Best value" },
@@ -51,9 +56,9 @@ export default async function HomePage() {
           <div className="hero-trust"><span><AppIcon name="check" size={15} />{catalog ? `${catalog.total} products` : "Global product catalog"}</span><span><AppIcon name="check" size={15} />Explainable ranking</span><span><AppIcon name="check" size={15} />Landed-cost clarity</span></div>
         </div>
         <div className="lane-board-new">
-          <div className="lane-title"><span>Live sourcing lanes</span><strong>Decision snapshot</strong></div>
+          <div className="lane-title"><span>Featured sourcing lanes</span><strong>Decision snapshot</strong></div>
           {lanes.map((lane) => <div className="lane-item" key={lane.code}><b>{lane.code}</b><div><strong>{lane.name}</strong><span>{lane.eta}</span></div><em>{lane.badge}</em></div>)}
-          <p>Scores combine cost, quality, reliability, delivery and risk.</p>
+          <p>Catalog origins also include Malaysia, Turkey and Vietnam. Scores combine cost, quality, reliability, delivery and risk.</p>
         </div>
       </section>
 
