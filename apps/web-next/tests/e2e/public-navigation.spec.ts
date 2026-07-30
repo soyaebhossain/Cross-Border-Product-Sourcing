@@ -1,7 +1,35 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 
 const expectCatalogSnapshot =
   process.env.E2E_EXPECT_CATALOG_SNAPSHOT === "1";
+
+async function expectAlignedProductCards(cards: Locator) {
+  await expect(cards.first()).toBeVisible();
+  const metrics = await cards.evaluateAll(nodes => nodes.map(node => {
+    const card = node.getBoundingClientRect();
+    const visual = node.querySelector(".product-card__visual")!.getBoundingClientRect();
+    const badge = node.querySelector(".product-image__badge")!.getBoundingClientRect();
+    return {
+      cardHeight: card.height,
+      visualWidth: visual.width,
+      visualHeight: visual.height,
+      visualTop: visual.top - card.top,
+      visualLeft: visual.left - card.left,
+      badgeRight: visual.right - badge.right,
+      badgeBottom: visual.bottom - badge.bottom,
+    };
+  }));
+  const spread = (values: number[]) => Math.max(...values) - Math.min(...values);
+
+  expect(metrics.length).toBeGreaterThan(0);
+  expect(spread(metrics.map(metric => metric.cardHeight))).toBeLessThanOrEqual(1);
+  expect(spread(metrics.map(metric => metric.visualWidth))).toBeLessThanOrEqual(1);
+  expect(spread(metrics.map(metric => metric.visualHeight))).toBeLessThanOrEqual(1);
+  expect(Math.max(...metrics.map(metric => Math.abs(metric.visualTop - 1)))).toBeLessThanOrEqual(1);
+  expect(Math.max(...metrics.map(metric => Math.abs(metric.visualLeft - 1)))).toBeLessThanOrEqual(1);
+  expect(spread(metrics.map(metric => metric.badgeRight))).toBeLessThanOrEqual(1);
+  expect(spread(metrics.map(metric => metric.badgeBottom))).toBeLessThanOrEqual(1);
+}
 
 test.beforeEach(async ({ page }) => {
   if (!expectCatalogSnapshot) return;
@@ -32,6 +60,7 @@ test("@public primary customer navigation is keyboard reachable", async ({ page 
 });
 
 test("@public read-only catalog snapshot supports browse, search and detail", async ({ page }) => {
+  test.setTimeout(60_000);
   test.skip(
     !expectCatalogSnapshot,
     "Set E2E_EXPECT_CATALOG_SNAPSHOT=1 with an unavailable API target",
@@ -49,6 +78,7 @@ test("@public read-only catalog snapshot supports browse, search and detail", as
   await expect(page.locator(".compact-grid .product-card")).toHaveCount(8);
   await expect(page.locator(".compact-grid .product-image img[data-nimg]")).toHaveCount(8);
   await expect(page.locator(".compact-grid .product-image--fallback")).toHaveCount(0);
+  await expectAlignedProductCards(page.locator(".compact-grid .product-card"));
   const categoryCards = page.locator(".category-strip > a");
   await expect(categoryCards).toHaveCount(12);
   for (const categoryName of [
@@ -74,6 +104,8 @@ test("@public read-only catalog snapshot supports browse, search and detail", as
   await mobileAccessories.click();
   await expect(page).toHaveURL(/category=mobile-accessories/);
   await expect(page.getByText("12 products", { exact: true })).toBeVisible();
+  await expect(page.locator(".compact-grid .product-card")).toHaveCount(12);
+  await expectAlignedProductCards(page.locator(".compact-grid .product-card"));
 
   await page.goto("/");
   const preciousCategory = page.getByRole("link", {

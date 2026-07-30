@@ -24,6 +24,19 @@ export function ProductCard({ product, imagePriority, selectable, selected, onSe
 
   return <article className="product-card">
     {selectable ? <label className="compare-check"><input type="checkbox" checked={selected} onChange={() => onSelect?.(product.id)} /> Compare</label> : null}
+    <div className="product-card__visual">
+      <Link className="product-card__media-link" href={`/products/${product.slug}`} aria-label={`View ${product.name}`}>
+        <ProductImage
+          src={media.src}
+          name={product.name}
+          category={product.category.name}
+          alt={media.alt}
+          sourceKind={media.kind}
+          verified={media.verified}
+          priority={imagePriority}
+        />
+      </Link>
+    </div>
     <div className="product-card__copy">
       <div className="card-signals"><span><CheckIcon /> AI assessed</span><span><CheckIcon /> Risk checked</span></div>
       <p className="eyebrow">{product.category.name}</p>
@@ -37,19 +50,6 @@ export function ProductCard({ product, imagePriority, selectable, selected, onSe
       </div> : null}
       <p className="summary">{product.description || "Supplier offer ready for landed-cost and risk comparison."}</p>
       <div className="meta-row"><span>{product.variants.length} variant{product.variants.length === 1 ? "" : "s"}</span><Link className="card-action" href={`/products/${product.slug}`}>{product.catalog_source === "snapshot" ? "View product" : "Compare sourcing"} <span aria-hidden>→</span></Link></div>
-    </div>
-    <div className="product-card__visual">
-      <Link className="product-card__media-link" href={`/products/${product.slug}`} aria-label={`View ${product.name}`}>
-        <ProductImage
-          src={media.src}
-          name={product.name}
-          category={product.category.name}
-          alt={media.alt}
-          sourceKind={media.kind}
-          verified={media.verified}
-          priority={imagePriority}
-        />
-      </Link>
     </div>
   </article>;
 }
