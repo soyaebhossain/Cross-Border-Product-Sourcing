@@ -139,5 +139,10 @@ jobs:
       - uses: actions/checkout@v4
       - run: docker compose config
       - run: docker compose --profile gateway config
-      - run: docker run --rm -v "$PWD/gateway/nginx.conf:/etc/nginx/nginx.conf:ro" nginx:1.28-alpine nginx -t
+      - run: >-
+          docker run --rm
+          --add-host api:127.0.0.1
+          --add-host web:127.0.0.1
+          -v "$PWD/gateway/nginx.conf:/etc/nginx/nginx.conf:ro"
+          nginx:1.28-alpine nginx -t
       - run: docker compose build api web
