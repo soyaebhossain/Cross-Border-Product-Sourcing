@@ -1,8 +1,210 @@
 "use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { loginWithCredentials } from "../../lib/api";
 
-export default function LoginPage(){const [identifier,setIdentifier]=useState("");const [password,setPassword]=useState("");const [loading,setLoading]=useState(false);const [error,setError]=useState("");const router=useRouter();
- const submit=async(e:React.FormEvent)=>{e.preventDefault();setLoading(true);setError("");try{await loginWithCredentials(identifier,password);router.push("/account/orders");router.refresh()}catch{setError("Invalid username, email, phone, or password.")}finally{setLoading(false)}};
- return <main className="shell shell--narrow"><section className="auth-card"><div><p className="eyebrow">Secure account</p><h1>Sign in to SourceAI</h1><p>Manage quotations, compare sourcing decisions and track cross-border orders.</p></div><form onSubmit={submit}><label>Username, email or phone<input autoComplete="username" value={identifier} onChange={e=>setIdentifier(e.target.value)} required/></label><label>Password<input type="password" autoComplete="current-password" value={password} onChange={e=>setPassword(e.target.value)} required/></label>{error?<div className="form-error" role="alert">{error}</div>:null}<button className="market-button" disabled={loading}>{loading?"Signing in…":"Sign in securely"}</button><small>Your session is stored in an HTTP-only cookie and is not exposed to browser scripts.</small></form></section></main>}
+import type { Route } from "next";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import {
+  confirmMfaEnrollment,
+  loginWithCredentials,
+  startGoogleLogin,
+  startMfaEnrollment,
+  verifyMfaLogin,
+  type CurrentUser,
+  type MfaRequired,
+} from "../../lib/api";
+import { useLocale } from "../../lib/locale-context";
+
+type Portal = "customer" | "admin";
+type Enrollment = { secret: string; otpauth_uri: string };
+
+export default function LoginPage() {
+  const [portal, setPortal] = useState<Portal>("customer");
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState(false);
+  const [remember, setRemember] = useState(true);
+  const [error, setError] = useState("");
+  const [mfa, setMfa] = useState<MfaRequired | null>(null);
+  const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
+  const [mfaCode, setMfaCode] = useState("");
+  const [recoveryMode, setRecoveryMode] = useState(false);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
+  const [codesStored, setCodesStored] = useState(false);
+  const [authenticatedUser, setAuthenticatedUser] = useState<CurrentUser | null>(null);
+  const [copyStatus, setCopyStatus] = useState("");
+  const router = useRouter();
+  const { locale } = useLocale();
+  const bn = locale === "bn";
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("portal") === "admin") setPortal("admin");
+    if (params.get("social_error")) setError("Google sign-in was not completed. Please try again or use email and password.");
+  }, []);
+
+  const redirectAfterAuth = (role: string) => {
+    const next = new URLSearchParams(window.location.search).get("next");
+    const safeNext = next?.startsWith("/") && !next.startsWith("//") ? next : null;
+    const privileged = role === "admin" || role === "operator";
+    router.push((safeNext || (privileged ? "/admin" : "/account")) as Route);
+    router.refresh();
+  };
+
+  const resetChallenge = () => {
+    setMfa(null);
+    setEnrollment(null);
+    setMfaCode("");
+    setRecoveryMode(false);
+    setRecoveryCodes([]);
+    setCodesStored(false);
+    setAuthenticatedUser(null);
+    setPassword("");
+    setError("");
+  };
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    try {
+      const result = await loginWithCredentials(identifier, password, remember, portal);
+      if ("mfa_required" in result) {
+        setMfa(result);
+        setPassword("");
+        if (result.mfa_enrollment_required) {
+          setEnrollment(await startMfaEnrollment(result.mfa_token));
+        }
+        return;
+      }
+      redirectAfterAuth(result.user.role);
+    } catch {
+      setError(portal === "admin"
+        ? (bn ? "Credential সঠিক নয়, account locked, অথবা এই account-এর admin access নেই।" : "Invalid credentials, a locked account, or no admin access.")
+        : (bn ? "Credential সঠিক নয় অথবা এটি admin-only account।" : "Invalid credentials or this is an admin-only account."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitMfa = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!mfa) return;
+    setLoading(true);
+    setError("");
+    try {
+      if (mfa.mfa_enrollment_required) {
+        const result = await confirmMfaEnrollment(mfa.mfa_token, mfaCode.replace(/\s/g, ""));
+        setRecoveryCodes(result.recovery_codes);
+        setAuthenticatedUser(result.user);
+        setMfaCode("");
+      } else {
+        const value = mfaCode.trim();
+        const result = await verifyMfaLogin(mfa.mfa_token, recoveryMode ? { recovery_code: value } : { code: value.replace(/\s/g, "") });
+        redirectAfterAuth(result.user.role);
+      }
+    } catch {
+      setError(recoveryMode
+        ? (bn ? "Recovery code সঠিক নয়, ব্যবহৃত হয়েছে, অথবা challenge-এর মেয়াদ শেষ।" : "The recovery code is invalid, already used, or the challenge expired.")
+        : (bn ? "Authenticator code সঠিক নয় অথবা challenge-এর মেয়াদ শেষ।" : "The authenticator code is invalid or the challenge expired."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyRecoveryCodes = async () => {
+    try {
+      await navigator.clipboard.writeText(recoveryCodes.join("\n"));
+      setCopyStatus(bn ? "কপি হয়েছে" : "Copied");
+    } catch {
+      setCopyStatus(bn ? "কপি করা যায়নি—ম্যানুয়ালি সংরক্ষণ করুন" : "Could not copy—save them manually");
+    }
+  };
+
+  const downloadRecoveryCodes = () => {
+    const blob = new Blob([recoveryCodes.join("\r\n")], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "sourceai-mfa-recovery-codes.txt";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (recoveryCodes.length && authenticatedUser) {
+    return <main className="shell shell--narrow">
+      <section className="auth-card auth-card--single" aria-labelledby="recovery-title">
+        <div>
+          <p className="eyebrow">{bn ? "একবারই দেখানো হবে" : "Shown once"}</p>
+          <h1 id="recovery-title">{bn ? "Recovery code নিরাপদে রাখুন" : "Store your recovery codes safely"}</h1>
+          <p>{bn ? "Authenticator হারালে প্রতিটি code একবার ব্যবহার করা যাবে। পেজ ছাড়লে এগুলো আর দেখানো হবে না।" : "Each code can be used once if your authenticator is unavailable. They will not be shown again after you leave this page."}</p>
+          <div className="mfa-recovery-codes" role="list" aria-label={bn ? "Recovery code" : "Recovery codes"}>{recoveryCodes.map(code => <code role="listitem" key={code}>{code}</code>)}</div>
+          <div className="form-actions"><button className="button button--ghost" type="button" onClick={copyRecoveryCodes}>{bn ? "সব কপি করুন" : "Copy all"}</button><button className="button button--ghost" type="button" onClick={downloadRecoveryCodes}>{bn ? "Text file ডাউনলোড" : "Download text file"}</button>{copyStatus ? <span role="status">{copyStatus}</span> : null}</div>
+          <label className="remember-login"><input type="checkbox" checked={codesStored} onChange={event => setCodesStored(event.target.checked)} /><span>{bn ? "আমি codeগুলো password manager বা নিরাপদ স্থানে রেখেছি" : "I stored these codes in a password manager or another safe place"}</span></label>
+          <button className="market-button" type="button" disabled={!codesStored} onClick={() => redirectAfterAuth(authenticatedUser.role)}>{bn ? "Admin dashboard খুলুন" : "Continue to admin dashboard"}</button>
+        </div>
+      </section>
+    </main>;
+  }
+
+  if (mfa) {
+    const enrollmentRequired = mfa.mfa_enrollment_required;
+    return <main className="shell shell--narrow">
+      <section className="auth-card auth-card--single">
+        <div>
+          <p className="eyebrow">{enrollmentRequired ? (bn ? "প্রথমবারের নিরাপত্তা সেটআপ" : "First-time security setup") : (bn ? "দ্বিতীয় নিরাপত্তা ধাপ" : "Second security step")}</p>
+          <h1>{enrollmentRequired ? (bn ? "Authenticator app সংযুক্ত করুন" : "Connect an authenticator app") : (bn ? "নিরাপত্তা code দিন" : "Enter your security code")}</h1>
+          <p>{bn ? `এই challenge প্রায় ${Math.max(1, Math.floor(mfa.expires_in / 60))} মিনিটের মধ্যে শেষ হবে।` : `This challenge expires in about ${Math.max(1, Math.floor(mfa.expires_in / 60))} minutes.`}</p>
+        </div>
+        {enrollmentRequired && enrollment ? <div className="mfa-enrollment">
+          <ol>
+            <li>{bn ? "Google Authenticator, Microsoft Authenticator বা compatible TOTP app খুলুন।" : "Open Google Authenticator, Microsoft Authenticator or another compatible TOTP app."}</li>
+            <li>{bn ? "নিচের secret key ম্যানুয়ালি যোগ করুন অথবা authenticator link খুলুন।" : "Add the secret key manually or open the authenticator link."}</li>
+            <li>{bn ? "App-এর ৬ সংখ্যার code দিয়ে setup নিশ্চিত করুন।" : "Confirm setup with the current six-digit code from the app."}</li>
+          </ol>
+          <label><span>{bn ? "Secret key" : "Secret key"}</span><output className="mfa-secret">{enrollment.secret}</output></label>
+          <a className="button button--ghost" href={enrollment.otpauth_uri}>{bn ? "Authenticator app-এ খুলুন" : "Open in authenticator app"}</a>
+        </div> : null}
+        <form onSubmit={submitMfa}>
+          {!enrollmentRequired ? <div className="login-role-switch" aria-label={bn ? "Verification পদ্ধতি" : "Verification method"}><button type="button" className={!recoveryMode ? "login-role-switch__active" : ""} onClick={() => { setRecoveryMode(false); setMfaCode(""); setError(""); }}>{bn ? "Authenticator code" : "Authenticator code"}</button><button type="button" className={recoveryMode ? "login-role-switch__active" : ""} onClick={() => { setRecoveryMode(true); setMfaCode(""); setError(""); }}>{bn ? "Recovery code" : "Recovery code"}</button></div> : null}
+          <label>{recoveryMode ? (bn ? "একবার ব্যবহারযোগ্য recovery code" : "One-time recovery code") : (bn ? "৬ সংখ্যার authenticator code" : "Six-digit authenticator code")}<input autoFocus autoComplete="one-time-code" inputMode={recoveryMode ? "text" : "numeric"} pattern={recoveryMode ? undefined : "[0-9]{6}"} minLength={6} maxLength={recoveryMode ? 30 : 6} value={mfaCode} onChange={event => setMfaCode(event.target.value)} required /></label>
+          {error ? <div className="form-error" role="alert">{error}</div> : null}
+          <button className="market-button" disabled={loading || mfaCode.trim().length < 6}>{loading ? (bn ? "যাচাই হচ্ছে…" : "Verifying…") : enrollmentRequired ? (bn ? "MFA চালু ও নিশ্চিত করুন" : "Enable and confirm MFA") : (bn ? "যাচাই করে প্রবেশ করুন" : "Verify and sign in")}</button>
+          <button className="auth-text-button" type="button" onClick={resetChallenge} disabled={loading}>{bn ? "Login-এ ফিরে যান" : "Back to sign in"}</button>
+        </form>
+      </section>
+    </main>;
+  }
+
+  return (
+    <main className="shell shell--narrow">
+      <section className="auth-card">
+        <div>
+          <p className="eyebrow">{portal === "admin" ? (bn ? "Operations access" : "Operations access") : (bn ? "নিরাপদ account" : "Secure account")}</p>
+          <h1>{portal === "admin" ? (bn ? "Admin sign in" : "Admin sign in") : (bn ? "SourceAI-এ sign in" : "Sign in to SourceAI")}</h1>
+          <p>{portal === "admin" ? (bn ? "Admin ও operator account-এর জন্য আলাদা, MFA-সুরক্ষিত প্রবেশ।" : "Separate, MFA-protected access for admin and operator accounts.") : (bn ? "কোট তুলনা, অর্ডার এবং delivery track করুন।" : "Manage quotes, orders and delivery tracking.")}</p>
+          <div className="login-role-switch" aria-label={bn ? "Login-এর ধরন" : "Choose login type"}>
+            <button type="button" className={portal === "customer" ? "login-role-switch__active" : ""} onClick={() => { setPortal("customer"); setError(""); }}>{bn ? "Customer" : "Customer"}</button>
+            <button type="button" className={portal === "admin" ? "login-role-switch__active" : ""} onClick={() => { setPortal("admin"); setError(""); }}>{bn ? "Admin / operator" : "Admin / operator"}</button>
+          </div>
+        </div>
+        <form onSubmit={submit}>
+          {portal === "customer" ? <>
+            <button className="social-login-button" type="button" disabled={socialLoading} onClick={async () => {
+              setSocialLoading(true); setError("");
+              try { await startGoogleLogin(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Google login is unavailable."); setSocialLoading(false); }
+            }}><span aria-hidden>G</span>{socialLoading ? (bn ? "Google-এ সংযোগ হচ্ছে…" : "Connecting to Google…") : (bn ? "Google দিয়ে চালিয়ে যান" : "Continue with Google")}</button>
+            <div className="auth-divider"><span>{bn ? "অথবা email / account credential" : "or use email / account credentials"}</span></div>
+          </> : null}
+          <label>{bn ? "Username, email অথবা phone" : "Username, email or phone"}<input autoComplete="username" value={identifier} onChange={event => setIdentifier(event.target.value)} required /></label>
+          <label>{bn ? "Password" : "Password"}<input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required /></label>
+          <label className="remember-login"><input type="checkbox" checked={remember} onChange={event => setRemember(event.target.checked)} /><span>{bn ? "এই device-এ sign in রাখা হবে" : "Keep me signed in on this device"}</span></label>
+          {error ? <div className="form-error" role="alert">{error}</div> : null}
+          <button className="market-button" disabled={loading}>{loading ? (bn ? "Sign in হচ্ছে…" : "Signing in…") : portal === "admin" ? (bn ? "Admin dashboard খুলুন" : "Open admin dashboard") : (bn ? "নিরাপদে sign in" : "Sign in securely")}</button>
+          {portal === "customer" ? <small>{bn ? "নতুন customer?" : "New customer?"} <Link className="nav-link" href="/signup">{bn ? "Account তৈরি করুন" : "Create an account"}</Link></small> : <small>{bn ? "শুধু অনুমোদিত admin/operator account প্রবেশ করতে পারবে। MFA প্রয়োজন।" : "Only authorized admin/operator accounts can enter. MFA is required."}</small>}
+        </form>
+      </section>
+    </main>
+  );
+}

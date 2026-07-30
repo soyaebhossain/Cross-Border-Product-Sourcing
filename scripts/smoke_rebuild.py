@@ -1,3 +1,5 @@
+"""Read-only smoke checks for the local SourceAI Next.js/FastAPI stack."""
+
 from __future__ import annotations
 
 import json
@@ -5,110 +7,118 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from typing import Any
 
 
-API_BASE = os.getenv("REBUILD_API_BASE", "http://127.0.0.1:8001")
-WEB_BASE = os.getenv("REBUILD_WEB_BASE", "http://127.0.0.1:3001")
+API_BASE = os.getenv("SOURCEAI_API_BASE", "http://127.0.0.1:8001").rstrip("/")
+WEB_BASE = os.getenv("SOURCEAI_WEB_BASE", "http://127.0.0.1:3000").rstrip("/")
 
 
-def read_json(url: str, *, method: str = "GET", body: dict | None = None) -> tuple[int, object]:
-    payload = None
-    headers: dict[str, str] = {}
-    if body is not None:
-        payload = json.dumps(body).encode("utf-8")
-        headers["Content-Type"] = "application/json"
-    request = urllib.request.Request(url, data=payload, headers=headers, method=method)
+def read_json(path: str) -> tuple[int, Any]:
+    request = urllib.request.Request(f"{API_BASE}{path}", method="GET")
     with urllib.request.urlopen(request, timeout=15) as response:
         return response.status, json.loads(response.read().decode("utf-8"))
 
 
 def read_text(url: str) -> tuple[int, str]:
     with urllib.request.urlopen(url, timeout=15) as response:
-        return response.status, response.read().decode("utf-8", "ignore")
+        return response.status, response.read().decode("utf-8", "replace")
+
+
+def expect_denied(path: str) -> bool:
+    try:
+        read_json(path)
+    except urllib.error.HTTPError as exc:
+        return exc.code in {401, 403}
+    return False
 
 
 def main() -> int:
-    checks: list[str] = []
-    failures: list[str] = []
+    passed: list[str] = []
+    failed: list[str] = []
 
     try:
-        status, health = read_json(f"{API_BASE}/api/health")
-        if status == 200 and health.get("status") == "ok":
-            checks.append("api health ok")
+        status, payload = read_json("/api/health")
+        if status == 200 and payload.get("status") == "ok":
+            passed.append("API liveness")
         else:
-            failures.append("api health returned unexpected payload")
+            failed.append("API liveness returned an unexpected response")
     except Exception as exc:  # noqa: BLE001
-        failures.append(f"api health failed: {exc}")
+        failed.append(f"API liveness failed ({type(exc).__name__})")
 
     try:
-        status, products = read_json(f"{API_BASE}/api/products/")
-        if status == 200 and isinstance(products, list) and products:
-            checks.append(f"api products ok ({len(products)} items)")
-            sample_slug = products[0]["slug"]
+        status, payload = read_json("/api/ready")
+        if status == 200 and payload.get("status") == "ready":
+            passed.append("API/database readiness")
         else:
-            sample_slug = None
-            failures.append("api products returned empty payload")
+            failed.append("API readiness returned an unexpected response")
     except Exception as exc:  # noqa: BLE001
-        sample_slug = None
-        failures.append(f"api products failed: {exc}")
+        failed.append(f"API readiness failed ({type(exc).__name__})")
+
+    sample_slug: str | None = None
+    try:
+        status, products = read_json("/api/products/")
+        if status == 200 and isinstance(products, list) and len(products) >= 50:
+            sample_slug = products[0].get("slug")
+            passed.append(f"public catalog ({len(products)} products)")
+        else:
+            failed.append("public catalog is unexpectedly small or malformed")
+    except Exception as exc:  # noqa: BLE001
+        failed.append(f"public catalog failed ({type(exc).__name__})")
 
     try:
-        status, countries = read_json(f"{API_BASE}/api/countries/")
-        if status == 200 and isinstance(countries, list) and countries:
-            checks.append(f"api countries ok ({len(countries)} items)")
+        _, categories = read_json("/api/categories/")
+        slugs = {str(item.get("slug")) for item in categories}
+        if "medical-products-accessories" in slugs:
+            passed.append("medical category")
         else:
-            failures.append("api countries returned empty payload")
+            failed.append("medical category is missing")
     except Exception as exc:  # noqa: BLE001
-        failures.append(f"api countries failed: {exc}")
+        failed.append(f"category check failed ({type(exc).__name__})")
 
     try:
-        status, recommendation = read_json(
-            f"{API_BASE}/api/recommendations/cheapest-country/",
-            method="POST",
-            body={
-                "product_slug": "iphone-14",
-                "qty": 1,
-                "delivery_type": "DOOR",
-                "priority": "balanced",
-            },
-        )
-        if status == 200 and recommendation.get("recommendations"):
-            checks.append("api recommendation ok")
+        _, countries = read_json("/api/countries/")
+        codes = {str(item.get("code")) for item in countries}
+        if "IN" in codes:
+            passed.append("India sourcing lane")
         else:
-            failures.append("api recommendation returned empty payload")
+            failed.append("India sourcing lane is missing")
     except Exception as exc:  # noqa: BLE001
-        failures.append(f"api recommendation failed: {exc}")
+        failed.append(f"country check failed ({type(exc).__name__})")
+
+    if expect_denied("/api/research/analytics/") and expect_denied("/api/research/export.csv"):
+        passed.append("research analytics/export access control")
+    else:
+        failed.append("research analytics/export must reject anonymous access")
 
     try:
         status, html = read_text(WEB_BASE)
-        if status == 200 and "Cross-border sourcing rebuilt with FastAPI and Next.js." in html:
-            checks.append("web home ok")
+        if status == 200 and "SourceAI" in html:
+            passed.append("Next.js home")
         else:
-            failures.append("web home returned unexpected content")
+            failed.append("Next.js home returned unexpected content")
     except Exception as exc:  # noqa: BLE001
-        failures.append(f"web home failed: {exc}")
+        failed.append(f"Next.js home failed ({type(exc).__name__})")
 
     if sample_slug:
         try:
             status, html = read_text(f"{WEB_BASE}/products/{sample_slug}")
-            if status == 200 and "Hybrid sourcing recommendation" in html:
-                checks.append("web product detail ok")
+            if status == 200 and sample_slug in html:
+                passed.append("product detail")
             else:
-                failures.append("web product detail returned unexpected content")
+                failed.append("product detail returned unexpected content")
         except Exception as exc:  # noqa: BLE001
-            failures.append(f"web product detail failed: {exc}")
+            failed.append(f"product detail failed ({type(exc).__name__})")
 
-    print("Checks:")
-    for item in checks:
+    print("Passed:")
+    for item in passed:
         print(f"- {item}")
-
-    if failures:
-        print("Failures:")
-        for item in failures:
+    if failed:
+        print("Failed:")
+        for item in failed:
             print(f"- {item}")
         return 1
-
-    print("All rebuild smoke checks passed.")
+    print("All read-only smoke checks passed.")
     return 0
 
 

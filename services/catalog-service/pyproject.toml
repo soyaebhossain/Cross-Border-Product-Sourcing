@@ -1,0 +1,12 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--strict-markers"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+
+[tool.ruff.lint]
+# Keep CI focused on correctness while the migrated codebase is incrementally
+# reformatted. Broader style rules can be enabled without blocking this release.
+select = ["E9", "F63", "F7", "F82"]

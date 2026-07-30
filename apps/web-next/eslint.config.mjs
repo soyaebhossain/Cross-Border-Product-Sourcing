@@ -1,13 +1,14 @@
-import { FlatCompat } from "@eslint/eslintrc";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { FlatCompat } from "@eslint/eslintrc";
 
-const baseDirectory = fileURLToPath(new URL(".", import.meta.url));
-const compat = new FlatCompat({ baseDirectory });
+const filename = fileURLToPath(import.meta.url);
+const dirname = path.dirname(filename);
+const compat = new FlatCompat({ baseDirectory: dirname });
 
-const eslintConfig = [
+const config = [
+  { ignores: [".next/**", "node_modules/**", "next-env.d.ts"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
-  { ignores: [".next/**", "out/**", "build/**", "next-env.d.ts"] },
-  { rules: { "@next/next/no-img-element": "off" } },
 ];
 
-export default eslintConfig;
+export default config;

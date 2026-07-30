@@ -8,7 +8,9 @@ from ..models import Category, Country, Product, ProductVariant, Seller, SellerO
 
 
 def list_categories(session: Session) -> list[Category]:
-    return session.scalars(select(Category).order_by(Category.name.asc())).all()
+    return session.scalars(
+        select(Category).where(Category.is_active.is_(True)).order_by(Category.name.asc())
+    ).all()
 
 
 def list_countries(session: Session) -> list[Country]:
@@ -18,7 +20,16 @@ def list_countries(session: Session) -> list[Country]:
 def list_products(session: Session, q: str = "") -> list[Product]:
     query = (
         select(Product)
-        .options(joinedload(Product.category), selectinload(Product.variants))
+        .options(
+            joinedload(Product.category),
+            selectinload(
+                Product.variants.and_(ProductVariant.is_active.is_(True))
+            ),
+        )
+        .where(
+            Product.is_active.is_(True),
+            Product.category.has(Category.is_active.is_(True)),
+        )
         .order_by(Product.name.asc())
     )
     if q.strip():
@@ -53,6 +64,11 @@ def browse_products(session: Session, q: str = "", category: str = "", page: int
             .join(Country, Country.id == SellerOffer.country_id)
             .join(Seller, Seller.id == SellerOffer.seller_id)
             .where(ProductVariant.product_id.in_(ids))
+            .where(
+                ProductVariant.is_active.is_(True),
+                SellerOffer.is_active.is_(True),
+                Seller.is_active.is_(True),
+            )
         ).all()
         seller_sets: dict[int, set[int]] = {item_id: set() for item_id in ids}
         for product_id, price, currency, mode, code, rating, seller_id in rows:
@@ -86,8 +102,17 @@ def browse_products(session: Session, q: str = "", category: str = "", page: int
 def get_product_by_slug_or_404(session: Session, slug: str) -> Product:
     product = session.scalar(
         select(Product)
-        .options(joinedload(Product.category), selectinload(Product.variants))
-        .where(Product.slug == slug)
+        .options(
+            joinedload(Product.category),
+            selectinload(
+                Product.variants.and_(ProductVariant.is_active.is_(True))
+            ),
+        )
+        .where(
+            Product.slug == slug,
+            Product.is_active.is_(True),
+            Product.category.has(Category.is_active.is_(True)),
+        )
     )
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
