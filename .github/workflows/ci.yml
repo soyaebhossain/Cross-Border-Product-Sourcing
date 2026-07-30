@@ -21,7 +21,7 @@ jobs:
       CATALOG_JWT_SECRET: ci-only-long-random-secret-not-for-production
       CATALOG_CORS_ORIGINS: http://localhost:3000
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -61,7 +61,7 @@ jobs:
       CATALOG_JWT_SECRET: ci-only-long-random-secret-not-for-production
       CATALOG_CORS_ORIGINS: http://localhost:3000
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -89,7 +89,7 @@ jobs:
       E2E_ADMIN_IDENTIFIER: e2e-admin
       E2E_ADMIN_PASSWORD: "A9!Quartz-River-CI-Only-2026"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -142,7 +142,7 @@ jobs:
       - frontend
       - postgres-migrations
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker compose config
       - run: docker compose --profile gateway config
       - run: >-
