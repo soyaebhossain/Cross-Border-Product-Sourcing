@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AppIcon } from "../components/app-icon";
 import { CategoryIcon } from "../components/category-icon";
 import { ProductCard } from "../components/product-card";
 import { browseProducts, getCategories } from "../lib/api";
@@ -41,7 +42,7 @@ export default async function HomePage() {
             <input name="q" placeholder="What product are you sourcing?" />
             <button>Search marketplace</button>
           </form>
-          <div className="hero-trust"><span>✓ 350 products</span><span>✓ Explainable ranking</span><span>✓ Landed-cost clarity</span></div>
+          <div className="hero-trust"><span><AppIcon name="check" size={15} />{catalog ? `${catalog.total} products` : "Global product catalog"}</span><span><AppIcon name="check" size={15} />Explainable ranking</span><span><AppIcon name="check" size={15} />Landed-cost clarity</span></div>
         </div>
         <div className="lane-board-new">
           <div className="lane-title"><span>Live sourcing lanes</span><strong>Decision snapshot</strong></div>
@@ -68,7 +69,7 @@ export default async function HomePage() {
       <section className="market-section">
         <div className="market-section-title">
           <div><span className="market-kicker">Live catalog</span><h2>Popular products</h2></div>
-          <Link href="/products">Browse all {catalog?.total || 350} →</Link>
+          <Link href="/products">{catalog ? `Browse all ${catalog.total}` : "Browse catalog"} →</Link>
         </div>
         {catalog?.items.length ? <div className="compact-grid">{catalog.items.map((product) => <ProductCard key={product.id} product={product} />)}</div> : <div className="market-empty">Catalog is starting. Please refresh shortly.</div>}
       </section>

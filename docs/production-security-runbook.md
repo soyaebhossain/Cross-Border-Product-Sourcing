@@ -144,6 +144,36 @@ overwrite or promote an existing account, applies the production password
 policy, and writes an audit event. Delete the injected environment value
 immediately after the job.
 
+### Account access recovery
+
+Reset a customer or admin password from the catalog-service directory:
+
+```shell
+python scripts/recover_account_access.py --identifier account@example.com --unlock
+```
+
+Use a numeric ID when an audit or legacy-data review shows that an identifier is
+ambiguous:
+
+```shell
+python scripts/recover_account_access.py --user-id 42 --reactivate --clear-mfa
+```
+
+The password is read twice with `getpass`; the CLI intentionally has no
+`--password` option. An approved one-process secret-store job may instead inject
+`SOURCEAI_ACCOUNT_PASSWORD`, which the script removes from its process
+environment after reading. Do not place passwords in shell history, logs, CI
+arguments, or the repository.
+
+Every successful reset applies the password policy, rejects reuse of the current
+password, increments `auth_version`, revokes every active refresh session,
+consumes pending authentication challenges, and writes an audit event containing
+only state flags and revocation counts. Account activation, lock state, and MFA
+enrollment are preserved unless the operator explicitly supplies `--reactivate`,
+`--unlock`, or `--clear-mfa`. Verify identity and record approval before those
+flags are used. Never reactivate a known/default administrator; provision a new
+administrator and enroll MFA.
+
 The first privileged password login returns HTTP 202 with
 `mfa_enrollment_required=true` and a five-minute `mfa_token`; it does not issue
 authentication cookies. Call `/api/auth/mfa/enroll/start/`, scan the returned

@@ -10,6 +10,7 @@ export default function ProductsPage() {
   const [category, setCategory] = useState("");
   const [sort, setSort] = useState("recommended");
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(24);
   const [data, setData] = useState<ProductPage | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
@@ -30,6 +31,17 @@ export default function ProductsPage() {
   }, []);
 
   useEffect(() => {
+    const queryList = window.matchMedia("(max-width: 767px)");
+    const updatePageSize = () => {
+      setPageSize(queryList.matches ? 12 : 24);
+      setPage(1);
+    };
+    updatePageSize();
+    queryList.addEventListener("change", updatePageSize);
+    return () => queryList.removeEventListener("change", updatePageSize);
+  }, []);
+
+  useEffect(() => {
     Promise.all([getCategories(), getCountries()]).then(([categoryRows, countryRows]) => {
       setCategories(categoryRows); setCountries(countryRows);
     }).catch(() => undefined);
@@ -38,12 +50,12 @@ export default function ProductsPage() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setLoading(true); setError(null);
-      browseProducts({ q: query, category, page, sort, country, maxPrice: maxPrice ? Number(maxPrice) : undefined, maxDelivery: delivery ? Number(delivery) : undefined, minRating: rating ? Number(rating) : undefined, risk })
+      browseProducts({ q: query, category, page, pageSize, sort, country, maxPrice: maxPrice ? Number(maxPrice) : undefined, maxDelivery: delivery ? Number(delivery) : undefined, minRating: rating ? Number(rating) : undefined, risk })
         .then(setData).catch(() => setError("Catalog could not be loaded. Please try again."))
         .finally(() => setLoading(false));
     }, 180);
     return () => clearTimeout(timer);
-  }, [query, category, page, sort, country, maxPrice, delivery, rating, risk]);
+  }, [query, category, page, pageSize, sort, country, maxPrice, delivery, rating, risk]);
 
   const activeFilters = useMemo(() => [category, country, maxPrice, delivery, rating, risk].filter(Boolean).length, [category, country, maxPrice, delivery, rating, risk]);
   const toggle = (id: number) => setCompare(value => value.includes(id) ? value.filter(item => item !== id) : value.length < 3 ? [...value, id] : value);

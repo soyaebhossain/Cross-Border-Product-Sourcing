@@ -67,6 +67,21 @@ codes. Store those codes outside the repository. Admin and customer routing is
 role-separated; `/research`, research analytics, and CSV research export are
 admin-only.
 
+If an existing customer or admin loses access, use the interactive recovery
+command from `services/catalog-service`:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\recover_account_access.py --identifier owner --unlock
+```
+
+The command prompts for the new password, increments the account authentication
+version, revokes active refresh sessions, consumes pending authentication
+challenges, and records a credential-free audit event. It preserves disabled,
+locked, and MFA state by default. Use `--reactivate` or `--clear-mfa` only after
+verifying the account owner; prefer `--user-id` when a legacy identifier is
+ambiguous. Never reactivate a known/default admin account—provision a replacement
+and complete MFA enrollment instead.
+
 ## Hosted deployment
 
 - Configure the Vercel project root as `apps/web-next`; that directory contains

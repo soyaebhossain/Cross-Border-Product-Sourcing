@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { getProducts, getLiveCountries, quoteProduct, saveQuote, type Country, type Product, type QuoteResponse } from "../../lib/api";
+import { getCountries, getProducts, quoteProduct, saveQuote, type Country, type Product, type QuoteResponse } from "../../lib/api";
 import { formatBdt } from "../../lib/format";
 
 export default function QuotePage() {
@@ -36,7 +36,7 @@ export default function QuotePage() {
         }
       }
     }).catch(() => {});
-    getLiveCountries().then(setCountries).catch(() => {});
+    getCountries().then(setCountries).catch(() => {});
   }, []);
 
   const selectedProduct = products.find((product) => product.id === selectedProductId);
@@ -93,18 +93,18 @@ export default function QuotePage() {
         {catalogPreview ? (
           <div className="catalog-preview-notice" role="status">
             <strong>Catalog preview</strong>
-            <span>Products are available to browse, but live quote, save and order actions are temporarily unavailable.</span>
+            <span>Products and sourcing lanes are available to browse. Quote controls are read-only until the secure account service is online.</span>
           </div>
         ) : null}
         <div className="section__header">
           <div>
             <p className="eyebrow">Quote</p>
-            <h2>Request a sourcing estimate</h2>
+            <h1>Request a sourcing estimate</h1>
           </div>
         </div>
 
         <form className="form-card" onSubmit={handleSubmit}>
-          <div className="form-grid">
+          <fieldset className="form-grid" disabled={catalogPreview}>
             <div className="form-field">
               <label>Product</label>
               <select
@@ -186,7 +186,7 @@ export default function QuotePage() {
                 <option value="PICKUP">Pickup</option>
               </select>
             </div>
-          </div>
+          </fieldset>
 
           <div className="form-actions">
             <button type="submit" className="button button--primary" disabled={loading || catalogPreview}>

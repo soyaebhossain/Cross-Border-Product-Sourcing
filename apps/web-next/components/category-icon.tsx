@@ -13,6 +13,10 @@ function categoryKind(name: string) {
   if (value.includes("hair")) return "haircare";
   if (value.includes("industrial") || value.includes("automation")) return "automation";
   if (value.includes("medical") || value.includes("health")) return "medical";
+  if (value.includes("component") || value.includes("computer") || value.includes("pc ")) return "components";
+  if (value.includes("phone") || value.includes("mobile")) return "phones";
+  if (value.includes("scientific") || value.includes("instrument") || value.includes("laboratory")) return "scientific";
+  if (value.includes("skin")) return "skincare";
   return "general";
 }
 
@@ -56,6 +60,22 @@ export function CategoryIcon({ name }: CategoryIconProps) {
         {kind === "medical" ? <>
           <path d="M12 5h8v7h7v8h-7v7h-8v-7H5v-8h7z" />
           <path d="M23 5c2.2 0 4 1.8 4 4" />
+        </> : null}
+        {kind === "components" ? <>
+          <rect x="8" y="8" width="16" height="16" rx="2" />
+          <path d="M12 12h8v8h-8zM12 3v5m8-5v5M12 24v5m8-5v5M3 12h5m-5 8h5m16-8h5m-5 8h5" />
+        </> : null}
+        {kind === "phones" ? <>
+          <rect x="9" y="3.5" width="14" height="25" rx="3" />
+          <path d="M13 7h6M14 24.5h4" />
+        </> : null}
+        {kind === "scientific" ? <>
+          <path d="M12 4h8M13 4v9L7 24a2.7 2.7 0 0 0 2.4 4h13.2a2.7 2.7 0 0 0 2.4-4l-6-11V4" />
+          <path d="M10.5 21h11M13 17h6" />
+        </> : null}
+        {kind === "skincare" ? <>
+          <path d="M12 8h8M13 4h6v4M10 8h12l2 19H8z" />
+          <path d="M12.5 16c2-2.5 5-2.5 7 0-1.3 3.2-5.7 3.2-7 0Z" />
         </> : null}
         {kind === "general" ? <>
           <path d="m16 4 11 6-11 6L5 10zM5 10v12l11 6 11-6V10M16 16v12" />

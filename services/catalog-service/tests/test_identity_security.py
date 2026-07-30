@@ -92,6 +92,65 @@ def test_failed_passwords_persist_and_lock_the_account(
         auth.authenticate_user(session, created["username"], "G7!vB2#qL9@xSecure")
 
 
+@pytest.mark.parametrize(
+    ("username", "email", "phone"),
+    [
+        ("customer-security@example.test", "another@example.test", None),
+        ("another-customer", "customer-security", None),
+        ("another-customer", "another@example.test", "CUSTOMER-SECURITY"),
+    ],
+)
+def test_registration_rejects_cross_field_login_identifier_collisions(
+    session: Session,
+    username: str,
+    email: str,
+    phone: str | None,
+) -> None:
+    auth.create_user(
+        session,
+        username="customer-security",
+        email="customer-security@example.test",
+        phone=None,
+        password="G7!vB2#qL9@xSecure",
+        role="customer",
+    )
+
+    with pytest.raises(HTTPException, match="Account already exists"):
+        auth.create_user(
+            session,
+            username=username,
+            email=email,
+            phone=phone,
+            password="V8!nM4@qZ7#cSecure",
+            role="customer",
+        )
+
+
+def test_legacy_ambiguous_login_identifier_fails_closed(
+    session: Session,
+) -> None:
+    first = AccountUser(
+        username="shared-login",
+        email="first@example.test",
+        password_hash=auth.make_password("G7!vB2#qL9@xSecure"),
+        role="customer",
+    )
+    second = AccountUser(
+        username="second-user",
+        email="shared-login",
+        password_hash=auth.make_password("V8!nM4@qZ7#cSecure"),
+        role="customer",
+    )
+    session.add_all((first, second))
+    session.commit()
+
+    with pytest.raises(auth.AmbiguousLoginIdentifierError):
+        auth.find_unique_user_by_identifier(session, "shared-login")
+    assert auth.authenticate_user(session, "shared-login", "G7!vB2#qL9@xSecure") is None
+    assert first.failed_login_attempts == 0
+    assert second.failed_login_attempts == 0
+
+
 def test_admin_mfa_enrollment_totp_and_one_time_recovery(
     session: Session,
 ) -> None:

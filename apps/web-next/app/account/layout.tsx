@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AppIcon, type AppIconName } from "../../components/app-icon";
 import { getCurrentUser, type CurrentUser } from "../../lib/api";
 import { useLocale } from "../../lib/locale-context";
 
@@ -31,14 +32,14 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
 
   if (!ready || !user) return <main className="shell shell--narrow"><div className="empty-state" aria-live="polite">{bn ? "অ্যাকাউন্ট যাচাই করা হচ্ছে…" : "Verifying account…"}</div></main>;
 
-  const navigation: Array<{ href: Route; en: string; bn: string; exact?: boolean }> = [
-    { href: "/account", en: "Overview", bn: "ওভারভিউ", exact: true },
-    { href: "/account/orders", en: "My orders", bn: "আমার অর্ডার" },
-    { href: "/account/saved-quotes", en: "Saved quotes", bn: "সেভড কোট" },
-    { href: "/account/profile", en: "Profile & addresses", bn: "প্রোফাইল ও ঠিকানা" },
-    { href: "/account/invoices", en: "Invoices", bn: "ইনভয়েস" },
-    { href: "/account/notifications", en: "Notifications", bn: "নোটিফিকেশন" },
-    { href: "/account/support", en: "Support & disputes", bn: "সাপোর্ট ও dispute" },
+  const navigation: Array<{ href: Route; en: string; bn: string; icon: AppIconName; exact?: boolean }> = [
+    { href: "/account", en: "Overview", bn: "ওভারভিউ", icon: "grid", exact: true },
+    { href: "/account/orders", en: "My orders", bn: "আমার অর্ডার", icon: "orders" },
+    { href: "/account/saved-quotes", en: "Saved quotes", bn: "সেভড কোট", icon: "globe" },
+    { href: "/account/profile", en: "Profile & addresses", bn: "প্রোফাইল ও ঠিকানা", icon: "user" },
+    { href: "/account/invoices", en: "Invoices", bn: "ইনভয়েস", icon: "package" },
+    { href: "/account/notifications", en: "Notifications", bn: "নোটিফিকেশন", icon: "alert" },
+    { href: "/account/support", en: "Support & disputes", bn: "সাপোর্ট ও dispute", icon: "shield" },
   ];
 
   return (
@@ -52,7 +53,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
           <nav aria-label={bn ? "অ্যাকাউন্ট নেভিগেশন" : "Account navigation"}>
             {navigation.map(item => {
               const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-              return <Link key={item.href} className={active ? "account-sidebar__link account-sidebar__link--active" : "account-sidebar__link"} href={item.href} aria-current={active ? "page" : undefined}>{bn ? item.bn : item.en}</Link>;
+              return <Link key={item.href} className={active ? "account-sidebar__link account-sidebar__link--active" : "account-sidebar__link"} href={item.href} aria-current={active ? "page" : undefined}><AppIcon name={item.icon} size={16} />{bn ? item.bn : item.en}</Link>;
             })}
           </nav>
           <p>{bn ? "আপনি শুধু নিজের অর্ডার ও কোট দেখতে পারবেন।" : "You can only access your own orders and quotes."}</p>

@@ -51,8 +51,9 @@ test("@public read-only catalog snapshot supports browse, search and detail", as
   await expect(page.getByText("410 products", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Quote unavailable" })).toBeDisabled();
 
-  await page.getByLabel("Search marketplace").fill("iPhone 14");
-  await page.getByRole("search").getByRole("button", { name: "Search" }).click();
+  const marketplaceSearch = page.getByRole("search");
+  await marketplaceSearch.getByRole("textbox", { name: "Search marketplace" }).fill("iPhone 14");
+  await marketplaceSearch.getByRole("button", { name: "Search products" }).click();
   await expect(page).toHaveURL(/\/products\?q=iPhone%2014$/);
   await expect(page.getByText("1 products", { exact: true })).toBeVisible();
   const productCard = page.getByRole("article").filter({ hasText: "iPhone 14" });

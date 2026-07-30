@@ -59,6 +59,31 @@ def test_admin_provisioning_rejects_weak_password() -> None:
     engine.dispose()
 
 
+def test_admin_provisioning_rejects_cross_field_identifier_collision() -> None:
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        session.add(
+            AccountUser(
+                username="existing-customer",
+                email="customer@example.test",
+                password_hash="not-used-by-this-test",
+                role="customer",
+            )
+        )
+        session.commit()
+
+        with pytest.raises(ValueError, match="already provisioned"):
+            provision_admin(
+                session,
+                username="customer@example.test",
+                email="new-owner@example.test",
+                password="V8!nM4@qZ7#cSecure",
+            )
+        assert session.scalar(select(func.count()).select_from(AccountUser)) == 1
+    engine.dispose()
+
+
 def test_sqlite_backup_manifest_and_isolated_restore_verification(tmp_path: Path) -> None:
     source = tmp_path / "source.sqlite3"
     engine = create_engine(f"sqlite:///{source.as_posix()}")

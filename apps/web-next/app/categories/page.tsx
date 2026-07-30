@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { AppIcon } from "../../components/app-icon";
+import { CategoryIcon } from "../../components/category-icon";
 import { getCategories, type Category } from "../../lib/api";
 
 export default function CategoriesPage() {
@@ -23,7 +25,7 @@ export default function CategoriesPage() {
         <div className="section__header">
           <div>
             <p className="eyebrow">Categories</p>
-            <h2>Browse catalog segments</h2>
+            <h1>Browse catalog segments</h1>
           </div>
           <Link href="/quote" className="button button--primary">
             Request a quote
@@ -42,13 +44,21 @@ export default function CategoriesPage() {
         ) : (
           <div className="category-grid">
             {categories.map((category) => (
-              <div className="category-chip" key={category.id}>
-                <strong>{category.name}</strong>
-                <small>{category.slug}</small>
-                <Link className="nav-link" href={`/quote?category=${encodeURIComponent(category.slug)}`}>
-                  Request quote for this category
+              <article className="category-chip category-directory-card" key={category.id}>
+                <div className="category-directory-card__header">
+                  <CategoryIcon name={category.name} />
+                  <div className="category-directory-card__copy">
+                    <h2>{category.name}</h2>
+                    <p>Explore products, variants, and sourcing routes.</p>
+                  </div>
+                </div>
+                <Link
+                  className="category-directory-card__action"
+                  href={`/products?category=${encodeURIComponent(category.slug)}`}
+                >
+                  Browse products <AppIcon name="arrow-right" size={16} />
                 </Link>
-              </div>
+              </article>
             ))}
           </div>
         )}

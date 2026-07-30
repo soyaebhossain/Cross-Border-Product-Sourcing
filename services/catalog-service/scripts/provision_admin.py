@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-from sqlalchemy import inspect, or_, select
+from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -15,7 +15,7 @@ SERVICE_ROOT = Path(__file__).resolve().parents[1]
 if str(SERVICE_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVICE_ROOT))
 
-from app.auth import make_password, validate_password_strength  # noqa: E402
+from app.auth import login_identifier_exists, make_password, validate_password_strength  # noqa: E402
 from app.db import engine  # noqa: E402
 from app.models import AccountUser, AdminAuditEvent  # noqa: E402
 
@@ -33,15 +33,7 @@ def provision_admin(
         raise ValueError("Username must be between 3 and 150 characters")
     if "@" not in normalized_email or len(normalized_email) > 254:
         raise ValueError("A valid admin email is required")
-    existing = session.scalar(
-        select(AccountUser).where(
-            or_(
-                AccountUser.username == normalized_username,
-                AccountUser.email == normalized_email,
-            )
-        )
-    )
-    if existing:
+    if login_identifier_exists(session, normalized_username, normalized_email):
         raise ValueError("The username or email is already provisioned; no account was changed")
     validate_password_strength(password, (normalized_username, normalized_email))
     admin = AccountUser(

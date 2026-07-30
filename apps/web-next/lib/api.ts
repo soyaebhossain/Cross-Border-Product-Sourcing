@@ -234,6 +234,80 @@ const serverApiBase = (
 ).replace(/\/+$/, "");
 let refreshRequest: Promise<boolean> | null = null;
 
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string;
+  readonly retryAfter: number | null;
+  readonly requestId: string | null;
+
+  constructor(
+    message: string,
+    {
+      status = 0,
+      code = "request_failed",
+      retryAfter = null,
+      requestId = null,
+      cause,
+    }: {
+      status?: number;
+      code?: string;
+      retryAfter?: number | null;
+      requestId?: string | null;
+      cause?: unknown;
+    } = {},
+  ) {
+    super(message, { cause });
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.retryAfter = retryAfter;
+    this.requestId = requestId;
+  }
+}
+
+function responseErrorCode(status: number) {
+  if (status === 401) return "invalid_credentials";
+  if (status === 403) return "forbidden";
+  if (status === 404) return "not_found";
+  if (status === 423) return "account_locked";
+  if (status === 429) return "rate_limited";
+  if (status >= 500) return "service_unavailable";
+  return "request_failed";
+}
+
+async function responseError(response: Response, fallback?: string): Promise<ApiError> {
+  const payload = await response.json().catch(() => ({})) as {
+    detail?: string | Array<{ msg?: string }>;
+  };
+  const detail = typeof payload.detail === "string"
+    ? payload.detail
+    : Array.isArray(payload.detail)
+      ? payload.detail.map(item => item.msg).filter(Boolean).join("; ")
+      : "";
+  const retryAfterValue = Number(response.headers.get("retry-after"));
+  return new ApiError(detail || fallback || `Request failed: ${response.status}`, {
+    status: response.status,
+    code: responseErrorCode(response.status),
+    retryAfter: Number.isFinite(retryAfterValue) && retryAfterValue > 0
+      ? retryAfterValue
+      : null,
+    requestId: response.headers.get("x-request-id"),
+  });
+}
+
+export function isApiServiceUnavailable(error: unknown): boolean {
+  return error instanceof ApiError
+    ? error.status === 0 || error.status === 404 || error.status >= 500
+    : error instanceof TypeError;
+}
+
+export type AuthServiceStatus = {
+  available: boolean;
+  status: "ready" | "unavailable";
+  httpStatus: number | null;
+  requestId: string | null;
+};
+
 function getRequestBase() {
   if (typeof window === "undefined") {
     if (!serverApiBase) {
@@ -261,7 +335,7 @@ async function fetchJson<T>(path: string): Promise<T> {
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    throw await responseError(response);
   }
 
   return response.json() as Promise<T>;
@@ -279,13 +353,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   });
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({})) as { detail?: string | Array<{ msg?: string }> };
-    const detail = typeof payload.detail === "string"
-      ? payload.detail
-      : Array.isArray(payload.detail)
-        ? payload.detail.map(item => item.msg).filter(Boolean).join("; ")
-        : "";
-    throw new Error(detail || `Request failed: ${response.status}`);
+    throw await responseError(response);
   }
 
   return response.json() as Promise<T>;
@@ -300,8 +368,7 @@ async function patchJson<T>(path: string, body: unknown): Promise<T> {
     credentials: "include",
   });
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({})) as { detail?: string };
-    throw new Error(payload.detail || `Request failed: ${response.status}`);
+    throw await responseError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -323,7 +390,15 @@ async function refreshSession(): Promise<boolean> {
 }
 
 async function apiFetch(path: string, init: RequestInit): Promise<Response> {
-  let response = await fetch(`${getRequestBase()}${path}`, init);
+  let response: Response;
+  try {
+    response = await fetch(`${getRequestBase()}${path}`, init);
+  } catch (cause) {
+    throw new ApiError("Unable to reach the account service.", {
+      code: "network_error",
+      cause,
+    });
+  }
   const authEntryPoint = path === "/api/auth/login/" || path === "/api/auth/register/" || path === "/api/auth/refresh/";
   if (response.status === 401 && !authEntryPoint && await refreshSession()) {
     response = await fetch(`${getRequestBase()}${path}`, init);
@@ -341,13 +416,7 @@ export async function requestJson<T>(path: string, init: RequestInit = {}): Prom
     headers,
   });
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({})) as { detail?: string | Array<{ msg?: string }> };
-    const detail = typeof payload.detail === "string"
-      ? payload.detail
-      : Array.isArray(payload.detail)
-        ? payload.detail.map(item => item.msg).filter(Boolean).join("; ")
-        : "";
-    throw new Error(detail || `Request failed: ${response.status}`);
+    throw await responseError(response);
   }
   return response.json() as Promise<T>;
 }
@@ -362,8 +431,7 @@ export async function requestVoid(path: string, init: RequestInit = {}): Promise
     headers,
   });
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({})) as { detail?: string };
-    throw new Error(payload.detail || `Request failed: ${response.status}`);
+    throw await responseError(response);
   }
 }
 
@@ -383,6 +451,33 @@ export function registerAccount(payload: { username: string; email?: string; pho
   return postJson<{ user: CurrentUser; message: string }>("/api/auth/register/", payload);
 }
 export function getCurrentUser() { return fetchJson<CurrentUser>("/api/auth/me/"); }
+export async function getAuthServiceStatus(timeoutMs = 5000): Promise<AuthServiceStatus> {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${getRequestBase()}/api/ready`, {
+      cache: "no-store",
+      credentials: "include",
+      signal: controller.signal,
+    });
+    const payload = await response.json().catch(() => ({})) as { status?: string };
+    return {
+      available: response.ok && payload.status === "ready",
+      status: response.ok && payload.status === "ready" ? "ready" : "unavailable",
+      httpStatus: response.status,
+      requestId: response.headers.get("x-request-id"),
+    };
+  } catch {
+    return {
+      available: false,
+      status: "unavailable",
+      httpStatus: null,
+      requestId: null,
+    };
+  } finally {
+    window.clearTimeout(timeout);
+  }
+}
 export function startMfaEnrollment(mfaToken: string) {
   return postJson<{ secret: string; otpauth_uri: string; message?: string }>("/api/auth/mfa/enroll/start/", { mfa_token: mfaToken });
 }
@@ -395,7 +490,18 @@ export function verifyMfaLogin(mfaToken: string, input: { code?: string; recover
 export async function startGoogleLogin() {
   const response = await apiFetch("/api/auth/social/google/start/", { credentials: "include", cache: "no-store" });
   const data = await response.json().catch(() => ({})) as { auth_url?: string; detail?: string };
-  if (!response.ok || !data.auth_url) throw new Error(data.detail || "Google login is unavailable");
+  if (!response.ok) {
+    throw new ApiError(data.detail || "Google login is unavailable", {
+      status: response.status,
+      code: response.status >= 500 ? "social_login_unavailable" : responseErrorCode(response.status),
+      requestId: response.headers.get("x-request-id"),
+    });
+  }
+  if (!data.auth_url) throw new ApiError("Google login is unavailable", {
+    status: response.status,
+    code: "social_login_unavailable",
+    requestId: response.headers.get("x-request-id"),
+  });
   window.location.assign(data.auth_url);
 }
 export async function logoutSession() {
