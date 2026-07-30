@@ -45,10 +45,17 @@ test("@public read-only catalog snapshot supports browse, search and detail", as
 
   await page.goto("/");
   await expect(page.getByRole("status").filter({ hasText: "Catalog preview" })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Browse all 410/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Browse all 470/ })).toBeVisible();
+  const preciousCategory = page.getByRole("link", {
+    name: /Jewelry, Gems & Precious Metals/,
+  });
+  await expect(preciousCategory).toBeVisible();
+  await preciousCategory.click();
+  await expect(page).toHaveURL(/category=jewelry-gems-precious-metals/);
+  await expect(page.getByText("60 products", { exact: true })).toBeVisible();
 
   await page.goto("/products");
-  await expect(page.getByText("410 products", { exact: true })).toBeVisible();
+  await expect(page.getByText("470 products", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Quote unavailable" })).toBeDisabled();
 
   const marketplaceSearch = page.getByRole("search");

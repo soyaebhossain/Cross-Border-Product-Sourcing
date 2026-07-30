@@ -10,6 +10,23 @@ type CategoryVisual = {
 function categoryVisual(category?: string): CategoryVisual {
   const value = (category || "").toLowerCase();
 
+  if (
+    value.includes("jewel") ||
+    value.includes("precious") ||
+    value.includes("gem") ||
+    value.includes("gold") ||
+    value.includes("silver") ||
+    value.includes("diamond") ||
+    value.includes("bullion")
+  ) {
+    return {
+      accent: "#a16207",
+      soft: "#fef3c7",
+      icon:
+        '<path d="m14 42 20-28h52l20 28-46 66Z"/><path d="M14 42h92M34 14l26 28 26-28M60 42v66"/>',
+    };
+  }
+
   if (value.includes("medical") || value.includes("health")) {
     return {
       accent: "#059669",

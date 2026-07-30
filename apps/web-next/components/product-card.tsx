@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Product } from "../lib/api";
 import { resolveImageUrl } from "../lib/api";
+import { formatAmount } from "../lib/format";
 import { ProductImage } from "./product-image";
 
 type ProductCardProps = {
@@ -17,6 +18,8 @@ function CheckIcon() {
 export function ProductCard({ product, selectable, selected, onSelect }: ProductCardProps) {
   const image = resolveImageUrl(product.image);
   const market = product.market;
+  const hasIndicativePreciousPricing =
+    product.category.slug === "jewelry-gems-precious-metals";
 
   return <article className="product-card">
     {selectable ? <label className="compare-check"><input type="checkbox" checked={selected} onChange={() => onSelect?.(product.id)} /> Compare</label> : null}
@@ -26,7 +29,7 @@ export function ProductCard({ product, selectable, selected, onSelect }: Product
       <h3>{product.name}</h3>
       <p className="meta">{product.model || "Model not specified"}</p>
       {market ? <div className="market-signals">
-        <span>{market.min_price ?? "—"} {market.currency || "USD"}</span>
+        <span>{hasIndicativePreciousPricing ? "Indicative " : ""}{formatAmount(market.min_price)} {market.currency || "USD"}</span>
         <span aria-label="Supplier rating">★ {market.max_rating?.toFixed(1) || "—"}</span>
         <span>{market.min_delivery_days || "—"} days</span>
         <span className={`risk-text risk-text--${market.risk_level?.toLowerCase()}`}>{market.risk_level} risk</span>

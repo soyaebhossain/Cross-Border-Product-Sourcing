@@ -58,7 +58,7 @@ def main() -> int:
     sample_slug: str | None = None
     try:
         status, products = read_json("/api/products/")
-        if status == 200 and isinstance(products, list) and len(products) >= 50:
+        if status == 200 and isinstance(products, list) and len(products) >= 470:
             sample_slug = products[0].get("slug")
             passed.append(f"public catalog ({len(products)} products)")
         else:
@@ -69,10 +69,18 @@ def main() -> int:
     try:
         _, categories = read_json("/api/categories/")
         slugs = {str(item.get("slug")) for item in categories}
-        if "medical-products-accessories" in slugs:
-            passed.append("medical category")
+        required_categories = {
+            "medical-products-accessories",
+            "jewelry-gems-precious-metals",
+        }
+        missing_categories = required_categories - slugs
+        if not missing_categories:
+            passed.append("medical and precious-material categories")
         else:
-            failed.append("medical category is missing")
+            failed.append(
+                "required categories are missing: "
+                + ", ".join(sorted(missing_categories))
+            )
     except Exception as exc:  # noqa: BLE001
         failed.append(f"category check failed ({type(exc).__name__})")
 

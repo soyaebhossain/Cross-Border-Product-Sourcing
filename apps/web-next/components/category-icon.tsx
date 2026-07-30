@@ -4,6 +4,15 @@ type CategoryIconProps = {
 
 function categoryKind(name: string) {
   const value = name.toLowerCase();
+  if (
+    value.includes("jewel") ||
+    value.includes("precious") ||
+    value.includes("gem") ||
+    value.includes("gold") ||
+    value.includes("silver") ||
+    value.includes("diamond") ||
+    value.includes("bullion")
+  ) return "jewelry";
   if (value.includes("3d") || value.includes("printing")) return "printing";
   if (value.includes("agri") || value.includes("farm")) return "agriculture";
   if (value.includes("energy") || value.includes("ev")) return "energy";
@@ -25,6 +34,10 @@ export function CategoryIcon({ name }: CategoryIconProps) {
   return (
     <span className={`category-icon category-icon--${kind}`} aria-hidden="true">
       <svg viewBox="0 0 32 32" fill="none">
+        {kind === "jewelry" ? <>
+          <path d="m6 12 5-7h10l5 7-10 15z" />
+          <path d="M6 12h20M11 5l5 7 5-7M16 12v15" />
+        </> : null}
         {kind === "printing" ? <>
           <path d="M7 5h18v7H7zM10 12v4m12-4v4M6 27h20M9 16h14v8H9z" />
           <path d="m16 16 4 2.3V23l-4 2.2-4-2.2v-4.7zM16 16v4.7m4-2.4-4 2.4-4-2.4" />

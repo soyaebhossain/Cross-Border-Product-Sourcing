@@ -224,7 +224,7 @@ Before executing:
 5. run:
 
    ```shell
-   python scripts/migrate_catalog_to_postgres.py --execute --minimum-products 350
+   python scripts/migrate_catalog_to_postgres.py --execute --minimum-products 470
    ```
 
 The command refuses a non-SQLite source, non-PostgreSQL target, source without
@@ -233,8 +233,9 @@ any target with pre-existing catalog rows. It copies in foreign-key order,
 resets PostgreSQL sequences, and compares every in-scope table count inside
 the target transaction.
 
-Afterward, independently reconcile category/product/medical-product counts,
-normalized slug/SKU uniqueness, offer foreign keys and representative quote
+Afterward, independently reconcile category/product, medical-product, and
+precious-product counts, normalized slug/SKU uniqueness, offer foreign keys,
+precious-material verification disclaimers, and representative quote
 calculations. Keep the old database read-only until rollback expiry. If
 historical customer/order/payment data must also move, do not broaden this
 script: design and review a separate PII/financial migration with legal,
@@ -253,7 +254,7 @@ The exporter uses a fixed public-field allowlist, excludes free text and
 third-party images, and never reads accounts, quotes, orders, payments,
 customer, support or audit data. Keep
 `NEXT_PUBLIC_CATALOG_SNAPSHOT_FALLBACK=1` only during cutover. After
-`/api/ready` returns 200 and the live browse API reports all 410 imported
+`/api/ready` returns 200 and the live browse API reports all 470 imported
 products, set it to `0` and redeploy Vercel; live catalog data will then be the
 only source.
 

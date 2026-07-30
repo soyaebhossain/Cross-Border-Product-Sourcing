@@ -52,9 +52,10 @@ This is a transient working-tree record, not release evidence:
   passing tests** and `pip-audit` reported **0 known vulnerabilities** for
   `requirements.txt`.
 - A live SQLite backup/isolated restore passed. The live development database
-  was upgraded to Alembic `20260730_04`; integrity checks reported 14
-  categories, 410 products, 85 medical products, zero foreign-key violations,
-  zero duplicate normalized slugs, and zero active administrators.
+  was upgraded to Alembic `20260730_04`; integrity checks reported 15
+  categories, 470 products, 85 medical products, 60 jewelry/gem/precious-metal
+  products, zero foreign-key violations, zero duplicate normalized slugs, and
+  zero active administrators.
 - A fresh SQLite upgrade to Alembic head passed. The PII-free
   catalog/configuration-to-empty-PostgreSQL migration tool has scope/order
   tests, but an actual PostgreSQL transfer has not yet been run.

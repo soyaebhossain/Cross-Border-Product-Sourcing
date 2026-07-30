@@ -535,6 +535,234 @@ def _ensure_medical_catalog(session: Session, countries: dict[str, Country]) -> 
                 offer.moq = moq
 
 
+def _ensure_precious_catalog(session: Session, countries: dict[str, Country]) -> None:
+    category_slug = "jewelry-gems-precious-metals"
+    category = session.scalar(select(Category).where(Category.slug == category_slug))
+    if not category:
+        category = Category(name="Jewelry, Gems & Precious Metals", slug=category_slug)
+        session.add(category)
+        session.flush()
+
+    product_names = [
+        # Gold jewelry
+        "Gold Cable Chain Necklace",
+        "Gold Figaro Chain Necklace",
+        "Gold Rope Chain Necklace",
+        "Gold Pendant Necklace",
+        "Gold Link Bracelet",
+        "Gold Cuff Bracelet",
+        "Gold Classic Bangle",
+        "Gold Stackable Ring",
+        "Gold Signet Ring",
+        "Gold Wedding Band",
+        "Gold Stud Earrings",
+        "Gold Hoop Earrings",
+        "Gold Bullion Bar",
+        "Gold Bullion Coin",
+        # Silver jewelry
+        "Silver Cable Chain Necklace",
+        "Silver Figaro Chain Necklace",
+        "Silver Rope Chain Necklace",
+        "Silver Pendant Necklace",
+        "Silver Link Bracelet",
+        "Silver Cuff Bracelet",
+        "Silver Classic Bangle",
+        "Silver Stackable Ring",
+        "Silver Signet Ring",
+        "Silver Wedding Band",
+        "Silver Stud Earrings",
+        "Silver Hoop Earrings",
+        "Silver Bullion Bar",
+        "Silver Bullion Coin",
+        # Other precious-metal jewelry and settings
+        "Platinum Chain Necklace",
+        "Platinum Link Bracelet",
+        "Platinum Wedding Band",
+        "Platinum Stud Earrings",
+        "Palladium Wedding Band",
+        "Rose Gold Bracelet",
+        "White Gold Pendant Setting",
+        "Two-Tone Gold Ring",
+        # Diamond stones and jewelry
+        "Round-Cut Diamond Stone",
+        "Princess-Cut Diamond Stone",
+        "Emerald-Cut Diamond Stone",
+        "Oval-Cut Diamond Stone",
+        "Pear-Cut Diamond Stone",
+        "Marquise-Cut Diamond Stone",
+        "Cushion-Cut Diamond Stone",
+        "Radiant-Cut Diamond Stone",
+        "Asscher-Cut Diamond Stone",
+        "Heart-Cut Diamond Stone",
+        "Diamond Solitaire Pendant",
+        "Diamond Tennis Bracelet",
+        "Diamond Stud Earrings",
+        "Diamond Cluster Ring",
+        # Colored gemstones
+        "Ruby Gemstone",
+        "Blue Sapphire Gemstone",
+        "Emerald Gemstone",
+        "Amethyst Gemstone",
+        "Aquamarine Gemstone",
+        "Citrine Gemstone",
+        "Garnet Gemstone",
+        "Opal Gemstone",
+        "Peridot Gemstone",
+        "Tanzanite Gemstone",
+    ]
+
+    existing_products = {product.slug: product for product in session.scalars(select(Product)).all()}
+    variants_by_sku = {
+        variant.sku: variant
+        for variant in session.scalars(select(ProductVariant).where(ProductVariant.sku.like("JPM-%"))).all()
+    }
+    precious_variants: list[tuple[int, ProductVariant]] = []
+
+    for index, name in enumerate(product_names, start=1):
+        slug = _slugify(name)
+        product = existing_products.get(slug)
+        description = (
+            f"{name} for cross-border supplier discovery and quote comparison. "
+            "Displayed offer prices are indicative demo values, not live precious-material market quotations. "
+            "Material composition, weight, dimensions, treatment, grade, origin, hallmark, certification, "
+            "and import requirements are supplier-declared and must be independently verified before purchase."
+        )
+        if not product:
+            product = Product(
+                name=name,
+                slug=slug,
+                model=f"JPM-{index:03d}",
+                description=description,
+                image=None,
+                category=category,
+            )
+            session.add(product)
+            session.flush()
+            existing_products[slug] = product
+        else:
+            product.name = name
+            product.model = f"JPM-{index:03d}"
+            product.description = description
+            product.category = category
+
+        sku = f"JPM-{index:03d}-STD"
+        variant = variants_by_sku.get(sku)
+        if index <= 14:
+            variant_name = "Gold — purity and net weight to be specified"
+        elif index <= 28:
+            variant_name = "Silver — fineness and net weight to be specified"
+        elif index <= 32:
+            variant_name = "Platinum — fineness and net weight to be specified"
+        elif index == 33:
+            variant_name = "Palladium — fineness and net weight to be specified"
+        elif index <= 36:
+            variant_name = "Gold alloy — composition and net weight to be specified"
+        elif index <= 50:
+            variant_name = "Diamond — cut, carat, color, clarity and certificate to be specified"
+        else:
+            variant_name = "Gemstone — grade, weight and treatment disclosure to be specified"
+        is_stone = 37 <= index <= 46 or index >= 51
+        if is_stone:
+            weight = (Decimal("0.010") + Decimal(index % 5) * Decimal("0.002")).quantize(Decimal("0.001"))
+            length, width, height = Decimal("6.00"), Decimal("6.00"), Decimal("3.00")
+        else:
+            weight = (Decimal("0.040") + Decimal(index % 7) * Decimal("0.006")).quantize(Decimal("0.001"))
+            length, width, height = Decimal("12.00"), Decimal("9.00"), Decimal("4.00")
+
+        if not variant:
+            variant = ProductVariant(
+                product=product,
+                sku=sku,
+                variant_name=variant_name,
+                weight_kg=weight,
+                length_cm=length,
+                width_cm=width,
+                height_cm=height,
+            )
+            session.add(variant)
+            session.flush()
+            variants_by_sku[sku] = variant
+        else:
+            variant.product = product
+            variant.variant_name = variant_name
+            variant.weight_kg = weight
+            variant.length_cm = length
+            variant.width_cm = width
+            variant.height_cm = height
+        precious_variants.append((index, variant))
+
+    seller_specs = [
+        ("Jaipur Jewelry Sourcing Studio", "IN", "4.70"),
+        ("Singapore Gem Trade Desk", "SG", "4.76"),
+        ("Shenzhen Jewelry Components Hub", "CN", "4.58"),
+    ]
+    sellers_by_key = {
+        (seller.name, seller.country.code): seller
+        for seller in session.scalars(select(Seller)).all()
+    }
+    for seller_name, country_code, rating in seller_specs:
+        key = (seller_name, country_code)
+        if key not in sellers_by_key:
+            sellers_by_key[key] = Seller(
+                country=countries[country_code],
+                name=seller_name,
+                rating=Decimal(rating),
+                note=(
+                    "Demo jewelry and gemstone sourcing profile. Buyer due diligence, "
+                    "material verification, and import-compliance review are required."
+                ),
+            )
+            session.add(sellers_by_key[key])
+    session.flush()
+
+    existing_offers = {
+        (offer.variant_id, offer.country_id, offer.seller_id, offer.mode): offer
+        for offer in session.scalars(select(SellerOffer)).all()
+    }
+    offer_specs = [
+        ("IN", "Jaipur Jewelry Sourcing Studio", "LOCAL", Decimal("1.00"), 1),
+        ("IN", "Jaipur Jewelry Sourcing Studio", "BULK", Decimal("0.94"), 5),
+        ("SG", "Singapore Gem Trade Desk", "LOCAL", Decimal("1.10"), 1),
+        ("CN", "Shenzhen Jewelry Components Hub", "BULK", Decimal("0.91"), 10),
+    ]
+    for index, variant in precious_variants:
+        if index <= 14:
+            base_price = Decimal("150.00") + Decimal(index) * Decimal("18.50")
+        elif index <= 28:
+            base_price = Decimal("20.00") + Decimal(index - 14) * Decimal("3.25")
+        elif index <= 36:
+            base_price = Decimal("210.00") + Decimal(index - 28) * Decimal("24.00")
+        elif index <= 50:
+            base_price = Decimal("95.00") + Decimal(index - 36) * Decimal("28.00")
+        else:
+            base_price = Decimal("22.00") + Decimal(index - 50) * Decimal("8.00")
+
+        for country_code, seller_name, mode, multiplier, moq in offer_specs:
+            country = countries[country_code]
+            seller = sellers_by_key[(seller_name, country_code)]
+            key = (variant.id, country.id, seller.id, mode)
+            offer = existing_offers.get(key)
+            price = (base_price * multiplier).quantize(Decimal("0.01"))
+            if not offer:
+                offer = SellerOffer(
+                    variant=variant,
+                    country=country,
+                    seller=seller,
+                    mode=mode,
+                    price_origin=price,
+                    currency="USD",
+                    stock=12 + index * 2,
+                    moq=moq,
+                )
+                session.add(offer)
+                existing_offers[key] = offer
+            else:
+                offer.price_origin = price
+                offer.currency = "USD"
+                offer.stock = 12 + index * 2
+                offer.moq = moq
+
+
 def _import_legacy_catalog(session: Session, sqlite_path: Path) -> bool:
     """Idempotently sync the legacy catalog, preferring its populated image_url field."""
     if not sqlite_path.exists():
@@ -826,6 +1054,7 @@ def seed_database(
     countries = _ensure_reference_data(session)
     _ensure_sellers_and_offers(session, countries)
     _ensure_medical_catalog(session, countries)
+    _ensure_precious_catalog(session, countries)
     if legacy_sqlite_path:
         _sync_legacy_offers(session, legacy_sqlite_path)
     if supply_chain_csv_path:

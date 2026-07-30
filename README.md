@@ -14,10 +14,13 @@ applications are not part of the active tree.
 - `gateway/nginx.conf` — reverse-proxy baseline; production TLS belongs at the
   managed edge/load balancer.
 
-The current development catalog contains 14 categories and 410 products,
-including Medical Products & Accessories. China, India, Singapore, and
-Thailand are available sourcing origins. Runtime database files are ignored
-and must never be committed.
+The current development catalog contains 15 categories and 470 products,
+including Medical Products & Accessories and Jewelry, Gems & Precious Metals.
+China, India, Singapore, and Thailand are available sourcing origins. Precious
+metal and gemstone seed prices are indicative demo values; purity, weight,
+grade, hallmark, certification, origin, and import requirements require
+independent verification. Runtime database files are ignored and must never be
+committed.
 
 ## Run locally on Windows
 

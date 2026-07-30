@@ -9,14 +9,20 @@ export default async function HomePage() {
     browseProducts({ pageSize: 8 }).catch(() => null),
     getCategories().catch(() => []),
   ]);
-  const categoryPreview = categories.slice(0, 9);
-  const medicalAccessories = categories.find(
-    (category) => category.slug === "medical-products-accessories",
-  );
-  const featuredCategories = medicalAccessories
-    && !categoryPreview.some((category) => category.id === medicalAccessories.id)
-    ? [...categoryPreview.slice(0, 8), medicalAccessories]
-    : categoryPreview;
+  const featuredCategorySlugs = [
+    "jewelry-gems-precious-metals",
+    "medical-products-accessories",
+  ];
+  const pinnedCategories = featuredCategorySlugs.flatMap((slug) => {
+    const category = categories.find((item) => item.slug === slug);
+    return category ? [category] : [];
+  });
+  const featuredCategories = [
+    ...categories
+      .filter((category) => !featuredCategorySlugs.includes(category.slug))
+      .slice(0, Math.max(0, 9 - pinnedCategories.length)),
+    ...pinnedCategories,
+  ];
 
   const lanes = [
     { code: "CN", name: "China → Bangladesh", eta: "7–14 days", badge: "Best value" },

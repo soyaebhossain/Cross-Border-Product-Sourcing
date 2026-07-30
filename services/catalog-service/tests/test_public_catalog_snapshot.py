@@ -192,18 +192,26 @@ def test_snapshot_rejects_case_insensitive_duplicate_slugs() -> None:
 
 def test_committed_snapshot_is_complete_and_contains_no_private_scope() -> None:
     snapshot = json.loads(COMMITTED_SNAPSHOT.read_text(encoding="utf-8"))
-    validate_public_catalog_snapshot(snapshot, minimum_products=410)
+    validate_public_catalog_snapshot(snapshot, minimum_products=470)
 
     assert snapshot["counts"] == {
-        "categories": 14,
+        "categories": 15,
         "countries": 4,
-        "products": 410,
-        "variants": 410,
+        "products": 470,
+        "variants": 470,
     }
-    assert len(snapshot["products"]) == 410
+    assert len(snapshot["products"]) == 470
     assert len(
         {product["slug"].casefold() for product in snapshot["products"]}
-    ) == 410
+    ) == 470
+    precious_products = [
+        product
+        for product in snapshot["products"]
+        if product["category"]["slug"] == "jewelry-gems-precious-metals"
+    ]
+    assert len(precious_products) == 60
+    assert all(product["variants"] for product in precious_products)
+    assert all(product["market"].get("supplier_count", 0) >= 1 for product in precious_products)
     assert all(
         product["image"] is None
         or product["image"].startswith("/media/products/")
