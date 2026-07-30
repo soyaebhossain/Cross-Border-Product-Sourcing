@@ -90,7 +90,7 @@ jobs:
       E2E_ADMIN_PASSWORD: "A9!Quartz-River-CI-Only-2026"
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
