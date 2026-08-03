@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 
 export function AdminModal({
   open,
@@ -8,14 +8,18 @@ export function AdminModal({
   description,
   children,
   onClose,
+  closeLabel = "Close dialog",
 }: {
   open: boolean;
   title: string;
   description?: string;
   children: React.ReactNode;
   onClose: () => void;
+  closeLabel?: string;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const descriptionId = useId();
 
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -25,8 +29,18 @@ export function AdminModal({
   }, [open]);
 
   return (
-    <dialog ref={dialogRef} className="admin-modal" onCancel={onClose} onClose={onClose} aria-labelledby="admin-modal-title" aria-describedby={description ? "admin-modal-description" : undefined}>
-      <div className="admin-modal__header"><div><h2 id="admin-modal-title">{title}</h2>{description ? <p id="admin-modal-description">{description}</p> : null}</div><button type="button" onClick={onClose} aria-label="Close dialog">×</button></div>
+    <dialog
+      ref={dialogRef}
+      className="admin-modal"
+      onCancel={event => {
+        event.preventDefault();
+        onClose();
+      }}
+      onClose={onClose}
+      aria-labelledby={titleId}
+      aria-describedby={description ? descriptionId : undefined}
+    >
+      <div className="admin-modal__header"><div><h2 id={titleId}>{title}</h2>{description ? <p id={descriptionId}>{description}</p> : null}</div><button type="button" onClick={onClose} aria-label={closeLabel}>×</button></div>
       {children}
     </dialog>
   );
