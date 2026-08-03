@@ -34,6 +34,10 @@ class AccountLockedError(Exception):
         super().__init__("Account is temporarily locked")
 
 
+class AmbiguousLoginIdentifierError(Exception):
+    """Raised when legacy data maps one login identifier to multiple accounts."""
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -126,23 +130,71 @@ def validate_password_strength(password: str, identifiers: tuple[str | None, ...
         raise ValueError("Password must contain " + ", ".join(dict.fromkeys(errors)))
 
 
-def _find_user_by_identifier(session: Session, identifier: str, *, for_update: bool = False) -> AccountUser | None:
-    normalized = identifier.strip()
-    statement = select(AccountUser).where(
-        or_(
-            func.lower(AccountUser.username) == normalized.casefold(),
-            func.lower(AccountUser.email) == normalized.casefold(),
-            AccountUser.phone == normalized,
+def _login_identifier_conditions(*identifiers: str | None) -> list[Any]:
+    normalized = {
+        identifier.strip().casefold()
+        for identifier in identifiers
+        if identifier is not None and identifier.strip()
+    }
+    conditions: list[Any] = []
+    for value in normalized:
+        conditions.extend(
+            (
+                func.lower(AccountUser.username) == value,
+                func.lower(AccountUser.email) == value,
+                func.lower(AccountUser.phone) == value,
+            )
         )
-    )
+    return conditions
+
+
+def login_identifier_exists(session: Session, *identifiers: str | None) -> bool:
+    """Return whether any value could log in as an existing account."""
+
+    conditions = _login_identifier_conditions(*identifiers)
+    if not conditions:
+        return False
+    return session.scalar(select(AccountUser.id).where(or_(*conditions)).limit(1)) is not None
+
+
+def find_unique_user_by_identifier(
+    session: Session,
+    identifier: str,
+    *,
+    for_update: bool = False,
+) -> AccountUser | None:
+    conditions = _login_identifier_conditions(identifier)
+    if not conditions:
+        return None
+    statement = select(AccountUser).where(or_(*conditions)).limit(2)
     if for_update:
         statement = statement.with_for_update()
-    return session.scalar(statement)
+    matches = list(session.scalars(statement))
+    if len(matches) > 1:
+        raise AmbiguousLoginIdentifierError("Login identifier maps to multiple accounts")
+    return matches[0] if matches else None
+
+
+def _find_user_by_identifier(
+    session: Session,
+    identifier: str,
+    *,
+    for_update: bool = False,
+) -> AccountUser | None:
+    """Backward-compatible internal wrapper around ambiguity-safe lookup."""
+
+    return find_unique_user_by_identifier(session, identifier, for_update=for_update)
 
 
 def authenticate_user(session: Session, identifier: str, password: str) -> dict[str, Any] | None:
     settings = get_settings()
-    user = _find_user_by_identifier(session, identifier, for_update=True)
+    try:
+        user = find_unique_user_by_identifier(session, identifier, for_update=True)
+    except AmbiguousLoginIdentifierError:
+        # Fail closed for legacy cross-field collisions without revealing which
+        # accounts matched the submitted identifier.
+        hashlib.pbkdf2_hmac("sha256", password.encode(), b"sourceai-dummy", 100_000)
+        return None
     if user is None or not user.is_active:
         # Bound work for nonexistent/disabled accounts without revealing which
         # identifier exists. The per-IP and per-account request limits still
@@ -191,16 +243,18 @@ def create_user(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     normalized_role = role if role in ALLOWED_ROLES else "customer"
-    identifier = (username or email or phone or "").strip()
+    identifier = next(
+        (
+            candidate.strip()
+            for candidate in (username, email, phone)
+            if candidate is not None and candidate.strip()
+        ),
+        "",
+    )
     if not identifier:
         raise HTTPException(status_code=400, detail="username, email, or phone required")
 
-    checks = [func.lower(AccountUser.username) == identifier.casefold()]
-    if email:
-        checks.append(func.lower(AccountUser.email) == email.strip().casefold())
-    if phone:
-        checks.append(AccountUser.phone == phone.strip())
-    if session.scalar(select(AccountUser).where(or_(*checks))):
+    if login_identifier_exists(session, identifier, email, phone):
         raise HTTPException(status_code=400, detail="Account already exists")
 
     user = AccountUser(

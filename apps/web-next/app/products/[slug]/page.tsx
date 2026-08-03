@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCheapestCountryRecommendation, getProductBySlug, resolveImageUrl } from "../../../lib/api";
+import { getCheapestCountryRecommendation, getProductBySlug, getProductMedia } from "../../../lib/api";
 import { SourcingWorkspace } from "../../../components/sourcing-workspace";
-import { ProductImage } from "../../../components/product-image";
+import { ProductGallery } from "../../../components/product-image";
 import { formatBdt } from "../../../lib/format";
 
 type ProductDetailPageProps = {
@@ -14,7 +14,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
   try {
     const product = await getProductBySlug(slug);
-    const image = resolveImageUrl(product.image);
+    const media = getProductMedia(product);
     const primaryVariantId = product.default_variant_id ?? product.variants[0]?.id;
     const catalogPreview = product.catalog_source === "snapshot";
     const recommendation = primaryVariantId && !catalogPreview
@@ -40,7 +40,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
         <section className="detail">
           <div className="detail__media">
-            <ProductImage src={image} name={product.name} category={product.category.name} />
+            <ProductGallery media={media} name={product.name} category={product.category.name} />
           </div>
 
           <div className="detail__copy">

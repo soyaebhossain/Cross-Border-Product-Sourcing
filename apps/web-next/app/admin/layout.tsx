@@ -3,7 +3,8 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { AppIcon } from "../../components/app-icon";
 import { getCurrentUser, type CurrentUser } from "../../lib/api";
 import { useLocale } from "../../lib/locale-context";
 
@@ -33,10 +34,30 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [checking, setChecking] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuToggleRef = useRef<HTMLButtonElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const menuWasOpenRef = useRef(false);
   const pathname = usePathname();
   const router = useRouter();
   const { locale } = useLocale();
   const bn = locale === "bn";
+
+  const trapNavigationFocus = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key !== "Tab" || !menuOpen || window.innerWidth > 820) return;
+    const focusable = Array.from(
+      event.currentTarget.querySelectorAll<HTMLElement>("a[href], button:not([disabled])"),
+    ).filter(element => element.offsetParent !== null);
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -54,6 +75,37 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => { active = false; };
   }, [router]);
   useEffect(() => setMenuOpen(false), [pathname]);
+  useEffect(() => {
+    if (!menuOpen) {
+      if (menuWasOpenRef.current) {
+        menuWasOpenRef.current = false;
+        const toggle = menuToggleRef.current;
+        if (toggle && toggle.offsetParent !== null) {
+          toggle.focus();
+        } else {
+          document.querySelector<HTMLElement>("#admin-navigation [aria-current='page']")?.focus();
+        }
+      }
+      return;
+    }
+    menuWasOpenRef.current = true;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    const closeAtDesktopLayout = () => {
+      if (window.innerWidth > 820) setMenuOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", closeOnEscape);
+    window.addEventListener("resize", closeAtDesktopLayout);
+    closeButtonRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+      window.removeEventListener("resize", closeAtDesktopLayout);
+    };
+  }, [menuOpen]);
   useEffect(() => {
     if (user?.role === "operator" && ["/admin/users", "/admin/roles", "/admin/rules", "/admin/audit"].some(path => pathname.startsWith(path))) {
       router.replace("/admin");
@@ -88,13 +140,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <main className="admin-app">
-      <button className="admin-sidebar-toggle" type="button" aria-expanded={menuOpen} aria-controls="admin-navigation" onClick={() => setMenuOpen(value => !value)}>
-        <AdminIcon name="overview" /> {bn ? "অ্যাডমিন মেনু" : "Admin menu"}
+      <button ref={menuToggleRef} className="admin-sidebar-toggle" type="button" aria-expanded={menuOpen} aria-controls="admin-navigation" onClick={() => setMenuOpen(value => !value)}>
+        <AdminIcon name="overview" /><span>{bn ? "অ্যাডমিন মেনু" : "Admin menu"}</span><AppIcon name="chevron-down" size={17} />
       </button>
-      <aside id="admin-navigation" className={menuOpen ? "admin-sidebar admin-sidebar--open" : "admin-sidebar"}>
+      {menuOpen ? <button className="admin-sidebar-backdrop" type="button" aria-label={bn ? "অ্যাডমিন মেনু বন্ধ করুন" : "Close admin menu"} onClick={() => setMenuOpen(false)} /> : null}
+      <aside
+        id="admin-navigation"
+        aria-label={bn ? "অ্যাডমিন নেভিগেশন" : "Admin navigation"}
+        aria-modal={menuOpen ? true : undefined}
+        className={menuOpen ? "admin-sidebar admin-sidebar--open" : "admin-sidebar"}
+        onKeyDown={trapNavigationFocus}
+        role={menuOpen ? "dialog" : undefined}
+      >
         <div className="admin-sidebar__identity">
           <span className="admin-sidebar__avatar" aria-hidden>{(user.username || user.email || "A").slice(0, 1).toUpperCase()}</span>
           <div><strong>{user.username || user.email || `User ${user.id}`}</strong><span>{user.role === "operator" ? (bn ? "অপারেটর" : "Operator") : (bn ? "অ্যাডমিনিস্ট্রেটর" : "Administrator")}</span></div>
+          <button ref={closeButtonRef} className="admin-sidebar__close" type="button" aria-label={bn ? "অ্যাডমিন মেনু বন্ধ করুন" : "Close admin menu"} onClick={() => setMenuOpen(false)}><AppIcon name="close" size={20} /></button>
         </div>
         <nav aria-label={bn ? "অ্যাডমিন নেভিগেশন" : "Admin navigation"}>
           {navigation.filter(item => !item.adminOnly || user.role === "admin").map(item => {

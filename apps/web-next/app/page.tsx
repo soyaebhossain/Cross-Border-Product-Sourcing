@@ -1,21 +1,53 @@
 import Link from "next/link";
+import { AppIcon } from "../components/app-icon";
 import { CategoryIcon } from "../components/category-icon";
 import { ProductCard } from "../components/product-card";
 import { browseProducts, getCategories } from "../lib/api";
 
 export default async function HomePage() {
   const [catalog, categories] = await Promise.all([
-    browseProducts({ pageSize: 8 }).catch(() => null),
+    browseProducts({ pageSize: 60 }).catch(() => null),
     getCategories().catch(() => []),
   ]);
-  const categoryPreview = categories.slice(0, 9);
-  const medicalAccessories = categories.find(
-    (category) => category.slug === "medical-products-accessories",
-  );
-  const featuredCategories = medicalAccessories
-    && !categoryPreview.some((category) => category.id === medicalAccessories.id)
-    ? [...categoryPreview.slice(0, 8), medicalAccessories]
-    : categoryPreview;
+  const popularProducts = (() => {
+    if (!catalog) return [];
+    const selected = [];
+    const selectedIds = new Set<number>();
+    const representedCategories = new Set<string>();
+
+    for (const product of catalog.items) {
+      if (!product.image || representedCategories.has(product.category.slug)) continue;
+      selected.push(product);
+      selectedIds.add(product.id);
+      representedCategories.add(product.category.slug);
+      if (selected.length === 8) return selected;
+    }
+    for (const product of catalog.items) {
+      if (selectedIds.has(product.id)) continue;
+      selected.push(product);
+      if (selected.length === 8) break;
+    }
+    return selected;
+  })();
+  const featuredCategorySlugs = [
+    "mobile-accessories",
+    "laptop-pc-accessories",
+    "educational-academic-tools",
+    "creator-content-tools",
+    "ecommerce-packaging-supplies",
+    "home-organization-storage",
+    "fashion-accessories",
+    "beauty-tools-accessories",
+    "kitchen-utility-tools",
+    "office-desk-accessories",
+    "jewelry-gems-precious-metals",
+    "medical-products-accessories",
+  ];
+  const priorityCategories = featuredCategorySlugs.flatMap((slug) => {
+    const category = categories.find((item) => item.slug === slug);
+    return category ? [category] : [];
+  });
+  const featuredCategories = priorityCategories;
 
   const lanes = [
     { code: "CN", name: "China → Bangladesh", eta: "7–14 days", badge: "Best value" },
@@ -41,12 +73,12 @@ export default async function HomePage() {
             <input name="q" placeholder="What product are you sourcing?" />
             <button>Search marketplace</button>
           </form>
-          <div className="hero-trust"><span>✓ 350 products</span><span>✓ Explainable ranking</span><span>✓ Landed-cost clarity</span></div>
+          <div className="hero-trust"><span><AppIcon name="check" size={15} />{catalog ? `${catalog.total} products` : "Global product catalog"}</span><span><AppIcon name="check" size={15} />Explainable ranking</span><span><AppIcon name="check" size={15} />Landed-cost clarity</span></div>
         </div>
         <div className="lane-board-new">
-          <div className="lane-title"><span>Live sourcing lanes</span><strong>Decision snapshot</strong></div>
+          <div className="lane-title"><span>Featured sourcing lanes</span><strong>Decision snapshot</strong></div>
           {lanes.map((lane) => <div className="lane-item" key={lane.code}><b>{lane.code}</b><div><strong>{lane.name}</strong><span>{lane.eta}</span></div><em>{lane.badge}</em></div>)}
-          <p>Scores combine cost, quality, reliability, delivery and risk.</p>
+          <p>Catalog origins also include Malaysia, Turkey and Vietnam. Scores combine cost, quality, reliability, delivery and risk.</p>
         </div>
       </section>
 
@@ -68,9 +100,9 @@ export default async function HomePage() {
       <section className="market-section">
         <div className="market-section-title">
           <div><span className="market-kicker">Live catalog</span><h2>Popular products</h2></div>
-          <Link href="/products">Browse all {catalog?.total || 350} →</Link>
+          <Link href="/products">{catalog ? `Browse all ${catalog.total}` : "Browse catalog"} →</Link>
         </div>
-        {catalog?.items.length ? <div className="compact-grid">{catalog.items.map((product) => <ProductCard key={product.id} product={product} />)}</div> : <div className="market-empty">Catalog is starting. Please refresh shortly.</div>}
+        {popularProducts.length ? <div className="compact-grid">{popularProducts.map((product, index) => <ProductCard key={product.id} product={product} imagePriority={index < 4} />)}</div> : <div className="market-empty">Catalog is starting. Please refresh shortly.</div>}
       </section>
 
       <section className="decision-banner">

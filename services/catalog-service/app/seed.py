@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import csv
+import json
 import re
 import sqlite3
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from .models import (
@@ -20,6 +22,15 @@ from .models import (
     SellerOffer,
     ServiceFeeRule,
     ShippingRateCard,
+)
+
+_GENERAL_GOODS_MANIFEST_PATH = (
+    Path(__file__).resolve().parent / "seed_data" / "general_goods_v1.json"
+)
+_OWNED_PRODUCT_IMAGE_PATTERN = re.compile(
+    r"^products/(?:[A-Za-z0-9][A-Za-z0-9_-]*/)*"
+    r"[A-Za-z0-9][A-Za-z0-9._-]*\.(?:avif|gif|jpe?g|png|webp)$",
+    re.IGNORECASE,
 )
 
 
@@ -42,13 +53,266 @@ def _int_from_row(row: dict[str, str], key: str, default: int = 0) -> int:
         return default
 
 
-def _ensure_reference_data(session: Session) -> dict[str, Country]:
+def _positive_manifest_decimal(value: Any, label: str) -> Decimal:
+    try:
+        parsed = Decimal(str(value))
+    except Exception as exc:
+        raise RuntimeError(f"{label} must be a decimal number") from exc
+    if parsed <= 0:
+        raise RuntimeError(f"{label} must be greater than zero")
+    return parsed
+
+
+def _nonnegative_manifest_decimal(value: Any, label: str) -> Decimal:
+    try:
+        parsed = Decimal(str(value))
+    except Exception as exc:
+        raise RuntimeError(f"{label} must be a decimal number") from exc
+    if parsed < 0:
+        raise RuntimeError(f"{label} must not be negative")
+    return parsed
+
+
+def _owned_product_image_path(value: Any, label: str) -> str | None:
+    """Return the canonical database value for an owned product asset.
+
+    Seed manifests are intentionally limited to project-owned media. Remote
+    hotlinks are mutable, can leak visitor requests to third parties, and make
+    deterministic public snapshots impossible.
+    """
+    if value is None:
+        return None
+    normalized = str(value).strip().replace("\\", "/").lstrip("/")
+    if normalized.startswith("media/"):
+        normalized = normalized.removeprefix("media/")
+    if not normalized:
+        return None
+    if len(normalized) > 500 or not _OWNED_PRODUCT_IMAGE_PATTERN.fullmatch(normalized):
+        raise RuntimeError(
+            f"{label} must be an owned relative product image path such as "
+            "products/example.webp"
+        )
+    return normalized
+
+
+def _merge_seed_image(current: str | None, proposed: str | None) -> str | None:
+    """Fill an empty image without overwriting an operator-managed value."""
+    if current and current.strip():
+        return current
+    return proposed
+
+
+def _load_general_goods_manifest(path: Path | None = None) -> dict[str, Any]:
+    manifest_path = path or _GENERAL_GOODS_MANIFEST_PATH
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"Unable to load general-goods seed manifest: {manifest_path}") from exc
+
+    if not isinstance(manifest, dict) or not str(manifest.get("catalog_revision") or "").strip():
+        raise RuntimeError("General-goods manifest requires a catalog_revision")
+
+    new_origins = manifest.get("new_origins")
+    supplier_profiles = manifest.get("supplier_profiles")
+    offer_strategy = manifest.get("offer_strategy")
+    categories = manifest.get("categories")
+    if not isinstance(new_origins, list) or not isinstance(supplier_profiles, list):
+        raise RuntimeError("General-goods manifest requires origin and supplier profile lists")
+    if not isinstance(offer_strategy, list) or len(offer_strategy) != 4:
+        raise RuntimeError("General-goods manifest requires exactly four offer strategies")
+    if not isinstance(categories, list):
+        raise RuntimeError("General-goods manifest requires a category list")
+
+    base_origin_codes = {"CN", "IN", "SG", "TH"}
+    new_origin_codes: set[str] = set()
+    for origin in new_origins:
+        code = str(origin.get("code") or "").upper()
+        if (
+            not re.fullmatch(r"[A-Z]{2}", code)
+            or code in base_origin_codes
+            or code in new_origin_codes
+        ):
+            raise RuntimeError(f"Invalid or duplicate new origin code: {code}")
+        new_origin_codes.add(code)
+        if not str(origin.get("name") or "").strip():
+            raise RuntimeError(f"Origin {code} requires a name")
+
+        shipping_rates = origin.get("shipping_rates")
+        eta_rules = origin.get("eta_rules")
+        if not isinstance(shipping_rates, list) or len(shipping_rates) != 4:
+            raise RuntimeError(f"Origin {code} requires four lightweight shipping bands")
+        shipping_keys: set[tuple[str, str, str]] = set()
+        for rate in shipping_rates:
+            method = str(rate.get("method") or "").upper()
+            minimum = _nonnegative_manifest_decimal(
+                rate.get("min_kg"),
+                f"{code} shipping min_kg",
+            )
+            maximum = _positive_manifest_decimal(
+                rate.get("max_kg"),
+                f"{code} shipping max_kg",
+            )
+            if method not in {"AIR", "SEA"}:
+                raise RuntimeError(f"Origin {code} has an unsupported shipping method")
+            if maximum < minimum:
+                raise RuntimeError(f"Origin {code} has an invalid shipping range")
+            _positive_manifest_decimal(rate.get("cost_bdt"), f"{code} shipping cost")
+            shipping_keys.add((method, str(minimum), str(maximum)))
+        if len(shipping_keys) != 4 or {item[0] for item in shipping_keys} != {"AIR", "SEA"}:
+            raise RuntimeError(f"Origin {code} shipping bands must be unique and cover AIR and SEA")
+
+        if not isinstance(eta_rules, list) or len(eta_rules) != 4:
+            raise RuntimeError(f"Origin {code} requires four ETA rules")
+        eta_keys: set[tuple[str, str]] = set()
+        for rule in eta_rules:
+            mode = str(rule.get("mode") or "").upper()
+            delivery_type = str(rule.get("delivery_type") or "").upper()
+            min_days = int(rule.get("min_days") or 0)
+            max_days = int(rule.get("max_days") or 0)
+            if mode not in {"LOCAL", "BULK"} or delivery_type not in {"DOOR", "PICKUP"}:
+                raise RuntimeError(f"Origin {code} has an unsupported ETA rule")
+            if min_days < 1 or max_days < min_days:
+                raise RuntimeError(f"Origin {code} has an invalid ETA range")
+            eta_keys.add((mode, delivery_type))
+        expected_eta_keys = {
+            ("LOCAL", "DOOR"),
+            ("LOCAL", "PICKUP"),
+            ("BULK", "DOOR"),
+            ("BULK", "PICKUP"),
+        }
+        if eta_keys != expected_eta_keys:
+            raise RuntimeError(f"Origin {code} ETA rules must cover every mode and delivery type")
+
+    supplier_codes: set[str] = set()
+    for profile in supplier_profiles:
+        code = str(profile.get("country_code") or "").upper()
+        if not re.fullmatch(r"[A-Z]{2}", code) or code in supplier_codes:
+            raise RuntimeError(f"Invalid or duplicate supplier country profile: {code}")
+        supplier_codes.add(code)
+        if not str(profile.get("name") or "").strip():
+            raise RuntimeError(f"Supplier profile {code} requires a name")
+        rating = _positive_manifest_decimal(profile.get("rating"), f"{code} supplier rating")
+        if rating > Decimal("5"):
+            raise RuntimeError(f"Supplier profile {code} rating must not exceed five")
+
+    known_country_codes = base_origin_codes | new_origin_codes
+    unsupported_supplier_codes = supplier_codes - known_country_codes
+    if unsupported_supplier_codes:
+        raise RuntimeError(
+            "Supplier profiles reference unsupported origins: "
+            + ", ".join(sorted(unsupported_supplier_codes))
+        )
+
+    offer_keys: set[tuple[int, str]] = set()
+    for strategy in offer_strategy:
+        origin_index = int(strategy.get("origin_index", -1))
+        mode = str(strategy.get("mode") or "").upper()
+        if origin_index not in {0, 1, 2} or mode not in {"LOCAL", "BULK"}:
+            raise RuntimeError("Offer strategy has an invalid origin index or mode")
+        key = (origin_index, mode)
+        if key in offer_keys:
+            raise RuntimeError("Offer strategies must use unique origin/mode pairs")
+        offer_keys.add(key)
+        _positive_manifest_decimal(strategy.get("price_multiplier"), "Offer price multiplier")
+        stock = int(strategy.get("stock") or 0)
+        moq = int(strategy.get("moq") or 0)
+        if stock < 1 or moq < 1 or stock < moq:
+            raise RuntimeError("Offer strategy stock and MOQ must be positive and compatible")
+
+    expected_category_count = int(manifest.get("expected_category_count") or 0)
+    expected_product_count = int(manifest.get("expected_product_count") or 0)
+    if len(categories) != expected_category_count:
+        raise RuntimeError("General-goods manifest category count does not match its expectation")
+
+    category_codes: set[str] = set()
+    category_slugs: set[str] = set()
+    product_slugs: set[str] = set()
+    product_models: set[str] = set()
+    product_skus: set[str] = set()
+    total_products = 0
+    for category in categories:
+        code = str(category.get("code") or "").upper()
+        slug = str(category.get("slug") or "")
+        name = str(category.get("name") or "")
+        products = category.get("products")
+        if not re.fullmatch(r"[A-Z]{3}", code) or code in category_codes:
+            raise RuntimeError(f"Invalid or duplicate category code: {code}")
+        if not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", slug) or slug in category_slugs:
+            raise RuntimeError(f"Invalid or duplicate category slug: {slug}")
+        if not name.strip() or not isinstance(products, list):
+            raise RuntimeError(f"Category {slug} requires a name and product list")
+        expected_category_products = int(category.get("expected_product_count") or 0)
+        if len(products) != expected_category_products:
+            raise RuntimeError(f"Category {slug} product count does not match its expectation")
+        category_codes.add(code)
+        category_slugs.add(slug)
+
+        for position, product in enumerate(products, start=1):
+            product_slug = str(product.get("slug") or "")
+            model = str(product.get("model") or "")
+            sku = str(product.get("sku") or "")
+            expected_model = f"{code}-{position:03d}"
+            if not str(product.get("name") or "").strip():
+                raise RuntimeError(f"Category {slug} has a product without a name")
+            if (
+                not product_slug.startswith(f"{slug}-")
+                or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", product_slug)
+                or product_slug in product_slugs
+            ):
+                raise RuntimeError(f"Invalid or duplicate product slug: {product_slug}")
+            if model != expected_model or model in product_models:
+                raise RuntimeError(f"Invalid or duplicate product model: {model}")
+            if sku != f"{model}-STD" or sku in product_skus:
+                raise RuntimeError(f"Invalid or duplicate product SKU: {sku}")
+            _positive_manifest_decimal(product.get("base_price_usd"), f"{sku} base price")
+            _positive_manifest_decimal(product.get("weight_kg"), f"{sku} weight")
+            dimensions = product.get("dimensions_cm")
+            if not isinstance(dimensions, list) or len(dimensions) != 3:
+                raise RuntimeError(f"{sku} requires three package dimensions")
+            for dimension in dimensions:
+                _positive_manifest_decimal(dimension, f"{sku} package dimension")
+            origins = product.get("origins")
+            if (
+                not isinstance(origins, list)
+                or len(origins) != 3
+                or len(set(origins)) != 3
+                or any(origin not in known_country_codes for origin in origins)
+                or any(origin not in supplier_codes for origin in origins)
+            ):
+                raise RuntimeError(f"{sku} requires three supported, unique origin codes")
+            if not str(product.get("spec_caveat") or "").strip():
+                raise RuntimeError(f"{sku} requires a specification caveat")
+            _owned_product_image_path(product.get("image"), f"{sku} image")
+            product_slugs.add(product_slug)
+            product_models.add(model)
+            product_skus.add(sku)
+            total_products += 1
+
+    if total_products != expected_product_count:
+        raise RuntimeError("General-goods manifest product count does not match its expectation")
+    return manifest
+
+
+def _ensure_reference_data(
+    session: Session,
+    new_origins: list[dict[str, Any]] | None = None,
+) -> dict[str, Country]:
+    country_specs = [
+        ("CN", "China"),
+        ("SG", "Singapore"),
+        ("TH", "Thailand"),
+        ("IN", "India"),
+    ]
+    for origin in new_origins or []:
+        country_specs.append((str(origin["code"]).upper(), str(origin["name"])))
+
+    country_codes = [code for code, _name in country_specs]
     countries = {
         country.code: country
-        for country in session.scalars(select(Country).where(Country.code.in_(["CN", "SG", "TH", "IN"]))).all()
+        for country in session.scalars(select(Country).where(Country.code.in_(country_codes))).all()
     }
 
-    for code, name in [("CN", "China"), ("SG", "Singapore"), ("TH", "Thailand"), ("IN", "India")]:
+    for code, name in country_specs:
         if code not in countries:
             countries[code] = Country(code=code, name=name)
             session.add(countries[code])
@@ -76,23 +340,38 @@ def _ensure_reference_data(session: Session) -> dict[str, Country]:
         ("CN", "SEA", "10.000", "49.999", "2800.00"),
         ("SG", "AIR", "0.000", "0.999", "720.00"),
         ("SG", "AIR", "1.000", "4.999", "1680.00"),
+        ("SG", "SEA", "0.000", "9.999", "1240.00"),
+        ("SG", "SEA", "10.000", "49.999", "3400.00"),
         ("TH", "AIR", "0.000", "0.999", "690.00"),
+        ("TH", "AIR", "1.000", "4.999", "1620.00"),
         ("TH", "SEA", "0.000", "9.999", "1180.00"),
+        ("TH", "SEA", "10.000", "49.999", "3250.00"),
         ("IN", "AIR", "0.000", "0.999", "650.00"),
         ("IN", "AIR", "1.000", "4.999", "1550.00"),
         ("IN", "SEA", "0.000", "9.999", "1080.00"),
         ("IN", "SEA", "10.000", "49.999", "3050.00"),
     ]
+    for origin in new_origins or []:
+        shipping_cards.extend(
+            (
+                str(origin["code"]).upper(),
+                str(rate["method"]).upper(),
+                str(rate["min_kg"]),
+                str(rate["max_kg"]),
+                str(rate["cost_bdt"]),
+            )
+            for rate in origin["shipping_rates"]
+        )
     for country_code, method, min_kg, max_kg, cost in shipping_cards:
-        exists = session.scalar(
-            select(ShippingRateCard.id).where(
+        existing_card = session.scalar(
+            select(ShippingRateCard).where(
                 ShippingRateCard.country_id == countries[country_code].id,
                 ShippingRateCard.method == method,
                 ShippingRateCard.min_kg == Decimal(min_kg),
                 ShippingRateCard.max_kg == Decimal(max_kg),
             )
         )
-        if not exists:
+        if not existing_card:
             session.add(
                 ShippingRateCard(
                     country=countries[country_code],
@@ -102,6 +381,8 @@ def _ensure_reference_data(session: Session) -> dict[str, Country]:
                     cost_bdt=Decimal(cost),
                 )
             )
+        else:
+            existing_card.cost_bdt = Decimal(cost)
 
     eta_rules = [
         ("CN", "LOCAL", "DOOR", 7, 12),
@@ -110,22 +391,37 @@ def _ensure_reference_data(session: Session) -> dict[str, Country]:
         ("CN", "BULK", "PICKUP", 15, 24),
         ("SG", "LOCAL", "DOOR", 5, 8),
         ("SG", "LOCAL", "PICKUP", 4, 6),
+        ("SG", "BULK", "DOOR", 14, 21),
+        ("SG", "BULK", "PICKUP", 12, 19),
         ("TH", "LOCAL", "DOOR", 6, 10),
+        ("TH", "LOCAL", "PICKUP", 5, 8),
         ("TH", "BULK", "DOOR", 14, 22),
+        ("TH", "BULK", "PICKUP", 12, 20),
         ("IN", "LOCAL", "DOOR", 5, 9),
         ("IN", "LOCAL", "PICKUP", 4, 7),
         ("IN", "BULK", "DOOR", 12, 20),
         ("IN", "BULK", "PICKUP", 10, 18),
     ]
+    for origin in new_origins or []:
+        eta_rules.extend(
+            (
+                str(origin["code"]).upper(),
+                str(rule["mode"]).upper(),
+                str(rule["delivery_type"]).upper(),
+                int(rule["min_days"]),
+                int(rule["max_days"]),
+            )
+            for rule in origin["eta_rules"]
+        )
     for country_code, mode, delivery_type, min_days, max_days in eta_rules:
-        exists = session.scalar(
-            select(ETARule.id).where(
+        existing_rule = session.scalar(
+            select(ETARule).where(
                 ETARule.country_id == countries[country_code].id,
                 ETARule.mode == mode,
                 ETARule.delivery_type == delivery_type,
             )
         )
-        if not exists:
+        if not existing_rule:
             session.add(
                 ETARule(
                     country=countries[country_code],
@@ -135,6 +431,9 @@ def _ensure_reference_data(session: Session) -> dict[str, Country]:
                     max_days=max_days,
                 )
             )
+        else:
+            existing_rule.min_days = min_days
+            existing_rule.max_days = max_days
 
     session.flush()
     return countries
@@ -535,8 +834,446 @@ def _ensure_medical_catalog(session: Session, countries: dict[str, Country]) -> 
                 offer.moq = moq
 
 
+def _ensure_precious_catalog(session: Session, countries: dict[str, Country]) -> None:
+    category_slug = "jewelry-gems-precious-metals"
+    category = session.scalar(select(Category).where(Category.slug == category_slug))
+    if not category:
+        category = Category(name="Jewelry, Gems & Precious Metals", slug=category_slug)
+        session.add(category)
+        session.flush()
+
+    product_names = [
+        # Gold jewelry
+        "Gold Cable Chain Necklace",
+        "Gold Figaro Chain Necklace",
+        "Gold Rope Chain Necklace",
+        "Gold Pendant Necklace",
+        "Gold Link Bracelet",
+        "Gold Cuff Bracelet",
+        "Gold Classic Bangle",
+        "Gold Stackable Ring",
+        "Gold Signet Ring",
+        "Gold Wedding Band",
+        "Gold Stud Earrings",
+        "Gold Hoop Earrings",
+        "Gold Bullion Bar",
+        "Gold Bullion Coin",
+        # Silver jewelry
+        "Silver Cable Chain Necklace",
+        "Silver Figaro Chain Necklace",
+        "Silver Rope Chain Necklace",
+        "Silver Pendant Necklace",
+        "Silver Link Bracelet",
+        "Silver Cuff Bracelet",
+        "Silver Classic Bangle",
+        "Silver Stackable Ring",
+        "Silver Signet Ring",
+        "Silver Wedding Band",
+        "Silver Stud Earrings",
+        "Silver Hoop Earrings",
+        "Silver Bullion Bar",
+        "Silver Bullion Coin",
+        # Other precious-metal jewelry and settings
+        "Platinum Chain Necklace",
+        "Platinum Link Bracelet",
+        "Platinum Wedding Band",
+        "Platinum Stud Earrings",
+        "Palladium Wedding Band",
+        "Rose Gold Bracelet",
+        "White Gold Pendant Setting",
+        "Two-Tone Gold Ring",
+        # Diamond stones and jewelry
+        "Round-Cut Diamond Stone",
+        "Princess-Cut Diamond Stone",
+        "Emerald-Cut Diamond Stone",
+        "Oval-Cut Diamond Stone",
+        "Pear-Cut Diamond Stone",
+        "Marquise-Cut Diamond Stone",
+        "Cushion-Cut Diamond Stone",
+        "Radiant-Cut Diamond Stone",
+        "Asscher-Cut Diamond Stone",
+        "Heart-Cut Diamond Stone",
+        "Diamond Solitaire Pendant",
+        "Diamond Tennis Bracelet",
+        "Diamond Stud Earrings",
+        "Diamond Cluster Ring",
+        # Colored gemstones
+        "Ruby Gemstone",
+        "Blue Sapphire Gemstone",
+        "Emerald Gemstone",
+        "Amethyst Gemstone",
+        "Aquamarine Gemstone",
+        "Citrine Gemstone",
+        "Garnet Gemstone",
+        "Opal Gemstone",
+        "Peridot Gemstone",
+        "Tanzanite Gemstone",
+    ]
+
+    existing_products = {product.slug: product for product in session.scalars(select(Product)).all()}
+    variants_by_sku = {
+        variant.sku: variant
+        for variant in session.scalars(select(ProductVariant).where(ProductVariant.sku.like("JPM-%"))).all()
+    }
+    precious_variants: list[tuple[int, ProductVariant]] = []
+
+    for index, name in enumerate(product_names, start=1):
+        slug = _slugify(name)
+        product = existing_products.get(slug)
+        description = (
+            f"{name} for cross-border supplier discovery and quote comparison. "
+            "Displayed offer prices are indicative demo values, not live precious-material market quotations. "
+            "Material composition, weight, dimensions, treatment, grade, origin, hallmark, certification, "
+            "and import requirements are supplier-declared and must be independently verified before purchase."
+        )
+        if not product:
+            product = Product(
+                name=name,
+                slug=slug,
+                model=f"JPM-{index:03d}",
+                description=description,
+                image=None,
+                category=category,
+            )
+            session.add(product)
+            session.flush()
+            existing_products[slug] = product
+        else:
+            product.name = name
+            product.model = f"JPM-{index:03d}"
+            product.description = description
+            product.category = category
+
+        sku = f"JPM-{index:03d}-STD"
+        variant = variants_by_sku.get(sku)
+        if index <= 14:
+            variant_name = "Gold — purity and net weight to be specified"
+        elif index <= 28:
+            variant_name = "Silver — fineness and net weight to be specified"
+        elif index <= 32:
+            variant_name = "Platinum — fineness and net weight to be specified"
+        elif index == 33:
+            variant_name = "Palladium — fineness and net weight to be specified"
+        elif index <= 36:
+            variant_name = "Gold alloy — composition and net weight to be specified"
+        elif index <= 50:
+            variant_name = "Diamond — cut, carat, color, clarity and certificate to be specified"
+        else:
+            variant_name = "Gemstone — grade, weight and treatment disclosure to be specified"
+        is_stone = 37 <= index <= 46 or index >= 51
+        if is_stone:
+            weight = (Decimal("0.010") + Decimal(index % 5) * Decimal("0.002")).quantize(Decimal("0.001"))
+            length, width, height = Decimal("6.00"), Decimal("6.00"), Decimal("3.00")
+        else:
+            weight = (Decimal("0.040") + Decimal(index % 7) * Decimal("0.006")).quantize(Decimal("0.001"))
+            length, width, height = Decimal("12.00"), Decimal("9.00"), Decimal("4.00")
+
+        if not variant:
+            variant = ProductVariant(
+                product=product,
+                sku=sku,
+                variant_name=variant_name,
+                weight_kg=weight,
+                length_cm=length,
+                width_cm=width,
+                height_cm=height,
+            )
+            session.add(variant)
+            session.flush()
+            variants_by_sku[sku] = variant
+        else:
+            variant.product = product
+            variant.variant_name = variant_name
+            variant.weight_kg = weight
+            variant.length_cm = length
+            variant.width_cm = width
+            variant.height_cm = height
+        precious_variants.append((index, variant))
+
+    seller_specs = [
+        ("Jaipur Jewelry Sourcing Studio", "IN", "4.70"),
+        ("Singapore Gem Trade Desk", "SG", "4.76"),
+        ("Shenzhen Jewelry Components Hub", "CN", "4.58"),
+    ]
+    sellers_by_key = {
+        (seller.name, seller.country.code): seller
+        for seller in session.scalars(select(Seller)).all()
+    }
+    for seller_name, country_code, rating in seller_specs:
+        key = (seller_name, country_code)
+        if key not in sellers_by_key:
+            sellers_by_key[key] = Seller(
+                country=countries[country_code],
+                name=seller_name,
+                rating=Decimal(rating),
+                note=(
+                    "Demo jewelry and gemstone sourcing profile. Buyer due diligence, "
+                    "material verification, and import-compliance review are required."
+                ),
+            )
+            session.add(sellers_by_key[key])
+    session.flush()
+
+    existing_offers = {
+        (offer.variant_id, offer.country_id, offer.seller_id, offer.mode): offer
+        for offer in session.scalars(select(SellerOffer)).all()
+    }
+    offer_specs = [
+        ("IN", "Jaipur Jewelry Sourcing Studio", "LOCAL", Decimal("1.00"), 1),
+        ("IN", "Jaipur Jewelry Sourcing Studio", "BULK", Decimal("0.94"), 5),
+        ("SG", "Singapore Gem Trade Desk", "LOCAL", Decimal("1.10"), 1),
+        ("CN", "Shenzhen Jewelry Components Hub", "BULK", Decimal("0.91"), 10),
+    ]
+    for index, variant in precious_variants:
+        if index <= 14:
+            base_price = Decimal("150.00") + Decimal(index) * Decimal("18.50")
+        elif index <= 28:
+            base_price = Decimal("20.00") + Decimal(index - 14) * Decimal("3.25")
+        elif index <= 36:
+            base_price = Decimal("210.00") + Decimal(index - 28) * Decimal("24.00")
+        elif index <= 50:
+            base_price = Decimal("95.00") + Decimal(index - 36) * Decimal("28.00")
+        else:
+            base_price = Decimal("22.00") + Decimal(index - 50) * Decimal("8.00")
+
+        for country_code, seller_name, mode, multiplier, moq in offer_specs:
+            country = countries[country_code]
+            seller = sellers_by_key[(seller_name, country_code)]
+            key = (variant.id, country.id, seller.id, mode)
+            offer = existing_offers.get(key)
+            price = (base_price * multiplier).quantize(Decimal("0.01"))
+            if not offer:
+                offer = SellerOffer(
+                    variant=variant,
+                    country=country,
+                    seller=seller,
+                    mode=mode,
+                    price_origin=price,
+                    currency="USD",
+                    stock=12 + index * 2,
+                    moq=moq,
+                )
+                session.add(offer)
+                existing_offers[key] = offer
+            else:
+                offer.price_origin = price
+                offer.currency = "USD"
+                offer.stock = 12 + index * 2
+                offer.moq = moq
+
+
+def _ensure_general_goods_catalog(
+    session: Session,
+    countries: dict[str, Country],
+    manifest: dict[str, Any],
+) -> None:
+    category_specs = manifest["categories"]
+    category_slugs = [str(item["slug"]) for item in category_specs]
+    existing_categories = {
+        item.slug: item
+        for item in session.scalars(
+            select(Category).where(Category.slug.in_(category_slugs))
+        ).all()
+    }
+    categories: dict[str, Category] = {}
+    for category_spec in category_specs:
+        slug = str(category_spec["slug"])
+        name = str(category_spec["name"])
+        category = existing_categories.get(slug)
+        if category and category.name != name:
+            raise RuntimeError(
+                f"Category slug collision for {slug}: expected {name!r}, found {category.name!r}"
+            )
+        if not category:
+            category = Category(name=name, slug=slug)
+            session.add(category)
+        categories[slug] = category
+    session.flush()
+
+    product_specs: list[tuple[dict[str, Any], dict[str, Any]]] = [
+        (category_spec, product_spec)
+        for category_spec in category_specs
+        for product_spec in category_spec["products"]
+    ]
+    expected_slugs = [str(product_spec["slug"]) for _category, product_spec in product_specs]
+    expected_models = [str(product_spec["model"]) for _category, product_spec in product_specs]
+    product_candidates = session.scalars(
+        select(Product).where(
+            or_(
+                Product.slug.in_(expected_slugs),
+                Product.model.in_(expected_models),
+            )
+        )
+    ).all()
+    products_by_slug: dict[str, Product] = {}
+    products_by_model: dict[str, Product] = {}
+    for product in product_candidates:
+        slug_match = product.slug in expected_slugs
+        model_match = bool(product.model and product.model in expected_models)
+        if slug_match:
+            if product.slug in products_by_slug:
+                raise RuntimeError(f"Duplicate product slug already exists: {product.slug}")
+            products_by_slug[product.slug] = product
+        if model_match and product.model:
+            if product.model in products_by_model:
+                raise RuntimeError(f"Duplicate product model already exists: {product.model}")
+            products_by_model[product.model] = product
+
+    seeded_products: list[tuple[dict[str, Any], Product]] = []
+    for category_spec, product_spec in product_specs:
+        slug = str(product_spec["slug"])
+        model = str(product_spec["model"])
+        product_by_slug = products_by_slug.get(slug)
+        product_by_model = products_by_model.get(model)
+        if product_by_slug and product_by_slug.model != model:
+            raise RuntimeError(
+                f"Product slug collision for {slug}: expected model {model}, "
+                f"found {product_by_slug.model or 'none'}"
+            )
+        if product_by_model and product_by_model.slug != slug:
+            raise RuntimeError(
+                f"Product model collision for {model}: expected slug {slug}, "
+                f"found {product_by_model.slug}"
+            )
+        if product_by_slug and product_by_model and product_by_slug.id != product_by_model.id:
+            raise RuntimeError(f"Product natural keys disagree for {slug} / {model}")
+
+        category = categories[str(category_spec["slug"])]
+        description = (
+            f"{product_spec['name']} for cross-border supplier discovery and quote comparison. "
+            "Displayed prices and availability are indicative demo values, not live supplier quotations. "
+            f"{str(product_spec['spec_caveat']).strip()}"
+        )
+        seed_image = _owned_product_image_path(product_spec.get("image"), f"{model} image")
+        product = product_by_slug or product_by_model
+        if not product:
+            product = Product(
+                name=str(product_spec["name"]),
+                slug=slug,
+                model=model,
+                description=description,
+                image=seed_image,
+                category=category,
+            )
+            session.add(product)
+            products_by_slug[slug] = product
+            products_by_model[model] = product
+        else:
+            product.name = str(product_spec["name"])
+            product.description = description
+            product.category = category
+            product.image = _merge_seed_image(product.image, seed_image)
+        seeded_products.append((product_spec, product))
+    session.flush()
+
+    expected_skus = [str(product_spec["sku"]) for product_spec, _product in seeded_products]
+    variants_by_sku: dict[str, ProductVariant] = {}
+    for variant in session.scalars(
+        select(ProductVariant).where(ProductVariant.sku.in_(expected_skus))
+    ).all():
+        if variant.sku in variants_by_sku:
+            raise RuntimeError(f"Duplicate product SKU already exists: {variant.sku}")
+        if variant.sku:
+            variants_by_sku[variant.sku] = variant
+
+    seeded_variants: list[tuple[dict[str, Any], ProductVariant]] = []
+    for product_spec, product in seeded_products:
+        sku = str(product_spec["sku"])
+        variant = variants_by_sku.get(sku)
+        if variant and variant.product_id != product.id:
+            raise RuntimeError(
+                f"Product SKU collision for {sku}: expected product {product.slug}, "
+                f"found product id {variant.product_id}"
+            )
+        dimensions = product_spec["dimensions_cm"]
+        if not variant:
+            variant = ProductVariant(product=product, sku=sku)
+            session.add(variant)
+            variants_by_sku[sku] = variant
+        variant.variant_name = "Standard supplier-declared specification"
+        variant.weight_kg = Decimal(str(product_spec["weight_kg"]))
+        variant.length_cm = Decimal(str(dimensions[0]))
+        variant.width_cm = Decimal(str(dimensions[1]))
+        variant.height_cm = Decimal(str(dimensions[2]))
+        seeded_variants.append((product_spec, variant))
+    session.flush()
+
+    supplier_specs = manifest["supplier_profiles"]
+    supplier_names = [str(item["name"]) for item in supplier_specs]
+    supplier_candidates = session.scalars(
+        select(Seller).where(Seller.name.in_(supplier_names))
+    ).all()
+    sellers_by_key: dict[tuple[str, str], Seller] = {}
+    for seller in supplier_candidates:
+        key = (seller.country.code, seller.name)
+        if key in sellers_by_key:
+            raise RuntimeError(
+                f"Duplicate supplier already exists for {seller.country.code} / {seller.name}"
+            )
+        sellers_by_key[key] = seller
+
+    for supplier_spec in supplier_specs:
+        country_code = str(supplier_spec["country_code"]).upper()
+        seller_name = str(supplier_spec["name"])
+        key = (country_code, seller_name)
+        seller = sellers_by_key.get(key)
+        if not seller:
+            seller = Seller(country=countries[country_code], name=seller_name)
+            session.add(seller)
+            sellers_by_key[key] = seller
+        seller.rating = Decimal(str(supplier_spec["rating"]))
+        seller.note = str(supplier_spec["note"])
+    session.flush()
+
+    supplier_by_country = {
+        str(item["country_code"]).upper(): sellers_by_key[
+            (str(item["country_code"]).upper(), str(item["name"]))
+        ]
+        for item in supplier_specs
+    }
+    seeded_variant_ids = [variant.id for _product_spec, variant in seeded_variants]
+    offers_by_key: dict[tuple[int, int, int, str], SellerOffer] = {}
+    for offer in session.scalars(
+        select(SellerOffer).where(SellerOffer.variant_id.in_(seeded_variant_ids))
+    ).all():
+        key = (offer.variant_id, offer.country_id, offer.seller_id, offer.mode)
+        if key in offers_by_key:
+            raise RuntimeError(
+                f"Duplicate seller offer already exists for variant {offer.variant_id}"
+            )
+        offers_by_key[key] = offer
+
+    for product_spec, variant in seeded_variants:
+        origins = [str(code).upper() for code in product_spec["origins"]]
+        base_price = Decimal(str(product_spec["base_price_usd"]))
+        for strategy in manifest["offer_strategy"]:
+            country_code = origins[int(strategy["origin_index"])]
+            country = countries[country_code]
+            seller = supplier_by_country[country_code]
+            mode = str(strategy["mode"]).upper()
+            key = (variant.id, country.id, seller.id, mode)
+            offer = offers_by_key.get(key)
+            if not offer:
+                offer = SellerOffer(
+                    variant=variant,
+                    country=country,
+                    seller=seller,
+                    mode=mode,
+                    price_origin=Decimal("0.01"),
+                    currency="USD",
+                )
+                session.add(offer)
+                offers_by_key[key] = offer
+            offer.price_origin = (
+                base_price * Decimal(str(strategy["price_multiplier"]))
+            ).quantize(Decimal("0.01"))
+            offer.currency = "USD"
+            offer.stock = int(strategy["stock"])
+            offer.moq = int(strategy["moq"])
+
+
 def _import_legacy_catalog(session: Session, sqlite_path: Path) -> bool:
-    """Idempotently sync the legacy catalog, preferring its populated image_url field."""
+    """Idempotently sync the legacy catalog without unstable placeholder images."""
     if not sqlite_path.exists():
         return False
 
@@ -580,6 +1317,8 @@ def _import_legacy_catalog(session: Session, sqlite_path: Path) -> bool:
         product = existing_products.get(row["slug"])
         # Prefer uploaded media over third-party placeholders; local files are stable and owned by the project.
         image = (row["image"] or "").strip() or (row["image_url"] or "").strip() or None
+        if image and "loremflickr.com" in image.lower():
+            image = None
         if not product:
             product = Product(name=row["name"], slug=row["slug"], model=row["model"],
                               description=row["description"], image=image,
@@ -591,7 +1330,7 @@ def _import_legacy_catalog(session: Session, sqlite_path: Path) -> bool:
             product.name = row["name"]
             product.model = row["model"]
             product.description = row["description"]
-            product.image = image
+            product.image = _merge_seed_image(product.image, image)
             product.category = category_map[row["category_id"]]
         product_map[row["id"]] = product
 
@@ -647,6 +1386,13 @@ def _import_legacy_catalog(session: Session, sqlite_path: Path) -> bool:
     connection.close()
     session.flush()
     return True
+
+
+def _remove_unstable_placeholder_images(session: Session) -> None:
+    for product in session.scalars(
+        select(Product).where(Product.image.ilike("%loremflickr.com/%"))
+    ).all():
+        product.image = None
 
 
 def _seed_demo_catalog(session: Session) -> None:
@@ -811,6 +1557,7 @@ def seed_database(
     legacy_sqlite_path: Path | None = None,
     supply_chain_csv_path: Path | None = None,
 ) -> None:
+    general_goods_manifest = _load_general_goods_manifest()
     has_products = session.scalar(select(Product.id).limit(1))
 
     if not has_products:
@@ -823,11 +1570,17 @@ def seed_database(
         _import_legacy_catalog(session, legacy_sqlite_path)
 
     session.flush()
-    countries = _ensure_reference_data(session)
+    countries = _ensure_reference_data(
+        session,
+        general_goods_manifest["new_origins"],
+    )
     _ensure_sellers_and_offers(session, countries)
     _ensure_medical_catalog(session, countries)
+    _ensure_precious_catalog(session, countries)
+    _ensure_general_goods_catalog(session, countries, general_goods_manifest)
     if legacy_sqlite_path:
         _sync_legacy_offers(session, legacy_sqlite_path)
     if supply_chain_csv_path:
         _ensure_supply_chain_dataset(session, supply_chain_csv_path, countries)
+    _remove_unstable_placeholder_images(session)
     session.commit()

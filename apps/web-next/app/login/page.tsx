@@ -4,8 +4,12 @@ import type { Route } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AppIcon, GoogleIcon } from "../../components/app-icon";
 import {
+  ApiError,
   confirmMfaEnrollment,
+  getAuthServiceStatus,
+  isApiServiceUnavailable,
   loginWithCredentials,
   startGoogleLogin,
   startMfaEnrollment,
@@ -17,6 +21,7 @@ import { useLocale } from "../../lib/locale-context";
 
 type Portal = "customer" | "admin";
 type Enrollment = { secret: string; otpauth_uri: string };
+type ServiceState = "checking" | "ready" | "offline";
 
 export default function LoginPage() {
   const [portal, setPortal] = useState<Portal>("customer");
@@ -25,7 +30,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [socialLoading, setSocialLoading] = useState(false);
   const [remember, setRemember] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [errorReference, setErrorReference] = useState("");
+  const [serviceState, setServiceState] = useState<ServiceState>("checking");
   const [mfa, setMfa] = useState<MfaRequired | null>(null);
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [mfaCode, setMfaCode] = useState("");
@@ -42,14 +50,69 @@ export default function LoginPage() {
     const params = new URLSearchParams(window.location.search);
     if (params.get("portal") === "admin") setPortal("admin");
     if (params.get("social_error")) setError("Google sign-in was not completed. Please try again or use email and password.");
+    void checkService();
   }, []);
+
+  const checkService = async () => {
+    setServiceState("checking");
+    const result = await getAuthServiceStatus();
+    setServiceState(result.available ? "ready" : "offline");
+    return result.available;
+  };
 
   const redirectAfterAuth = (role: string) => {
     const next = new URLSearchParams(window.location.search).get("next");
-    const safeNext = next?.startsWith("/") && !next.startsWith("//") ? next : null;
     const privileged = role === "admin" || role === "operator";
+    const localNext = next?.startsWith("/") && !next.startsWith("//") ? next : null;
+    const privilegedPath = Boolean(localNext && /^\/(?:admin|research)(?:\/|$|\?)/.test(localNext));
+    const safeNext = localNext && (privileged || !privilegedPath) ? localNext : null;
     router.push((safeNext || (privileged ? "/admin" : "/account")) as Route);
     router.refresh();
+  };
+
+  const selectPortal = (nextPortal: Portal) => {
+    setPortal(nextPortal);
+    setError("");
+    setErrorReference("");
+    const params = new URLSearchParams(window.location.search);
+    if (nextPortal === "admin") params.set("portal", "admin");
+    else params.delete("portal");
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+  };
+
+  const loginErrorMessage = (reason: unknown) => {
+    setErrorReference(reason instanceof ApiError ? reason.requestId || "" : "");
+    if (isApiServiceUnavailable(reason)) {
+      setServiceState("offline");
+      return bn
+        ? "Account service এখন সংযুক্ত নেই। আপনার credential ভুল নয়—service চালু হলে আবার চেষ্টা করুন।"
+        : "The account service is not connected right now. Your credentials were not rejected—please retry when the service is online.";
+    }
+    if (reason instanceof ApiError) {
+      if (reason.status === 401) {
+        return bn
+          ? "ইউজারনেম/email/phone অথবা password সঠিক নয়।"
+          : "The username, email, phone, or password is incorrect.";
+      }
+      if (reason.status === 403) {
+        return portal === "admin"
+          ? (bn ? "এই account-এ admin/operator access নেই। Customer sign in ব্যবহার করুন।" : "This account does not have admin/operator access. Use customer sign in.")
+          : (bn ? "এটি admin/operator account। Admin access নির্বাচন করুন।" : "This is an admin/operator account. Choose admin access.");
+      }
+      if (reason.status === 423) {
+        const wait = reason.retryAfter ? Math.max(1, Math.ceil(reason.retryAfter / 60)) : null;
+        return wait
+          ? (bn ? `নিরাপত্তার জন্য account সাময়িকভাবে locked। প্রায় ${wait} মিনিট পর চেষ্টা করুন।` : `The account is temporarily locked for security. Try again in about ${wait} minute${wait === 1 ? "" : "s"}.`)
+          : (bn ? "নিরাপত্তার জন্য account সাময়িকভাবে locked। কিছুক্ষণ পর চেষ্টা করুন।" : "The account is temporarily locked for security. Please try again later.");
+      }
+      if (reason.status === 429) {
+        return bn
+          ? "অনেকবার চেষ্টা করা হয়েছে। কিছুক্ষণ অপেক্ষা করে আবার চেষ্টা করুন।"
+          : "Too many attempts. Wait a moment before trying again.";
+      }
+    }
+    return bn ? "Sign in সম্পন্ন করা যায়নি। আবার চেষ্টা করুন।" : "Sign in could not be completed. Please try again.";
   };
 
   const resetChallenge = () => {
@@ -66,8 +129,13 @@ export default function LoginPage() {
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (serviceState === "offline" && !await checkService()) {
+      setError(loginErrorMessage(new ApiError("Account service unavailable", { code: "service_unavailable" })));
+      return;
+    }
     setLoading(true);
     setError("");
+    setErrorReference("");
     try {
       const result = await loginWithCredentials(identifier, password, remember, portal);
       if ("mfa_required" in result) {
@@ -79,10 +147,8 @@ export default function LoginPage() {
         return;
       }
       redirectAfterAuth(result.user.role);
-    } catch {
-      setError(portal === "admin"
-        ? (bn ? "Credential সঠিক নয়, account locked, অথবা এই account-এর admin access নেই।" : "Invalid credentials, a locked account, or no admin access.")
-        : (bn ? "Credential সঠিক নয় অথবা এটি admin-only account।" : "Invalid credentials or this is an admin-only account."));
+    } catch (reason) {
+      setError(loginErrorMessage(reason));
     } finally {
       setLoading(false);
     }
@@ -167,7 +233,7 @@ export default function LoginPage() {
           <a className="button button--ghost" href={enrollment.otpauth_uri}>{bn ? "Authenticator app-এ খুলুন" : "Open in authenticator app"}</a>
         </div> : null}
         <form onSubmit={submitMfa}>
-          {!enrollmentRequired ? <div className="login-role-switch" aria-label={bn ? "Verification পদ্ধতি" : "Verification method"}><button type="button" className={!recoveryMode ? "login-role-switch__active" : ""} onClick={() => { setRecoveryMode(false); setMfaCode(""); setError(""); }}>{bn ? "Authenticator code" : "Authenticator code"}</button><button type="button" className={recoveryMode ? "login-role-switch__active" : ""} onClick={() => { setRecoveryMode(true); setMfaCode(""); setError(""); }}>{bn ? "Recovery code" : "Recovery code"}</button></div> : null}
+          {!enrollmentRequired ? <div className="login-role-switch" role="group" aria-label={bn ? "Verification পদ্ধতি" : "Verification method"}><button type="button" className={!recoveryMode ? "login-role-switch__active" : ""} aria-pressed={!recoveryMode} onClick={() => { setRecoveryMode(false); setMfaCode(""); setError(""); }}>{bn ? "Authenticator code" : "Authenticator code"}</button><button type="button" className={recoveryMode ? "login-role-switch__active" : ""} aria-pressed={recoveryMode} onClick={() => { setRecoveryMode(true); setMfaCode(""); setError(""); }}>{bn ? "Recovery code" : "Recovery code"}</button></div> : null}
           <label>{recoveryMode ? (bn ? "একবার ব্যবহারযোগ্য recovery code" : "One-time recovery code") : (bn ? "৬ সংখ্যার authenticator code" : "Six-digit authenticator code")}<input autoFocus autoComplete="one-time-code" inputMode={recoveryMode ? "text" : "numeric"} pattern={recoveryMode ? undefined : "[0-9]{6}"} minLength={6} maxLength={recoveryMode ? 30 : 6} value={mfaCode} onChange={event => setMfaCode(event.target.value)} required /></label>
           {error ? <div className="form-error" role="alert">{error}</div> : null}
           <button className="market-button" disabled={loading || mfaCode.trim().length < 6}>{loading ? (bn ? "যাচাই হচ্ছে…" : "Verifying…") : enrollmentRequired ? (bn ? "MFA চালু ও নিশ্চিত করুন" : "Enable and confirm MFA") : (bn ? "যাচাই করে প্রবেশ করুন" : "Verify and sign in")}</button>
@@ -184,24 +250,38 @@ export default function LoginPage() {
           <p className="eyebrow">{portal === "admin" ? (bn ? "Operations access" : "Operations access") : (bn ? "নিরাপদ account" : "Secure account")}</p>
           <h1>{portal === "admin" ? (bn ? "Admin sign in" : "Admin sign in") : (bn ? "SourceAI-এ sign in" : "Sign in to SourceAI")}</h1>
           <p>{portal === "admin" ? (bn ? "Admin ও operator account-এর জন্য আলাদা, MFA-সুরক্ষিত প্রবেশ।" : "Separate, MFA-protected access for admin and operator accounts.") : (bn ? "কোট তুলনা, অর্ডার এবং delivery track করুন।" : "Manage quotes, orders and delivery tracking.")}</p>
-          <div className="login-role-switch" aria-label={bn ? "Login-এর ধরন" : "Choose login type"}>
-            <button type="button" className={portal === "customer" ? "login-role-switch__active" : ""} onClick={() => { setPortal("customer"); setError(""); }}>{bn ? "Customer" : "Customer"}</button>
-            <button type="button" className={portal === "admin" ? "login-role-switch__active" : ""} onClick={() => { setPortal("admin"); setError(""); }}>{bn ? "Admin / operator" : "Admin / operator"}</button>
+          <div className="login-role-switch" role="group" aria-label={bn ? "Login-এর ধরন" : "Choose login type"}>
+            <button type="button" className={portal === "customer" ? "login-role-switch__active" : ""} aria-pressed={portal === "customer"} onClick={() => selectPortal("customer")}><AppIcon name="user" size={17} />{bn ? "Customer" : "Customer"}</button>
+            <button type="button" className={portal === "admin" ? "login-role-switch__active" : ""} aria-pressed={portal === "admin"} onClick={() => selectPortal("admin")}><AppIcon name="shield" size={17} />{bn ? "Admin / operator" : "Admin / operator"}</button>
+          </div>
+          <div className={`auth-service-status auth-service-status--${serviceState}`} role="status">
+            <span aria-hidden />
+            <div>
+              <strong>{serviceState === "ready" ? (bn ? "Account service online" : "Account service online") : serviceState === "checking" ? (bn ? "নিরাপদ সংযোগ যাচাই হচ্ছে…" : "Checking secure connection…") : (bn ? "Account service offline" : "Account service offline")}</strong>
+              {serviceState === "offline" ? <small>{bn ? "Catalog দেখা যাবে, কিন্তু live login-এর জন্য backend চালু করতে হবে।" : "The catalog remains available, but live sign-in needs the production backend."}</small> : null}
+            </div>
+            {serviceState === "offline" ? <button type="button" onClick={() => void checkService()}><AppIcon name="refresh" size={15} />{bn ? "Retry" : "Retry"}</button> : null}
           </div>
         </div>
         <form onSubmit={submit}>
           {portal === "customer" ? <>
-            <button className="social-login-button" type="button" disabled={socialLoading} onClick={async () => {
+            <button className="social-login-button" type="button" disabled={socialLoading || serviceState !== "ready"} onClick={async () => {
               setSocialLoading(true); setError("");
-              try { await startGoogleLogin(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Google login is unavailable."); setSocialLoading(false); }
-            }}><span aria-hidden>G</span>{socialLoading ? (bn ? "Google-এ সংযোগ হচ্ছে…" : "Connecting to Google…") : (bn ? "Google দিয়ে চালিয়ে যান" : "Continue with Google")}</button>
+              try { await startGoogleLogin(); } catch (reason) {
+                setError(isApiServiceUnavailable(reason)
+                  ? loginErrorMessage(reason)
+                  : reason instanceof Error ? reason.message : "Google login is unavailable.");
+                setSocialLoading(false);
+              }
+            }}><GoogleIcon />{socialLoading ? (bn ? "Google-এ সংযোগ হচ্ছে…" : "Connecting to Google…") : (bn ? "Google দিয়ে চালিয়ে যান" : "Continue with Google")}</button>
             <div className="auth-divider"><span>{bn ? "অথবা email / account credential" : "or use email / account credentials"}</span></div>
           </> : null}
-          <label>{bn ? "Username, email অথবা phone" : "Username, email or phone"}<input autoComplete="username" value={identifier} onChange={event => setIdentifier(event.target.value)} required /></label>
-          <label>{bn ? "Password" : "Password"}<input type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required /></label>
+          <label className="auth-field"><span><AppIcon name="user" size={16} />{bn ? "Username, email অথবা phone" : "Username, email or phone"}</span><div className="auth-input"><input autoCapitalize="none" autoComplete="username" spellCheck={false} value={identifier} onChange={event => setIdentifier(event.target.value)} required /></div></label>
+          <label className="auth-field"><span><AppIcon name="lock" size={16} />{bn ? "Password" : "Password"}</span><div className="auth-input"><input type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required /><button type="button" className="auth-password-toggle" aria-label={showPassword ? (bn ? "Password লুকান" : "Hide password") : (bn ? "Password দেখুন" : "Show password")} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}><AppIcon name={showPassword ? "eye-off" : "eye"} size={18} /></button></div></label>
           <label className="remember-login"><input type="checkbox" checked={remember} onChange={event => setRemember(event.target.checked)} /><span>{bn ? "এই device-এ sign in রাখা হবে" : "Keep me signed in on this device"}</span></label>
           {error ? <div className="form-error" role="alert">{error}</div> : null}
-          <button className="market-button" disabled={loading}>{loading ? (bn ? "Sign in হচ্ছে…" : "Signing in…") : portal === "admin" ? (bn ? "Admin dashboard খুলুন" : "Open admin dashboard") : (bn ? "নিরাপদে sign in" : "Sign in securely")}</button>
+          {errorReference ? <small className="auth-error-reference">{bn ? "Support reference" : "Support reference"}: <code>{errorReference}</code></small> : null}
+          <button className="market-button auth-submit" disabled={loading || socialLoading || serviceState === "checking"}>{loading ? (bn ? "Sign in হচ্ছে…" : "Signing in…") : portal === "admin" ? <><AppIcon name="shield" size={18} />{bn ? "Admin dashboard খুলুন" : "Open admin dashboard"}</> : <><AppIcon name="lock" size={18} />{bn ? "নিরাপদে sign in" : "Sign in securely"}</>}</button>
           {portal === "customer" ? <small>{bn ? "নতুন customer?" : "New customer?"} <Link className="nav-link" href="/signup">{bn ? "Account তৈরি করুন" : "Create an account"}</Link></small> : <small>{bn ? "শুধু অনুমোদিত admin/operator account প্রবেশ করতে পারবে। MFA প্রয়োজন।" : "Only authorized admin/operator accounts can enter. MFA is required."}</small>}
         </form>
       </section>

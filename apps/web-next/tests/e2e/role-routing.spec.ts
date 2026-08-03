@@ -10,7 +10,7 @@ async function login(page: Page, portal: "Customer" | "Admin / operator", identi
   await page.goto(portal === "Customer" ? "/login" : "/login?portal=admin");
   await page.getByRole("button", { name: portal }).click();
   await page.getByLabel("Username, email or phone").fill(identifier);
-  await page.getByLabel("Password").fill(password);
+  await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: portal === "Customer" ? "Sign in securely" : "Open admin dashboard" }).click();
 }
 

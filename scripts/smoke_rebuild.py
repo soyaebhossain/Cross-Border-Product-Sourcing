@@ -58,7 +58,7 @@ def main() -> int:
     sample_slug: str | None = None
     try:
         status, products = read_json("/api/products/")
-        if status == 200 and isinstance(products, list) and len(products) >= 50:
+        if status == 200 and isinstance(products, list) and len(products) >= 610:
             sample_slug = products[0].get("slug")
             passed.append(f"public catalog ({len(products)} products)")
         else:
@@ -69,20 +69,45 @@ def main() -> int:
     try:
         _, categories = read_json("/api/categories/")
         slugs = {str(item.get("slug")) for item in categories}
-        if "medical-products-accessories" in slugs:
-            passed.append("medical category")
+        required_categories = {
+            "beauty-tools-accessories",
+            "creator-content-tools",
+            "ecommerce-packaging-supplies",
+            "educational-academic-tools",
+            "fashion-accessories",
+            "home-organization-storage",
+            "kitchen-utility-tools",
+            "laptop-pc-accessories",
+            "medical-products-accessories",
+            "mobile-accessories",
+            "jewelry-gems-precious-metals",
+            "office-desk-accessories",
+            "pet-care-accessories",
+            "travel-luggage-accessories",
+        }
+        missing_categories = required_categories - slugs
+        if not missing_categories:
+            passed.append("medical, precious-material, and priority categories")
         else:
-            failed.append("medical category is missing")
+            failed.append(
+                "required categories are missing: "
+                + ", ".join(sorted(missing_categories))
+            )
     except Exception as exc:  # noqa: BLE001
         failed.append(f"category check failed ({type(exc).__name__})")
 
     try:
         _, countries = read_json("/api/countries/")
         codes = {str(item.get("code")) for item in countries}
-        if "IN" in codes:
-            passed.append("India sourcing lane")
+        required_origins = {"CN", "IN", "MY", "SG", "TH", "TR", "VN"}
+        missing_origins = required_origins - codes
+        if not missing_origins:
+            passed.append("seven sourcing origins")
         else:
-            failed.append("India sourcing lane is missing")
+            failed.append(
+                "required sourcing origins are missing: "
+                + ", ".join(sorted(missing_origins))
+            )
     except Exception as exc:  # noqa: BLE001
         failed.append(f"country check failed ({type(exc).__name__})")
 

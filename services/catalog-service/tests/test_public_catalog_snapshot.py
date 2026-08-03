@@ -146,6 +146,12 @@ def test_exporter_whitelists_public_fields_and_is_reproducible() -> None:
     product = snapshot["products"][0]
     assert product["description"] is None
     assert product["image"] is None
+    assert product["image_metadata"] == {
+        "url": None,
+        "alt": "Pulse Oximeter",
+        "kind": "fallback",
+        "credit": None,
+    }
     assert product["market"] == {
         "countries": ["IN"],
         "supplier_count": 1,
@@ -173,6 +179,46 @@ def test_exporter_whitelists_public_fields_and_is_reproducible() -> None:
     assert b"supplier.example.test" not in serialized
 
 
+def test_exporter_includes_owned_image_metadata() -> None:
+    connection = _fixture_connection()
+    connection.execute(
+        "UPDATE catalog_products SET image = 'products/medical/pulse-oximeter.webp'"
+    )
+    try:
+        snapshot = build_public_catalog_snapshot(connection, minimum_products=1)
+    finally:
+        connection.close()
+
+    product = snapshot["products"][0]
+    assert product["image"] == "/media/products/medical/pulse-oximeter.webp"
+    assert product["image_metadata"] == {
+        "url": "/media/products/medical/pulse-oximeter.webp",
+        "alt": "Pulse Oximeter",
+        "kind": "owned",
+        "credit": None,
+    }
+
+
+def test_exporter_labels_generated_catalog_media_as_illustrative() -> None:
+    connection = _fixture_connection()
+    connection.execute(
+        "UPDATE catalog_products "
+        "SET image = 'products/illustrative/pulse-oximeter.webp'"
+    )
+    try:
+        snapshot = build_public_catalog_snapshot(connection, minimum_products=1)
+    finally:
+        connection.close()
+
+    product = snapshot["products"][0]
+    assert product["image_metadata"] == {
+        "url": "/media/products/illustrative/pulse-oximeter.webp",
+        "alt": "Pulse Oximeter",
+        "kind": "illustrative",
+        "credit": None,
+    }
+
+
 def test_snapshot_rejects_case_insensitive_duplicate_slugs() -> None:
     connection = _fixture_connection()
     try:
@@ -192,18 +238,60 @@ def test_snapshot_rejects_case_insensitive_duplicate_slugs() -> None:
 
 def test_committed_snapshot_is_complete_and_contains_no_private_scope() -> None:
     snapshot = json.loads(COMMITTED_SNAPSHOT.read_text(encoding="utf-8"))
-    validate_public_catalog_snapshot(snapshot, minimum_products=410)
+    validate_public_catalog_snapshot(snapshot, minimum_products=610)
 
     assert snapshot["counts"] == {
-        "categories": 14,
-        "countries": 4,
-        "products": 410,
-        "variants": 410,
+        "categories": 27,
+        "countries": 7,
+        "products": 610,
+        "variants": 610,
     }
-    assert len(snapshot["products"]) == 410
+    assert len(snapshot["products"]) == 610
     assert len(
         {product["slug"].casefold() for product in snapshot["products"]}
-    ) == 410
+    ) == 610
+    precious_products = [
+        product
+        for product in snapshot["products"]
+        if product["category"]["slug"] == "jewelry-gems-precious-metals"
+    ]
+    assert len(precious_products) == 60
+    assert all(product["variants"] for product in precious_products)
+    assert all(product["market"].get("supplier_count", 0) >= 1 for product in precious_products)
+    expected_priority_counts = {
+        "beauty-tools-accessories": 12,
+        "creator-content-tools": 12,
+        "ecommerce-packaging-supplies": 12,
+        "educational-academic-tools": 12,
+        "fashion-accessories": 12,
+        "home-organization-storage": 12,
+        "kitchen-utility-tools": 12,
+        "laptop-pc-accessories": 12,
+        "mobile-accessories": 12,
+        "office-desk-accessories": 12,
+        "pet-care-accessories": 10,
+        "travel-luggage-accessories": 10,
+    }
+    priority_counts = {
+        slug: sum(
+            product["category"]["slug"] == slug
+            for product in snapshot["products"]
+        )
+        for slug in expected_priority_counts
+    }
+    assert priority_counts == expected_priority_counts
+    priority_products = [
+        product
+        for product in snapshot["products"]
+        if product["category"]["slug"] in expected_priority_counts
+    ]
+    assert all(product["variants"] for product in priority_products)
+    assert all(product["market"].get("supplier_count", 0) >= 1 for product in priority_products)
+    assert all(product["image"] for product in priority_products)
+    assert all(
+        product["image_metadata"]["kind"] == "illustrative"
+        for product in priority_products
+    )
     assert all(
         product["image"] is None
         or product["image"].startswith("/media/products/")

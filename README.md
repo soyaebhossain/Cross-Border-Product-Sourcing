@@ -14,10 +14,14 @@ applications are not part of the active tree.
 - `gateway/nginx.conf` — reverse-proxy baseline; production TLS belongs at the
   managed edge/load balancer.
 
-The current development catalog contains 14 categories and 410 products,
-including Medical Products & Accessories. China, India, Singapore, and
-Thailand are available sourcing origins. Runtime database files are ignored
-and must never be committed.
+The current development catalog contains 27 categories and 610 products. It
+includes Medical Products & Accessories, Jewelry, Gems & Precious Metals, ten
+priority everyday-goods segments, plus travel/luggage and pet-care accessories.
+China, India, Malaysia, Singapore, Thailand, Turkey, and Vietnam are available
+sourcing origins. Seeded prices and routes are indicative demo values; material,
+electrical, food-contact, purity, grade, certification, origin, HS
+classification, and import requirements require independent verification.
+Runtime database files are ignored and must never be committed.
 
 ## Run locally on Windows
 
@@ -67,6 +71,21 @@ codes. Store those codes outside the repository. Admin and customer routing is
 role-separated; `/research`, research analytics, and CSV research export are
 admin-only.
 
+If an existing customer or admin loses access, use the interactive recovery
+command from `services/catalog-service`:
+
+```powershell
+.\.venv\Scripts\python.exe scripts\recover_account_access.py --identifier owner --unlock
+```
+
+The command prompts for the new password, increments the account authentication
+version, revokes active refresh sessions, consumes pending authentication
+challenges, and records a credential-free audit event. It preserves disabled,
+locked, and MFA state by default. Use `--reactivate` or `--clear-mfa` only after
+verifying the account owner; prefer `--user-id` when a legacy identifier is
+ambiguous. Never reactivate a known/default admin account—provision a replacement
+and complete MFA enrollment instead.
+
 ## Hosted deployment
 
 - Configure the Vercel project root as `apps/web-next`; that directory contains
@@ -74,7 +93,9 @@ admin-only.
   `/media` routes, while server rendering and the fixed reverse proxy use the
   HTTPS API origin. Production Vercel deployments target the maintained Render
   service; non-production deployments require an explicit `API_BASE_URL` and
-  must never proxy mutations into the production database.
+  must never proxy mutations into the production database. Every frontend build
+  runs `verify:deployment` first and fails if the repository build configuration
+  selects Vite or contains a Vite dependency/configuration file.
 - `render.yaml` builds the maintained non-root FastAPI image, applies Alembic
   migrations before startup, and checks `/api/ready`. Before syncing the
   Blueprint, provide the `sync: false` MFA, monitoring, and payment-proof

@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0",
+    "verify:deployment": "node scripts/verify-deployment-config.mjs",
+    "prebuild": "npm run verify:deployment",
     "build": "next build",
     "lint": "eslint .",
     "start": "next start --hostname 0.0.0.0",

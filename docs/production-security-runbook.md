@@ -144,6 +144,36 @@ overwrite or promote an existing account, applies the production password
 policy, and writes an audit event. Delete the injected environment value
 immediately after the job.
 
+### Account access recovery
+
+Reset a customer or admin password from the catalog-service directory:
+
+```shell
+python scripts/recover_account_access.py --identifier account@example.com --unlock
+```
+
+Use a numeric ID when an audit or legacy-data review shows that an identifier is
+ambiguous:
+
+```shell
+python scripts/recover_account_access.py --user-id 42 --reactivate --clear-mfa
+```
+
+The password is read twice with `getpass`; the CLI intentionally has no
+`--password` option. An approved one-process secret-store job may instead inject
+`SOURCEAI_ACCOUNT_PASSWORD`, which the script removes from its process
+environment after reading. Do not place passwords in shell history, logs, CI
+arguments, or the repository.
+
+Every successful reset applies the password policy, rejects reuse of the current
+password, increments `auth_version`, revokes every active refresh session,
+consumes pending authentication challenges, and writes an audit event containing
+only state flags and revocation counts. Account activation, lock state, and MFA
+enrollment are preserved unless the operator explicitly supplies `--reactivate`,
+`--unlock`, or `--clear-mfa`. Verify identity and record approval before those
+flags are used. Never reactivate a known/default administrator; provision a new
+administrator and enroll MFA.
+
 The first privileged password login returns HTTP 202 with
 `mfa_enrollment_required=true` and a five-minute `mfa_token`; it does not issue
 authentication cookies. Call `/api/auth/mfa/enroll/start/`, scan the returned
@@ -194,7 +224,7 @@ Before executing:
 5. run:
 
    ```shell
-   python scripts/migrate_catalog_to_postgres.py --execute --minimum-products 350
+   python scripts/migrate_catalog_to_postgres.py --execute --minimum-products 610
    ```
 
 The command refuses a non-SQLite source, non-PostgreSQL target, source without
@@ -203,8 +233,9 @@ any target with pre-existing catalog rows. It copies in foreign-key order,
 resets PostgreSQL sequences, and compares every in-scope table count inside
 the target transaction.
 
-Afterward, independently reconcile category/product/medical-product counts,
-normalized slug/SKU uniqueness, offer foreign keys and representative quote
+Afterward, independently reconcile category/product, medical-product, and
+precious-product counts, normalized slug/SKU uniqueness, offer foreign keys,
+precious-material verification disclaimers, and representative quote
 calculations. Keep the old database read-only until rollback expiry. If
 historical customer/order/payment data must also move, do not broaden this
 script: design and review a separate PII/financial migration with legal,
@@ -223,7 +254,7 @@ The exporter uses a fixed public-field allowlist, excludes free text and
 third-party images, and never reads accounts, quotes, orders, payments,
 customer, support or audit data. Keep
 `NEXT_PUBLIC_CATALOG_SNAPSHOT_FALLBACK=1` only during cutover. After
-`/api/ready` returns 200 and the live browse API reports all 410 imported
+`/api/ready` returns 200 and the live browse API reports all 610 imported
 products, set it to `0` and redeploy Vercel; live catalog data will then be the
 only source.
 

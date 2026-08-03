@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./professional.css";
+import "./ui-polish.css";
 import { Header } from "./Header";
 import { Footer } from "./Footer";
 import { LocaleProvider } from "../lib/locale-context";

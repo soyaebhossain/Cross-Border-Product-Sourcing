@@ -48,18 +48,25 @@ and test-covered. The current blockers are:
 
 This is a transient working-tree record, not release evidence:
 
-- Backend Ruff and `compileall` passed; the final local run reported **49
+- Backend Ruff and `compileall` passed; the final local run reported **70
   passing tests** and `pip-audit` reported **0 known vulnerabilities** for
   `requirements.txt`.
 - A live SQLite backup/isolated restore passed. The live development database
-  was upgraded to Alembic `20260730_04`; integrity checks reported 14
-  categories, 410 products, 85 medical products, zero foreign-key violations,
-  zero duplicate normalized slugs, and zero active administrators.
+  was upgraded to Alembic `20260730_04`; integrity checks reported 27
+  categories, 610 products, 85 medical products, 60 jewelry/gem/precious-metal
+  products, 140 priority everyday/travel/pet accessories, seven sourcing
+  origins, zero foreign-key violations, zero duplicate normalized slugs, and
+  zero active administrators.
+- The PII-free public catalog snapshot exported twice with the same SHA-256
+  (`bfb39d06c7f3ba4046ee2fa7d4a4bc0652715b7a8f6fba0e172d6100bd5af97e`);
+  desktop and mobile snapshot browse checks passed.
 - A fresh SQLite upgrade to Alembic head passed. The PII-free
   catalog/configuration-to-empty-PostgreSQL migration tool has scope/order
   tests, but an actual PostgreSQL transfer has not yet been run.
 - Frontend `npm run lint -- --quiet`, `npx tsc --noEmit`, and the Next.js
-  15.5.22 production build passed; the build generated all 35 pages.
+  15.5.22 production build passed; the build generated all 35 pages. The
+  prebuild deployment guard also confirmed the maintained frontend uses
+  Next.js and contains no Vite dependency or configuration file.
 - Playwright passed 4 public desktop/mobile checks and 2 live customer/admin
   role-routing checks against an isolated test database. The production
   frontend dependency audit reported 0 findings. Compose configuration passed
