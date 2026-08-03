@@ -231,7 +231,7 @@ export default function ProfilePage() {
           <h1>{bn ? "প্রোফাইল ও ঠিকানা" : "Profile and addresses"}</h1>
           <p>{bn ? "কোম্পানি, ভাষা এবং shipping/billing ঠিকানা নিরাপদে পরিচালনা করুন।" : "Manage your company, regional preferences, and shipping or billing addresses securely."}</p>
         </div>
-        <button className="button button--primary" type="button" onClick={openNew}>
+        <button className={`button button--primary ${styles.addAddressButton}`} type="button" onClick={openNew}>
           <span className={styles.buttonIcon} aria-hidden>+</span>
           {bn ? "ঠিকানা যোগ করুন" : "Add address"}
         </button>

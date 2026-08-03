@@ -392,6 +392,10 @@
   line-height: 0;
 }
 
+.addAddressButton {
+  min-height: 44px;
+}
+
 .addressForm {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
