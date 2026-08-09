@@ -186,10 +186,11 @@ def save_quote_record(session: Session, payload: SaveQuoteIn, current_user: Curr
             if metadata.get("source") == "ollama-via-n8n"
             else "deterministic-fallback"
         )
+        reported_model = str(metadata.get("model") or "").strip()[:100]
         review_required = bool(explanation.get("human_review_required"))
         saved_quote.ai_explanation = AIDecisionExplanation(
             provider=provider,
-            model="qwen3:8b" if provider == "ollama-via-n8n" else None,
+            model=(reported_model or "qwen3:8b") if provider == "ollama-via-n8n" else None,
             prompt_version="quote-v1",
             deterministic_snapshot=context,
             explanation=explanation,

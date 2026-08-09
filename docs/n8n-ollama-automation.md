@@ -56,6 +56,10 @@ returns `ai_metadata.source=deterministic-fallback`; sourcing remains usable.
 - Pin reviewed n8n and Ollama image digests rather than using the development
   `latest` defaults.
 - Restrict n8n ingress to the API service where possible.
+- The included workflows read their token, model, and private Ollama URL from
+  environment variables, so Compose explicitly permits node environment access.
+  Keep this n8n instance private and limited to reviewed workflows and trusted
+  operators; do not install untrusted workflows or community nodes.
 - Configure execution retention, backups, monitoring and a real error alert.
 - Run `n8n audit` after configuration changes and review unprotected webhooks,
   community nodes, Code nodes and unused credentials.

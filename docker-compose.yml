@@ -56,7 +56,8 @@ services:
       CATALOG_SUPPLY_CHAIN_CSV_PATH: "${CATALOG_SUPPLY_CHAIN_CSV_PATH:-/data/supply_chain_data.csv}"
       CATALOG_AUTOMATION_WEBHOOK_URL: "${CATALOG_AUTOMATION_WEBHOOK_URL:-http://n8n:5678/webhook/sourceai-quote-explanation}"
       CATALOG_AUTOMATION_WEBHOOK_TOKEN: "${N8N_AUTOMATION_TOKEN:-development-only-change-me}"
-      CATALOG_AUTOMATION_TIMEOUT_SECONDS: "${CATALOG_AUTOMATION_TIMEOUT_SECONDS:-12}"
+      CATALOG_AUTOMATION_TIMEOUT_SECONDS: "${CATALOG_AUTOMATION_TIMEOUT_SECONDS:-30}"
+      CATALOG_AUTOMATION_MODEL: "${OLLAMA_MODEL:-qwen3:8b}"
     volumes:
       - ./Data:/data:ro
     healthcheck:
@@ -149,6 +150,9 @@ services:
       GENERIC_TIMEZONE: "${GENERIC_TIMEZONE:-Asia/Dhaka}"
       N8N_DIAGNOSTICS_ENABLED: "false"
       N8N_PERSONALIZATION_ENABLED: "false"
+      # Required by the reviewed workflows for token, model and private URL lookup.
+      # Do not allow untrusted users or community workflows on this instance.
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
     volumes:
       - n8n_data:/home/node/.n8n
       - ./automation/n8n/workflows:/workflows:ro

@@ -80,7 +80,8 @@ class Settings(BaseSettings):
     payment_proof_allowed_hosts: str = ""
     automation_webhook_url: str | None = None
     automation_webhook_token: str | None = None
-    automation_timeout_seconds: float = 12.0
+    automation_timeout_seconds: float = 30.0
+    automation_model: str = "qwen3:8b"
 
     model_config = SettingsConfigDict(
         env_prefix="CATALOG_",

@@ -1,4 +1,5 @@
 {
+  "id": "20d20bf1-f1ec-41dd-83e7-07a95cd3fc21",
   "name": "SourceAI - Quote AI Explanation",
   "nodes": [
     {
@@ -9,6 +10,7 @@
         "options": {}
       },
       "id": "webhook",
+      "webhookId": "e6d14183-cbf2-42b2-a687-58c19e09e195",
       "name": "Quote Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
@@ -42,8 +44,8 @@
         "url": "={{ $env.OLLAMA_BASE_URL + '/api/generate' }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { model: $env.OLLAMA_MODEL, stream: false, format: 'json', prompt: 'You are SourceAI, a cautious cross-border sourcing explanation assistant. Never change or recalculate any monetary value. Explain only the supplied deterministic recommendation in Bangla. Return JSON only with summary_bn, advantages, risks, missing_information, recommended_checks, confidence (0..1), and human_review_required. Medium or High risk must require human review. Data: ' + JSON.stringify($json.body.recommendation) } }}",
-        "options": {"timeout": 10000}
+        "jsonBody": "={{ { model: $env.OLLAMA_MODEL, stream: false, think: false, format: 'json', options: { temperature: 0.2, num_predict: 700 }, prompt: 'You are SourceAI, a cautious cross-border sourcing explanation assistant. Never change or recalculate any monetary value. Explain only the supplied deterministic recommendation in Bangla. Return JSON only with summary_bn, advantages, risks, missing_information, recommended_checks, confidence (0..1), and human_review_required. Medium or High risk must require human review. Data: ' + JSON.stringify($json.body.recommendation) } }}",
+        "options": {"timeout": 25000}
       },
       "id": "ollama",
       "name": "Generate With Ollama",
@@ -93,7 +95,7 @@
     "Validate Output": {"main": [[{"node":"Return Explanation","type":"main","index":0}]]}
   },
   "settings": {"executionOrder": "v1", "errorWorkflow": ""},
-  "active": false,
+  "active": true,
   "versionId": "f0b92979-2cad-4e0b-a934-7600373348bd",
   "meta": {"templateCredsSetupCompleted": true},
   "tags": []
