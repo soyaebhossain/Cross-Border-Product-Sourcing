@@ -180,3 +180,16 @@
     grid-column: 3 !important;
   }
 }
+
+@media (min-width: 1400px) {
+  .site-header:not(.site-header--authenticated) {
+    grid-template-columns: auto minmax(300px, 360px) minmax(max-content, 1fr) auto !important;
+    gap: 12px !important;
+    padding-inline: 16px !important;
+  }
+  .site-header:not(.site-header--authenticated) .global-search {
+    width: 100%;
+    min-width: 0;
+    max-width: 360px;
+  }
+}

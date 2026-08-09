@@ -130,7 +130,7 @@ test("@public read-only catalog snapshot supports browse, search and detail", as
   await expect(productCard.locator(".product-image__badge")).toContainText(
     /Reference image|Illustrative preview/,
   );
-  await productCard.getByRole("link", { name: /View product/ }).click();
+  await productCard.getByRole("link", { name: "View product", exact: true }).click();
 
   await expect(page.getByRole("heading", { name: "iPhone 14", exact: true })).toBeVisible();
   const productGallery = page.getByRole("region", {
