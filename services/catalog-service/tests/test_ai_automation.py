@@ -26,7 +26,11 @@ def _recommendation(risk: str = "Low") -> dict:
 def test_unconfigured_automation_returns_deterministic_fallback() -> None:
     result = automation.explain_recommendation(
         _recommendation("Medium"),
-        Settings(database_url="sqlite://"),
+        Settings(
+            database_url="sqlite://",
+            automation_webhook_url=None,
+            automation_webhook_token=None,
+        ),
     )
 
     assert result.automation_available is False
@@ -44,7 +48,14 @@ def test_bangla_fallback_localizes_explanation_fields() -> None:
         "Shipping and tariff rules are still normalized reference estimates until carrier-specific feeds are connected."
     ]
 
-    result = automation.explain_recommendation(recommendation, Settings(database_url="sqlite://"))
+    result = automation.explain_recommendation(
+        recommendation,
+        Settings(
+            database_url="sqlite://",
+            automation_webhook_url=None,
+            automation_webhook_token=None,
+        ),
+    )
 
     assert result.source == "deterministic-fallback"
     assert "বর্তমান যাচাইযোগ্য হিসাব" in result.explanation["summary_bn"]
@@ -133,7 +144,11 @@ def test_production_automation_requires_https_and_paired_secret() -> None:
         "payment_proof_allowed_hosts": "proofs.example.com",
     }
     with pytest.raises(RuntimeError, match="Automation webhook URL and token"):
-        Settings(**base, automation_webhook_url="https://n8n.example.com/webhook/sourceai").validate_runtime_security()
+        Settings(
+            **base,
+            automation_webhook_url="https://n8n.example.com/webhook/sourceai",
+            automation_webhook_token=None,
+        ).validate_runtime_security()
     with pytest.raises(RuntimeError, match="must use HTTPS"):
         Settings(
             **base,
