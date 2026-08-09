@@ -54,6 +54,9 @@ services:
       CATALOG_WHATSAPP_SENDER_ID: "${CATALOG_WHATSAPP_SENDER_ID:-}"
       CATALOG_PAYMENT_PROOF_ALLOWED_HOSTS: "${CATALOG_PAYMENT_PROOF_ALLOWED_HOSTS:-}"
       CATALOG_SUPPLY_CHAIN_CSV_PATH: "${CATALOG_SUPPLY_CHAIN_CSV_PATH:-/data/supply_chain_data.csv}"
+      CATALOG_AUTOMATION_WEBHOOK_URL: "${CATALOG_AUTOMATION_WEBHOOK_URL:-http://n8n:5678/webhook/sourceai-quote-explanation}"
+      CATALOG_AUTOMATION_WEBHOOK_TOKEN: "${N8N_AUTOMATION_TOKEN:-development-only-change-me}"
+      CATALOG_AUTOMATION_TIMEOUT_SECONDS: "${CATALOG_AUTOMATION_TIMEOUT_SECONDS:-12}"
     volumes:
       - ./Data:/data:ro
     healthcheck:
@@ -119,6 +122,39 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
 
+  ollama:
+    image: "${OLLAMA_IMAGE:-ollama/ollama:latest}"
+    profiles: ["automation"]
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+
+  n8n:
+    image: "${N8N_IMAGE:-docker.n8n.io/n8nio/n8n:latest}"
+    profiles: ["automation"]
+    restart: unless-stopped
+    depends_on:
+      ollama:
+        condition: service_started
+    environment:
+      N8N_HOST: "0.0.0.0"
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: "http"
+      N8N_ENCRYPTION_KEY: "${N8N_ENCRYPTION_KEY:-development-only-change-this-encryption-key}"
+      N8N_AUTOMATION_TOKEN: "${N8N_AUTOMATION_TOKEN:-development-only-change-me}"
+      OLLAMA_BASE_URL: "http://ollama:11434"
+      OLLAMA_MODEL: "${OLLAMA_MODEL:-qwen3:8b}"
+      GENERIC_TIMEZONE: "${GENERIC_TIMEZONE:-Asia/Dhaka}"
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./automation/n8n/workflows:/workflows:ro
+    ports:
+      - "127.0.0.1:5678:5678"
+
   gateway:
     image: nginx:1.28-alpine
     profiles:
@@ -135,3 +171,5 @@ services:
 
 volumes:
   postgres_data:
+  n8n_data:
+  ollama_data:

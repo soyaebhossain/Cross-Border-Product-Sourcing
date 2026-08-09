@@ -1,0 +1,100 @@
+{
+  "name": "SourceAI - Quote AI Explanation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sourceai-quote-explanation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook",
+      "name": "Quote Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-760, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
+          "conditions": [
+            {
+              "id": "token-check",
+              "leftValue": "={{ $json.headers.authorization }}",
+              "rightValue": "={{ 'Bearer ' + $env.N8N_AUTOMATION_TOKEN }}",
+              "operator": {"type": "string", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "authorize",
+      "name": "Authorize",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-540, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OLLAMA_BASE_URL + '/api/generate' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: $env.OLLAMA_MODEL, stream: false, format: 'json', prompt: 'You are SourceAI, a cautious cross-border sourcing explanation assistant. Never change or recalculate any monetary value. Explain only the supplied deterministic recommendation in Bangla. Return JSON only with summary_bn, advantages, risks, missing_information, recommended_checks, confidence (0..1), and human_review_required. Medium or High risk must require human review. Data: ' + JSON.stringify($json.body.recommendation) } }}",
+        "options": {"timeout": 10000}
+      },
+      "id": "ollama",
+      "name": "Generate With Ollama",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-300, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.response; let value; try { value = JSON.parse(raw); } catch { throw new Error('Ollama returned invalid JSON'); } const lists = ['advantages','risks','missing_information','recommended_checks']; const clean = { summary_bn: String(value.summary_bn || '').slice(0,2000), confidence: Number.isFinite(Number(value.confidence)) ? Math.max(0, Math.min(1, Number(value.confidence))) : null, human_review_required: Boolean(value.human_review_required) }; for (const key of lists) clean[key] = Array.isArray(value[key]) ? value[key].slice(0,8).map(v => String(v).slice(0,500)) : []; return [{ json: { explanation: clean } }];"
+      },
+      "id": "validate",
+      "name": "Validate Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-60, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {"responseCode": 200}
+      },
+      "id": "success",
+      "name": "Return Explanation",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [180, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: 'unauthorized' } }}",
+        "options": {"responseCode": 401}
+      },
+      "id": "unauthorized",
+      "name": "Reject Request",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [-300, 140]
+    }
+  ],
+  "connections": {
+    "Quote Webhook": {"main": [[{"node":"Authorize","type":"main","index":0}]]},
+    "Authorize": {"main": [[{"node":"Generate With Ollama","type":"main","index":0}],[{"node":"Reject Request","type":"main","index":0}]]},
+    "Generate With Ollama": {"main": [[{"node":"Validate Output","type":"main","index":0}]]},
+    "Validate Output": {"main": [[{"node":"Return Explanation","type":"main","index":0}]]}
+  },
+  "settings": {"executionOrder": "v1", "errorWorkflow": ""},
+  "active": false,
+  "versionId": "f0b92979-2cad-4e0b-a934-7600373348bd",
+  "meta": {"templateCredsSetupCompleted": true},
+  "tags": []
+}

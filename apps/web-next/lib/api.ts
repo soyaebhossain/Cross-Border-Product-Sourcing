@@ -97,6 +97,22 @@ export type QuoteResponse = {
     min_days: number;
     max_days: number;
   };
+  ai_explanation?: {
+    summary_bn: string;
+    advantages: string[];
+    risks: string[];
+    missing_information: string[];
+    recommended_checks: string[];
+    confidence: number | null;
+    human_review_required: boolean;
+  };
+  ai_metadata?: {
+    source: "ollama-via-n8n" | "deterministic-fallback" | string;
+    model?: string | null;
+    prompt_version?: string;
+    automation_available: boolean;
+    monetary_calculations_are_deterministic: boolean;
+  };
 };
 
 export type OrderSummary = {
@@ -724,6 +740,16 @@ export function quoteProduct(payload: {
   delivery_type: string;
 }) {
   return postJson<QuoteResponse>("/api/quote/", payload);
+}
+
+export function quoteProductWithAi(payload: {
+  variant_id: number;
+  country: string;
+  mode: string;
+  qty: number;
+  delivery_type: string;
+}) {
+  return postJson<QuoteResponse>("/api/quote/ai-explanation/", payload);
 }
 
 export function getCheapestCountryRecommendation(input: {

@@ -298,6 +298,44 @@ class SavedQuote(Base):
     )
 
     orders: Mapped[list["Order"]] = relationship(back_populates="saved_quote", lazy="selectin")
+    ai_explanation: Mapped["AIDecisionExplanation | None"] = relationship(
+        back_populates="saved_quote", uselist=False, cascade="all, delete-orphan"
+    )
+
+
+class AIDecisionExplanation(Base):
+    __tablename__ = "ai_decision_explanations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    saved_quote_id: Mapped[int] = mapped_column(
+        ForeignKey("orders_saved_quotes.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    model: Mapped[str | None] = mapped_column(String(120))
+    prompt_version: Mapped[str] = mapped_column(String(40), nullable=False, server_default="quote-v1")
+    deterministic_snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
+    explanation: Mapped[dict] = mapped_column(JSON, nullable=False)
+    confidence: Mapped[Decimal | None] = mapped_column(Numeric(5, 4))
+    human_review_required: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="0", index=True
+    )
+    review_status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="NOT_REQUIRED", server_default="NOT_REQUIRED", index=True
+    )
+    review_note: Mapped[str | None] = mapped_column(Text())
+    reviewed_by_user_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    saved_quote: Mapped["SavedQuote"] = relationship(back_populates="ai_explanation")
 
 
 class Order(Base):

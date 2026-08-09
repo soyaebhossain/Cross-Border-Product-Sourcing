@@ -19,10 +19,11 @@ from app.api.routes.admin_analytics import (
     profitability_analytics,
     supplier_analytics,
 )
-from app.api.routes.admin_operations import archive_product
+from app.api.routes.admin_operations import archive_product, decide_ai_review
 from app.db import Base
 from app.models import (
     AccountUser,
+    AIDecisionExplanation,
     AdminAuditEvent,
     Category,
     Country,
@@ -39,7 +40,7 @@ from app.models import (
     ServiceFeeRule,
     ShippingRateCard,
 )
-from app.schemas import CreateOrderIn, SaveQuoteIn, UpdateOrderStatusIn
+from app.schemas import AIReviewDecisionIn, CreateOrderIn, SaveQuoteIn, UpdateOrderStatusIn
 from app.security import request_id_context
 from app.services.catalog import list_products
 from app.services.financial_operations import (
@@ -295,6 +296,57 @@ def test_saved_quote_price_is_server_owned_and_quote_orders_are_unique(session: 
     )
     with pytest.raises(HTTPException, match="already linked"):
         create_manual_order_record(session, duplicate, CUSTOMER)
+
+
+def test_saved_ai_explanation_is_persisted_and_human_review_is_audited(session: Session) -> None:
+    variant = session.scalar(select(ProductVariant))
+    seller = session.scalar(select(Seller))
+    seller.rating = Decimal("2.50")
+    session.commit()
+    quote = save_quote_record(
+        session,
+        SaveQuoteIn(
+            variant_id=variant.id,
+            country="CN",
+            mode="LOCAL",
+            qty=1,
+            delivery_type="DOOR",
+            response={
+                "ai_explanation": {
+                    "summary_bn": "Bulk sourcing explanation",
+                    "advantages": ["lower unit cost"],
+                    "risks": [],
+                    "missing_information": [],
+                    "recommended_checks": [],
+                    "confidence": 0.8,
+                    "human_review_required": False,
+                },
+                "ai_metadata": {"source": "ollama-via-n8n"},
+            },
+        ),
+        CUSTOMER,
+    )
+    review = session.scalar(
+        select(AIDecisionExplanation).where(AIDecisionExplanation.saved_quote_id == quote.id)
+    )
+    assert review is not None
+    assert review.provider == "ollama-via-n8n"
+    assert review.human_review_required is True
+    assert review.review_status == "PENDING"
+
+    result = decide_ai_review(
+        review.id,
+        AIReviewDecisionIn(decision="APPROVED", note="Verified against the quote snapshot"),
+        session,
+        ADMIN,
+    )
+    assert result["review_status"] == "APPROVED"
+    assert result["reviewed_by_user_id"] == ADMIN["sub"]
+    event = session.scalar(
+        select(AdminAuditEvent).where(AdminAuditEvent.action == "ai_explanation.reviewed")
+    )
+    assert event is not None
+    assert event.entity_id == str(review.id)
 
 
 def test_soft_archive_hides_product_and_variant_from_public_sourcing(session: Session) -> None:

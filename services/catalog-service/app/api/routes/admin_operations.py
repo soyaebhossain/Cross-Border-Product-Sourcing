@@ -39,6 +39,7 @@ from ...auth import get_current_user
 from ...db import get_session
 from ...models import (
     AccountUser,
+    AIDecisionExplanation,
     Category,
     Country,
     CurrencyRate,
@@ -56,6 +57,7 @@ from ...models import (
     ServiceFeeRule,
     ShippingRateCard,
 )
+from ...schemas import AIReviewDecisionIn
 from ...services.financial_operations import (
     create_refund,
     financial_snapshot,
@@ -98,6 +100,96 @@ ROLE_CAPABILITIES = {
         "audit_read",
     ],
 }
+
+
+def _ai_review_json(review: AIDecisionExplanation) -> dict[str, Any]:
+    quote = review.saved_quote
+    return {
+        "id": review.id,
+        "saved_quote_id": review.saved_quote_id,
+        "product_name": quote.product_name,
+        "variant_name": quote.variant_name,
+        "country": quote.country_code,
+        "mode": quote.mode,
+        "qty": quote.qty,
+        "provider": review.provider,
+        "model": review.model,
+        "prompt_version": review.prompt_version,
+        "explanation": review.explanation,
+        "confidence": review.confidence,
+        "human_review_required": review.human_review_required,
+        "review_status": review.review_status,
+        "review_note": review.review_note,
+        "reviewed_by_user_id": review.reviewed_by_user_id,
+        "reviewed_at": review.reviewed_at,
+        "created_at": review.created_at,
+        "updated_at": review.updated_at,
+    }
+
+
+@router.get("/api/admin/ai-reviews/")
+def list_ai_reviews(
+    status_filter: str | None = Query(default=None, alias="status", max_length=20),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=100),
+    session: Session = Depends(get_session),
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    require_operator(user)
+    statement = select(AIDecisionExplanation).options(joinedload(AIDecisionExplanation.saved_quote))
+    if status_filter:
+        statement = statement.where(AIDecisionExplanation.review_status == status_filter.upper())
+    statement = statement.order_by(
+        AIDecisionExplanation.human_review_required.desc(),
+        AIDecisionExplanation.created_at.desc(),
+    )
+    total = int(session.scalar(select(func.count()).select_from(statement.subquery())) or 0)
+    reviews = session.scalars(statement.offset((page - 1) * page_size).limit(page_size)).all()
+    return {
+        "items": [_ai_review_json(review) for review in reviews],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": ceil(total / page_size) if total else 0,
+    }
+
+
+@router.patch("/api/admin/ai-reviews/{review_id}/")
+def decide_ai_review(
+    review_id: int,
+    payload: AIReviewDecisionIn,
+    session: Session = Depends(get_session),
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    require_operator(user)
+    review = _not_found(
+        session.scalar(
+            select(AIDecisionExplanation)
+            .options(joinedload(AIDecisionExplanation.saved_quote))
+            .where(AIDecisionExplanation.id == review_id)
+        ),
+        "AI review",
+    )
+    before = {"review_status": review.review_status, "review_note": review.review_note}
+    review.review_status = payload.decision
+    review.review_note = payload.note.strip()
+    review.reviewed_by_user_id = int(user["sub"])
+    review.reviewed_at = utc_now()
+    review.updated_at = utc_now()
+    record_admin_audit(
+        session,
+        user,
+        action="ai_explanation.reviewed",
+        entity_type="ai_decision_explanation",
+        entity_id=review.id,
+        before=before,
+        after={"review_status": review.review_status, "review_note": review.review_note},
+        note=payload.note,
+        request_id=payload.request_id,
+    )
+    session.commit()
+    session.refresh(review)
+    return _ai_review_json(review)
 
 
 def require_operator(user: dict[str, Any]) -> None:
@@ -1237,7 +1329,7 @@ def admin_quote_detail(
     quote = _not_found(
         session.scalar(
             select(SavedQuote)
-            .options(selectinload(SavedQuote.orders))
+            .options(selectinload(SavedQuote.orders), joinedload(SavedQuote.ai_explanation))
             .where(SavedQuote.id == quote_id)
         ),
         "Saved quote",
@@ -1259,6 +1351,7 @@ def admin_quote_detail(
         "order_ids": [order.id for order in quote.orders],
         "created_at": quote.created_at,
         "updated_at": quote.updated_at,
+        "ai_review": _ai_review_json(quote.ai_explanation) if quote.ai_explanation else None,
     }
 
 

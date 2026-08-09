@@ -13,13 +13,14 @@ from sqlalchemy import create_engine, inspect, text
 
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
-HEAD_REVISION = "20260730_04"
+HEAD_REVISION = "20260806_05"
 EXPECTED_TABLES = {
     "accounts_auth_challenges",
     "accounts_refresh_sessions",
     "accounts_social_identities",
     "accounts_users",
     "admin_audit_events",
+    "ai_decision_explanations",
     "catalog_categories",
     "catalog_product_variants",
     "catalog_products",

@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from ..models import (
+    AIDecisionExplanation,
     AdminAuditEvent,
     ManualPaymentProof,
     Order,
@@ -34,6 +35,7 @@ from ..schemas import (
     UpdateOrderStatusIn,
 )
 from .sourcing import build_quote, get_variant_or_404
+from .automation import fallback_explanation, quote_automation_context, validated_explanation
 
 
 CurrentUser = dict[str, Any]
@@ -168,6 +170,33 @@ def save_quote_record(session: Session, payload: SaveQuoteIn, current_user: Curr
         expires_at=expires_at,
     )
     session.add(saved_quote)
+    client_explanation = payload.response.get("ai_explanation")
+    if isinstance(client_explanation, dict):
+        context = quote_automation_context(
+            snapshot,
+            country_code=payload.country,
+            mode=payload.mode,
+        )
+        fallback = fallback_explanation(context)
+        explanation = validated_explanation(client_explanation, fallback)
+        metadata = payload.response.get("ai_metadata")
+        metadata = metadata if isinstance(metadata, dict) else {}
+        provider = (
+            "ollama-via-n8n"
+            if metadata.get("source") == "ollama-via-n8n"
+            else "deterministic-fallback"
+        )
+        review_required = bool(explanation.get("human_review_required"))
+        saved_quote.ai_explanation = AIDecisionExplanation(
+            provider=provider,
+            model="qwen3:8b" if provider == "ollama-via-n8n" else None,
+            prompt_version="quote-v1",
+            deterministic_snapshot=context,
+            explanation=explanation,
+            confidence=explanation.get("confidence"),
+            human_review_required=review_required,
+            review_status="PENDING" if review_required else "NOT_REQUIRED",
+        )
     session.commit()
     session.refresh(saved_quote)
     invalidate_admin_analytics()

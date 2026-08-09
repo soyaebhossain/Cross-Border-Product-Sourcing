@@ -118,6 +118,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/orders", icon: "orders", en: "Orders", bn: "অর্ডার" },
     { href: "/admin/payments", icon: "payments", en: "Payments", bn: "পেমেন্ট" },
     { href: "/admin/quotes", icon: "quotes", en: "Saved quotes", bn: "সেভড কোট" },
+    { href: "/admin/ai-reviews", icon: "quotes", en: "AI review queue", bn: "AI রিভিউ কিউ" },
     { href: "/admin/catalog", icon: "catalog", en: "Products & categories", bn: "পণ্য ও ক্যাটাগরি" },
     { href: "/admin/suppliers", icon: "suppliers", en: "Suppliers & offers", bn: "সাপ্লায়ার ও অফার" },
     { href: "/admin/users", icon: "users", en: "Customers & users", bn: "কাস্টমার ও ইউজার", adminOnly: true },

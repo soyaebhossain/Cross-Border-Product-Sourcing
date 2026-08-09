@@ -15,7 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY alembic.ini ./
 COPY migrations ./migrations
 COPY docker-entrypoint.sh ./
-RUN chmod +x ./docker-entrypoint.sh
+RUN sed -i 's/\r$//' ./docker-entrypoint.sh \
+    && chmod +x ./docker-entrypoint.sh
 
 COPY app ./app
 COPY media ./media

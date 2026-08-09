@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
-import { getCountries, getProducts, quoteProduct, saveQuote, type Country, type Product, type QuoteResponse } from "../../lib/api";
+import { getCountries, getProducts, quoteProductWithAi, saveQuote, type Country, type Product, type QuoteResponse } from "../../lib/api";
 import { formatBdt } from "../../lib/format";
 
 export default function QuotePage() {
@@ -57,7 +57,7 @@ export default function QuotePage() {
     }
     setLoading(true);
     try {
-      const result = await quoteProduct({
+      const result = await quoteProductWithAi({
         variant_id: selectedVariantId,
         country: form.country,
         mode: form.mode,
@@ -86,6 +86,8 @@ export default function QuotePage() {
     if (!response?.breakdown) return null;
     return response.breakdown;
   }, [response]);
+  const aiExplanation = response?.ai_explanation;
+  const aiMetadata = response?.ai_metadata;
 
   return (
     <main className="shell shell--narrow">
@@ -241,6 +243,31 @@ export default function QuotePage() {
             <div className="form-actions">
               <button type="button" className="button button--primary" onClick={handleSave} disabled={savedQuoteId !== null}>{savedQuoteId ? "Saved to comparisons" : "Save for comparison"}</button>
             </div>
+            {aiExplanation ? (
+              <article className="form-card" aria-labelledby="ai-explanation-title">
+                <div className="section__header">
+                  <div>
+                    <p className="eyebrow">AI-assisted explanation</p>
+                    <h2 id="ai-explanation-title">সোর্সিং সিদ্ধান্তের ব্যাখ্যা</h2>
+                  </div>
+                  <span className={`admin-status admin-status--${aiExplanation.human_review_required ? "pending" : "approved"}`}>
+                    {aiExplanation.human_review_required ? "Human review required" : "No mandatory review"}
+                  </span>
+                </div>
+                <p>{aiExplanation.summary_bn}</p>
+                <div className="form-grid">
+                  <div><strong>Advantages</strong><ul>{aiExplanation.advantages.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                  <div><strong>Risks</strong><ul>{aiExplanation.risks.length ? aiExplanation.risks.map((item) => <li key={item}>{item}</li>) : <li>No additional risk identified.</li>}</ul></div>
+                  <div><strong>Missing information</strong><ul>{aiExplanation.missing_information.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                  <div><strong>Recommended checks</strong><ul>{aiExplanation.recommended_checks.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                </div>
+                <small>
+                  {aiMetadata?.automation_available ? `Generated with ${aiMetadata.model || "local AI"}.` : "AI service unavailable; deterministic fallback shown."}
+                  {aiExplanation.confidence !== null ? ` Self-reported confidence: ${Math.round(aiExplanation.confidence * 100)}%.` : ""}
+                  {" "}All monetary values remain server-calculated.
+                </small>
+              </article>
+            ) : null}
             {savedQuoteId ? (
               <div className="save-success" role="status">
                 <div><strong>Quote saved successfully</strong><span>You can compare it later or continue directly to checkout.</span></div>

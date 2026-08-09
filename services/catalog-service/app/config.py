@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 SERVICE_DIR = Path(__file__).resolve().parents[1]
-ROOT_DIR = Path(__file__).resolve().parents[3]
+ROOT_DIR = SERVICE_DIR.parents[1] if len(SERVICE_DIR.parents) > 1 else SERVICE_DIR
 INSECURE_JWT_SECRETS = {
     "",
     "change-me",
@@ -78,6 +78,9 @@ class Settings(BaseSettings):
     whatsapp_api_token: str | None = None
     whatsapp_sender_id: str | None = None
     payment_proof_allowed_hosts: str = ""
+    automation_webhook_url: str | None = None
+    automation_webhook_token: str | None = None
+    automation_timeout_seconds: float = 12.0
 
     model_config = SettingsConfigDict(
         env_prefix="CATALOG_",
@@ -216,6 +219,19 @@ class Settings(BaseSettings):
             errors.append(
                 "CATALOG_PAYMENT_PROOF_ALLOWED_HOSTS must list approved HTTPS object-storage hosts"
             )
+        if bool(self.automation_webhook_url) != bool(self.automation_webhook_token):
+            errors.append("Automation webhook URL and token must be configured together")
+        if self.automation_webhook_url:
+            parsed_automation = urlsplit(self.automation_webhook_url)
+            if (
+                parsed_automation.scheme != "https"
+                or not parsed_automation.netloc
+                or parsed_automation.username
+                or parsed_automation.password
+            ):
+                errors.append("CATALOG_AUTOMATION_WEBHOOK_URL must use HTTPS in production")
+        if not 1 <= self.automation_timeout_seconds <= 30:
+            errors.append("CATALOG_AUTOMATION_TIMEOUT_SECONDS must be between 1 and 30")
         for origin in self.allowed_browser_origins:
             parsed_origin = urlsplit(origin)
             if (

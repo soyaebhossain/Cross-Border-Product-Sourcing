@@ -76,6 +76,12 @@ class UpdateQuoteStatusIn(BaseModel):
     status: str = Field(pattern="^(requested|received|approved|expired)$")
 
 
+class AIReviewDecisionIn(BaseModel):
+    decision: Literal["APPROVED", "REJECTED"]
+    note: str = Field(min_length=3, max_length=2000)
+    request_id: str | None = Field(default=None, max_length=100)
+
+
 class CreateOrderIn(QuoteRequestIn):
     saved_quote_id: int | None = Field(default=None, ge=1)
     offer_id: int | None = Field(default=None, ge=1)

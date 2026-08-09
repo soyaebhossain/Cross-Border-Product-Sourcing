@@ -164,6 +164,8 @@ build, dependency-audit, Compose, and container checks.
   `docs/dashboard-metric-contract.md`
 - Customer accounts, invoices, notifications, support, disputes, and provider
   worker operations: `docs/customer-automation-runbook.md`
+- Optional self-hosted n8n/Ollama quote explanations and safe fallback:
+  `docs/n8n-ollama-automation.md`
 - Browser acceptance layers and protected role-test prerequisites:
   `docs/frontend-e2e.md`
 

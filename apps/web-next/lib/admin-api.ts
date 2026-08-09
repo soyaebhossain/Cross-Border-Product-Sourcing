@@ -125,6 +125,29 @@ export type AdminQuoteDetail = {
   order_ids: number[];
   created_at?: string;
   updated_at?: string;
+  ai_review?: AdminAIReview | null;
+};
+
+export type AdminAIReview = {
+  id: number;
+  saved_quote_id: number;
+  product_name: string;
+  variant_name?: string | null;
+  country: string;
+  mode: string;
+  qty: number;
+  provider: string;
+  model?: string | null;
+  prompt_version: string;
+  explanation: NonNullable<QuoteResponse["ai_explanation"]>;
+  confidence?: string | number | null;
+  human_review_required: boolean;
+  review_status: "PENDING" | "APPROVED" | "REJECTED" | "NOT_REQUIRED" | string;
+  review_note?: string | null;
+  reviewed_by_user_id?: number | null;
+  reviewed_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type AdminSettings = {
@@ -254,6 +277,8 @@ export function getAdminRoles() { return requestJson<AdminRoleContract>("/api/ad
 export function getAdminOrderDetail(id: number | string) { return requestJson<AdminOrderDetail>(`/api/admin/orders/${id}/`); }
 export function getAdminPaymentDetail(id: number | string) { return requestJson<{ payment: NonNullable<AdminOrderDetail["payment"]>; order: AdminOrderDetail }>(`/api/admin/payments/${id}/`); }
 export function getAdminQuoteDetail(id: number | string) { return requestJson<AdminQuoteDetail>(`/api/admin/quotes/${id}/`); }
+export function decideAdminAIReview(id: number, decision: "APPROVED" | "REJECTED", note: string) { return requestJson<AdminAIReview>(`/api/admin/ai-reviews/${id}/`, json("PATCH", { decision, note })); }
+export function getAdminAIReviews(status = "PENDING", page = 1) { return requestJson<AdminListResponse<AdminAIReview>>(`/api/admin/ai-reviews/${queryString({ status, page, page_size: 50 })}`); }
 export function updateAdminSettlement(id: number, payload: Partial<{ actual_cost_bdt: number; promised_delivery_at: string; delivered_at: string; quality_defect_reported: boolean }> & { note: string }) { return requestJson<AdminOrderDetail>(`/api/admin/orders/${id}/settlement/`, json("PATCH", payload)); }
 export function reverseAdminPayment(id: number, note: string) { return requestJson<{ order: AdminOrderDetail; reversal: AdminAdjustment }>(`/api/admin/payments/${id}/reverse/`, json("POST", { note })); }
 export function createAdminRefund(orderId: number, payload: { amount_bdt: number; transaction_id?: string; reason: string }) { return requestJson<{ refund: AdminAdjustment; financials: Record<string, string | number | null> }>(`/api/admin/orders/${orderId}/refunds/`, json("POST", payload)); }
