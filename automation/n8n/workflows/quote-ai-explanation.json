@@ -44,8 +44,8 @@
         "url": "={{ $env.OLLAMA_BASE_URL + '/api/generate' }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { model: $env.OLLAMA_MODEL, stream: false, think: false, format: 'json', options: { temperature: 0.2, num_predict: 700 }, prompt: 'You are SourceAI, a cautious cross-border sourcing explanation assistant. Never change or recalculate any monetary value. Explain only the supplied deterministic recommendation in Bangla. Return JSON only with summary_bn, advantages, risks, missing_information, recommended_checks, confidence (0..1), and human_review_required. Medium or High risk must require human review. Data: ' + JSON.stringify($json.body.recommendation) } }}",
-        "options": {"timeout": 25000}
+        "jsonBody": "={{ { model: $env.OLLAMA_MODEL, stream: false, think: false, format: 'json', options: { temperature: 0.1, num_predict: 650 }, prompt: 'You are SourceAI, a cautious cross-border sourcing explanation assistant. Never change or recalculate monetary values. Explain only the supplied deterministic recommendation in ' + (($json.body.recommendation.response_language || 'en') === 'bn' ? 'natural, concise Bangla' : 'clear, concise English') + '. Return valid JSON only. Use short sentences. Schema: {\"summary_bn\":\"string\",\"advantages\":[\"string\"],\"risks\":[\"string\"],\"missing_information\":[\"string\"],\"recommended_checks\":[\"string\"],\"confidence\":0.0,\"human_review_required\":false}. Use at most 2 items in each array. Medium or High risk must require human review. Data: ' + JSON.stringify($json.body.recommendation) } }}",
+        "options": {"timeout": 45000}
       },
       "id": "ollama",
       "name": "Generate With Ollama",
@@ -55,7 +55,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $json.response; let value; try { value = JSON.parse(raw); } catch { throw new Error('Ollama returned invalid JSON'); } const lists = ['advantages','risks','missing_information','recommended_checks']; const clean = { summary_bn: String(value.summary_bn || '').slice(0,2000), confidence: Number.isFinite(Number(value.confidence)) ? Math.max(0, Math.min(1, Number(value.confidence))) : null, human_review_required: Boolean(value.human_review_required) }; for (const key of lists) clean[key] = Array.isArray(value[key]) ? value[key].slice(0,8).map(v => String(v).slice(0,500)) : []; return [{ json: { explanation: clean } }];"
+        "jsCode": "const raw = $json.response; let value; try { value = JSON.parse(raw); } catch { throw new Error('Ollama returned invalid JSON'); } const lists = ['advantages','risks','missing_information','recommended_checks']; const clean = { summary_bn: String(value.summary_bn || '').slice(0,2000), confidence: Number.isFinite(Number(value.confidence)) ? Math.max(0, Math.min(1, Number(value.confidence))) : null, human_review_required: Boolean(value.human_review_required) }; for (const key of lists) { const source = Array.isArray(value[key]) ? value[key] : (value[key] == null || value[key] === '' ? [] : [value[key]]); clean[key] = source.slice(0,3).map(v => String(v).slice(0,500)); } return [{ json: { explanation: clean } }];"
       },
       "id": "validate",
       "name": "Validate Output",
@@ -94,7 +94,7 @@
     "Generate With Ollama": {"main": [[{"node":"Validate Output","type":"main","index":0}]]},
     "Validate Output": {"main": [[{"node":"Return Explanation","type":"main","index":0}]]}
   },
-  "settings": {"executionOrder": "v1", "errorWorkflow": ""},
+  "settings": {"executionOrder": "v1", "errorWorkflow": "e81b7f9b-5586-4a29-81aa-80ca06562786"},
   "active": true,
   "versionId": "f0b92979-2cad-4e0b-a934-7600373348bd",
   "meta": {"templateCredsSetupCompleted": true},

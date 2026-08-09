@@ -2,13 +2,15 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./professional.css";
 import "./ui-polish.css";
+import "./sourcing-basket.css";
 import { Header } from "./Header";
 import { Footer } from "./Footer";
 import { LocaleProvider } from "../lib/locale-context";
+import { SourcingBasketProvider } from "../lib/sourcing-basket";
 
 export const metadata: Metadata = {
-  title: "SourceAI | AI Decision-Support Marketplace",
-  description: "A Decision-Support Marketplace Using Artificial Intelligence for Efficient Cross-Border Product Sourcing.",
+  title: "SourceAI | Explainable Sourcing Decision Support",
+  description: "Compare product cost, supplier reliability, delivery, and sourcing risk before requesting a cross-border quotation.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -16,9 +18,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en">
       <body>
         <LocaleProvider>
-          <Header />
-          {children}
-          <Footer />
+          <SourcingBasketProvider>
+            <Header />
+            {children}
+            <Footer />
+          </SourcingBasketProvider>
         </LocaleProvider>
       </body>
     </html>

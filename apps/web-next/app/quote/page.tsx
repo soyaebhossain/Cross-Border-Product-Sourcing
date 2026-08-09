@@ -5,8 +5,10 @@ import Link from "next/link";
 import type { Route } from "next";
 import { getCountries, getProducts, quoteProductWithAi, saveQuote, type Country, type Product, type QuoteResponse } from "../../lib/api";
 import { formatBdt } from "../../lib/format";
+import { useLocale } from "../../lib/locale-context";
 
 export default function QuotePage() {
+  const { locale } = useLocale();
   const [products, setProducts] = useState<Product[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
@@ -63,6 +65,7 @@ export default function QuotePage() {
         mode: form.mode,
         qty: Number(form.qty) || 1,
         delivery_type: form.delivery_type,
+        language: locale,
       });
       setResponse(result);
       setSavedQuoteId(null);

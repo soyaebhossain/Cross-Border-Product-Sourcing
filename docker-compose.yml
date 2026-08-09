@@ -56,8 +56,8 @@ services:
       CATALOG_SUPPLY_CHAIN_CSV_PATH: "${CATALOG_SUPPLY_CHAIN_CSV_PATH:-/data/supply_chain_data.csv}"
       CATALOG_AUTOMATION_WEBHOOK_URL: "${CATALOG_AUTOMATION_WEBHOOK_URL:-http://n8n:5678/webhook/sourceai-quote-explanation}"
       CATALOG_AUTOMATION_WEBHOOK_TOKEN: "${N8N_AUTOMATION_TOKEN:-development-only-change-me}"
-      CATALOG_AUTOMATION_TIMEOUT_SECONDS: "${CATALOG_AUTOMATION_TIMEOUT_SECONDS:-30}"
-      CATALOG_AUTOMATION_MODEL: "${OLLAMA_MODEL:-qwen3:8b}"
+      CATALOG_AUTOMATION_TIMEOUT_SECONDS: "${CATALOG_AUTOMATION_TIMEOUT_SECONDS:-50}"
+      CATALOG_AUTOMATION_MODEL: "${OLLAMA_MODEL:-qwen3:1.7b}"
     volumes:
       - ./Data:/data:ro
     healthcheck:
@@ -146,7 +146,7 @@ services:
       N8N_ENCRYPTION_KEY: "${N8N_ENCRYPTION_KEY:-development-only-change-this-encryption-key}"
       N8N_AUTOMATION_TOKEN: "${N8N_AUTOMATION_TOKEN:-development-only-change-me}"
       OLLAMA_BASE_URL: "http://ollama:11434"
-      OLLAMA_MODEL: "${OLLAMA_MODEL:-qwen3:8b}"
+      OLLAMA_MODEL: "${OLLAMA_MODEL:-qwen3:1.7b}"
       GENERIC_TIMEZONE: "${GENERIC_TIMEZONE:-Asia/Dhaka}"
       N8N_DIAGNOSTICS_ENABLED: "false"
       N8N_PERSONALIZATION_ENABLED: "false"

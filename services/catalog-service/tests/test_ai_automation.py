@@ -36,6 +36,22 @@ def test_unconfigured_automation_returns_deterministic_fallback() -> None:
     assert "China" in result.explanation["summary_bn"]
 
 
+def test_bangla_fallback_localizes_explanation_fields() -> None:
+    recommendation = _recommendation("Low")
+    recommendation["response_language"] = "bn"
+    recommendation["recommendations"][0]["advantages"] = ["lowest landed cost"]
+    recommendation["data_gaps"] = [
+        "Shipping and tariff rules are still normalized reference estimates until carrier-specific feeds are connected."
+    ]
+
+    result = automation.explain_recommendation(recommendation, Settings(database_url="sqlite://"))
+
+    assert result.source == "deterministic-fallback"
+    assert "বর্তমান যাচাইযোগ্য হিসাব" in result.explanation["summary_bn"]
+    assert result.explanation["advantages"] == ["সর্বনিম্ন ল্যান্ডেড কস্ট"]
+    assert "Carrier-specific feed" in result.explanation["missing_information"][0]
+
+
 def test_automation_response_is_bounded_and_cannot_disable_required_review(monkeypatch) -> None:
     class Response:
         status = 200
@@ -139,3 +155,36 @@ def test_bulk_quote_context_forces_human_review_risk() -> None:
     fallback = automation.fallback_explanation(context)
     assert context["recommendations"][0]["risk_level"] == "Medium"
     assert fallback["human_review_required"] is True
+
+
+def test_country_automation_context_is_bounded() -> None:
+    recommendation = {
+        "product": {"name": "Webcam", "variant_id": 139},
+        "priority": "balanced",
+        "qty": 10,
+        "recommendations": [
+            {
+                "rank": index + 1,
+                "country": {"code": code, "name": code},
+                "mode": "LOCAL",
+                "score": "80",
+                "estimated_total_bdt": "12000",
+                "eta": {"min_days": 10, "max_days": 15},
+                "risk_level": "Low",
+                "advantages": ["a", "b", "c", "ignored"],
+                "weaknesses": [],
+                "selected_offer": {"seller_name": f"Supplier {code}", "private": "discard"},
+                "large_unused_field": "discard",
+            }
+            for index, code in enumerate(["CN", "MY", "SG", "TH"])
+        ],
+        "data_gaps": ["gap"] * 10,
+    }
+
+    context = automation.country_automation_context(recommendation)
+
+    assert len(context["recommendations"]) == 3
+    assert len(context["recommendations"][0]["advantages"]) == 3
+    assert context["recommendations"][0]["supplier"] == "Supplier CN"
+    assert "large_unused_field" not in context["recommendations"][0]
+    assert len(context["data_gaps"]) == 5

@@ -5,6 +5,7 @@ import type { Route } from "next";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppIcon, type AppIconName } from "../components/app-icon";
+import { QuoteBasketButton } from "../components/quote-basket-button";
 import { getCurrentUser, logoutSession, type CurrentUser } from "../lib/api";
 import { useLocale } from "../lib/locale-context";
 
@@ -22,8 +23,9 @@ export function Header() {
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    const target = `/products?q=${encodeURIComponent(search.trim())}`;
-    window.location.assign(target);
+    const value = search.trim();
+    if (!value) return;
+    window.location.assign(`/products?q=${encodeURIComponent(value)}`);
   };
   const signOut = async () => {
     await logoutSession();
@@ -41,17 +43,19 @@ export function Header() {
 
   return <div className="header-stack"><header className={currentUser ? "site-header site-header--authenticated" : "site-header"}>
     <div className="site-header__brand"><Link href="/"><span className="brand-mark">S</span><span>Source<strong>AI</strong><small>{bn ? "সোর্সিং সিদ্ধান্তের মার্কেটপ্লেস" : "Decision-support marketplace"}</small></span></Link></div>
-    <form className="global-search" onSubmit={submit} role="search"><span className="search-icon"><AppIcon name="search" size={18} /></span><input aria-label={bn ? "মার্কেটপ্লেসে খুঁজুন" : "Search marketplace"} value={search} onChange={event => setSearch(event.target.value)} placeholder={bn ? "পণ্য, মডেল বা ক্যাটাগরি খুঁজুন…" : "Search products, models, categories…"} /><button type="submit" aria-label={bn ? "পণ্য খুঁজুন" : "Search products"}><AppIcon name="search" size={17} /><span>{bn ? "খুঁজুন" : "Search"}</span></button></form>
-    <button className="mobile-menu" type="button" aria-label={open ? (bn ? "নেভিগেশন বন্ধ করুন" : "Close navigation") : (bn ? "নেভিগেশন খুলুন" : "Open navigation")} aria-expanded={open} aria-controls="primary-navigation" onClick={() => setOpen(value => !value)}><AppIcon name={open ? "close" : "menu"} size={22} /></button>
+    <form className="global-search" onSubmit={submit} role="search"><span className="search-icon"><AppIcon name="search" size={18} /></span><input aria-label={bn ? "মার্কেটপ্লেসে খুঁজুন" : "Search marketplace"} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={bn ? "পণ্য, মডেল বা ক্যাটাগরি খুঁজুন…" : "Search products, models, categories…"} /><button type="submit" aria-label={bn ? "পণ্য খুঁজুন" : "Search products"}><AppIcon name="search" size={17} /><span>{bn ? "খুঁজুন" : "Search"}</span></button></form>
+    <button className="mobile-menu" type="button" aria-label={open ? (bn ? "নেভিগেশন বন্ধ করুন" : "Close navigation") : (bn ? "নেভিগেশন খুলুন" : "Open navigation")} aria-expanded={open} aria-controls="primary-navigation" onClick={() => setOpen((value) => !value)}><AppIcon name={open ? "close" : "menu"} size={22} /></button>
     <nav id="primary-navigation" aria-label="Primary navigation" className={open ? "site-header__nav site-header__nav--open" : "site-header__nav"}>
       {nav.map(([href, label, icon]) => <Link key={href} className={pathname === href || (href !== "/admin" && pathname.startsWith(href)) ? "nav-link nav-link--active" : "nav-link"} href={href}><AppIcon name={icon} size={16} />{label}</Link>)}
+      {!isPrivileged ? <QuoteBasketButton mobile /> : null}
       {currentUser ? <Link className="nav-link mobile-account-link" href={accountHref}><AppIcon name="user" size={16} /><span>{bn ? "অ্যাকাউন্ট" : "Account"} · {currentUser.username || currentUser.email || `User ${currentUser.id}`}</span></Link> : null}
       {currentUser ? <button className="nav-link mobile-account-link mobile-signout" type="button" onClick={signOut}><AppIcon name="logout" size={16} />{bn ? "সাইন আউট" : "Sign out"}</button> : <Link className="nav-link mobile-account-link" href="/login"><AppIcon name="lock" size={16} />{bn ? "সাইন ইন" : "Sign in"}</Link>}
       <button className="locale-toggle locale-toggle--mobile" type="button" onClick={toggleLocale} aria-label={bn ? "ইংরেজি ভাষা বেছে নিন" : "Switch to Bangla"}><AppIcon name="language" size={16} />{bn ? "EN" : "বাংলা"}</button>
     </nav>
     <div className="site-header__action">
+      {!isPrivileged ? <QuoteBasketButton /> : null}
       <button className="locale-toggle" type="button" onClick={toggleLocale} aria-label={bn ? "ইংরেজি ভাষা বেছে নিন" : "Switch to Bangla"}><AppIcon name="language" size={16} /><span>{bn ? "EN" : "বাংলা"}</span></button>
       {currentUser ? <><Link className="account-chip" href={accountHref}><AppIcon name={isPrivileged ? "shield" : "user"} size={17} /><span><small>{isAdmin ? (bn ? "অ্যাডমিন" : "Admin") : currentUser.role === "operator" ? (bn ? "অপারেটর" : "Operator") : (bn ? "অ্যাকাউন্ট" : "Account")}</small><strong>{currentUser.username || currentUser.email || `User ${currentUser.id}`}</strong></span></Link><button className="button button--ghost header-logout" onClick={signOut} aria-label={bn ? "সাইন আউট" : "Sign out"}><AppIcon name="logout" size={17} /><span>{bn ? "সাইন আউট" : "Logout"}</span></button></> : <Link className="button button--primary header-signin" href="/login"><AppIcon name="lock" size={17} />{bn ? "সাইন ইন" : "Sign in"}</Link>}
     </div>
-  </header><div className="trust-strip"><span><AppIcon name="check" size={14} />{bn ? "নিরাপদ সোর্সিং" : "Secure sourcing workflow"}</span><span><AppIcon name="check" size={14} />{bn ? "স্বচ্ছ ল্যান্ডেড কস্ট" : "Transparent landed cost"}</span><span><AppIcon name="check" size={14} />{bn ? "ব্যাখ্যাযোগ্য AI র‍্যাংকিং" : "Explainable AI ranking"}</span><span><AppIcon name="check" size={14} />{bn ? "সাপ্লায়ার ঝুঁকি সংকেত" : "Supplier risk signals"}</span></div></div>;
+  </header><div className="trust-strip"><span><AppIcon name="check" size={14} />{bn ? "নিরাপদ সোর্সিং workflow" : "Secure sourcing workflow"}</span><span><AppIcon name="check" size={14} />{bn ? "স্বচ্ছ ল্যান্ডেড কস্ট" : "Transparent landed cost"}</span><span><AppIcon name="check" size={14} />{bn ? "ব্যাখ্যাযোগ্য decision support" : "Explainable decision support"}</span><span><AppIcon name="check" size={14} />{bn ? "সাপ্লায়ার ঝুঁকি সংকেত" : "Supplier risk signals"}</span></div></div>;
 }

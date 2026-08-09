@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCheapestCountryRecommendation, getProductBySlug, getProductMedia } from "../../../lib/api";
 import { SourcingWorkspace } from "../../../components/sourcing-workspace";
+import { ProductDetailActionPanel } from "../../../components/product-detail-action-panel";
 import { ProductGallery } from "../../../components/product-image";
 import { formatBdt } from "../../../lib/format";
 
@@ -62,6 +63,8 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 <strong>{product.variants.length}</strong>
               </div>
             </div>
+
+            <ProductDetailActionPanel product={product} />
 
             <div className="variant-list">
               {product.variants.map((variant) => (

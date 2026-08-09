@@ -49,6 +49,7 @@ class QuoteRequestIn(BaseModel):
     mode: Literal["LOCAL", "BULK"]
     qty: int = Field(ge=1)
     delivery_type: Literal["DOOR", "PICKUP"]
+    language: Literal["en", "bn"] = "en"
 
 
 class QuoteRecommendIn(BaseModel):
@@ -66,6 +67,7 @@ class CheapestCountryRecommendIn(BaseModel):
     priority: str = "balanced"
     countries: list[str] | None = None
     weights: dict[str, float] | None = None
+    language: Literal["en", "bn"] = "en"
 
 
 class SaveQuoteIn(QuoteRequestIn):

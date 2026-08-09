@@ -9,7 +9,7 @@ from ...db import get_session
 from ...config import Settings
 from ...schemas import CheapestCountryRecommendIn, QuoteRecommendIn, QuoteRequestIn
 from ...services.sourcing import build_country_recommendations, build_quote, recommend_routes
-from ...services.automation import explain_recommendation, quote_automation_context
+from ...services.automation import country_automation_context, explain_recommendation, quote_automation_context
 
 
 router = APIRouter()
@@ -31,6 +31,7 @@ def quote_ai_explanation(
         quote_result,
         country_code=payload.country,
         mode=payload.mode,
+        language=payload.language,
     )
     settings: Settings = request.app.state.catalog_settings
     automation = explain_recommendation(context, settings)
@@ -74,7 +75,7 @@ def cheapest_country_ai_explanation(
 ) -> dict[str, Any]:
     recommendation = build_country_recommendations(session, payload)
     settings: Settings = request.app.state.catalog_settings
-    automation = explain_recommendation(recommendation, settings)
+    automation = explain_recommendation(country_automation_context(recommendation, language=payload.language), settings)
     return {
         **recommendation,
         "ai_explanation": automation.explanation,

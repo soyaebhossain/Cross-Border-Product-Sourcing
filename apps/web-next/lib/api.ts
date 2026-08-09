@@ -236,6 +236,21 @@ export type CheapestCountryRecommendation = {
   methodology: RecommendationMethodology;
   recommendations: RecommendationItem[];
   data_gaps: string[];
+  ai_explanation?: {
+    summary_bn: string;
+    advantages: string[];
+    risks: string[];
+    missing_information: string[];
+    recommended_checks: string[];
+    confidence: number | null;
+    human_review_required: boolean;
+  };
+  ai_metadata?: {
+    source: "ollama-via-n8n" | "deterministic-fallback" | string;
+    model?: string | null;
+    automation_available: boolean;
+    monetary_calculations_are_deterministic: boolean;
+  };
 };
 
 export type AiInsights = {
@@ -748,6 +763,7 @@ export function quoteProductWithAi(payload: {
   mode: string;
   qty: number;
   delivery_type: string;
+  language?: "en" | "bn";
 }) {
   return postJson<QuoteResponse>("/api/quote/ai-explanation/", payload);
 }
@@ -762,6 +778,24 @@ export function getCheapestCountryRecommendation(input: {
   weights?: Record<string, number>;
 }) {
   return postJson<CheapestCountryRecommendation>("/api/recommendations/cheapest-country/", {
+    qty: 1,
+    delivery_type: "DOOR",
+    priority: "balanced",
+    ...input,
+  });
+}
+
+export function getCheapestCountryRecommendationWithAi(input: {
+  variant_id?: number;
+  product_slug?: string;
+  qty?: number;
+  delivery_type?: string;
+  priority?: string;
+  countries?: string[];
+  weights?: Record<string, number>;
+  language?: "en" | "bn";
+}) {
+  return postJson<CheapestCountryRecommendation>("/api/recommendations/cheapest-country/ai-explanation/", {
     qty: 1,
     delivery_type: "DOOR",
     priority: "balanced",

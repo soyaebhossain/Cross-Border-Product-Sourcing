@@ -33,7 +33,7 @@ workflow in the quote workflow settings, then activate them deliberately.
 3. Pull the configured model once:
 
    ```powershell
-   docker compose --profile automation exec ollama ollama pull qwen3:8b
+   docker compose --profile automation exec ollama ollama pull qwen3:1.7b
    ```
 
 4. Open `http://127.0.0.1:5678`, create the local n8n owner, and import both

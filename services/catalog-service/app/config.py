@@ -80,8 +80,8 @@ class Settings(BaseSettings):
     payment_proof_allowed_hosts: str = ""
     automation_webhook_url: str | None = None
     automation_webhook_token: str | None = None
-    automation_timeout_seconds: float = 30.0
-    automation_model: str = "qwen3:8b"
+    automation_timeout_seconds: float = 50.0
+    automation_model: str = "qwen3:1.7b"
 
     model_config = SettingsConfigDict(
         env_prefix="CATALOG_",
@@ -231,8 +231,8 @@ class Settings(BaseSettings):
                 or parsed_automation.password
             ):
                 errors.append("CATALOG_AUTOMATION_WEBHOOK_URL must use HTTPS in production")
-        if not 1 <= self.automation_timeout_seconds <= 30:
-            errors.append("CATALOG_AUTOMATION_TIMEOUT_SECONDS must be between 1 and 30")
+        if not 1 <= self.automation_timeout_seconds <= 60:
+            errors.append("CATALOG_AUTOMATION_TIMEOUT_SECONDS must be between 1 and 60")
         for origin in self.allowed_browser_origins:
             parsed_origin = urlsplit(origin)
             if (

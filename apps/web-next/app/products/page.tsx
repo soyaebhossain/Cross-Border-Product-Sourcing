@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import { useEffect, useMemo, useState } from "react";
 import { ProductCard } from "../../components/product-card";
 import { browseProducts, getCategories, getCountries, type Category, type Country, type ProductPage } from "../../lib/api";
@@ -23,6 +24,7 @@ export default function ProductsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [compare, setCompare] = useState<number[]>([]);
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -55,10 +57,10 @@ export default function ProductsPage() {
         .finally(() => setLoading(false));
     }, 180);
     return () => clearTimeout(timer);
-  }, [query, category, page, pageSize, sort, country, maxPrice, delivery, rating, risk]);
+  }, [query, category, page, pageSize, sort, country, maxPrice, delivery, rating, risk, retryToken]);
 
   const activeFilters = useMemo(() => [category, country, maxPrice, delivery, rating, risk].filter(Boolean).length, [category, country, maxPrice, delivery, rating, risk]);
-  const toggle = (id: number) => setCompare(value => value.includes(id) ? value.filter(item => item !== id) : value.length < 3 ? [...value, id] : value);
+  const toggle = (id: number) => setCompare(value => value.includes(id) ? value.filter(item => item !== id) : value.length < 4 ? [...value, id] : value);
   const reset = () => { setCategory(""); setCountry(""); setMaxPrice(""); setDelivery(""); setRating(""); setRisk(""); setSort("recommended"); setPage(1); };
   const catalogPreview = data?.catalog_source === "snapshot";
 
@@ -83,10 +85,10 @@ export default function ProductsPage() {
       </aside>
       <section className="catalog-results">
         <div className="catalog-toolbar"><div><strong>{loading ? "Loading products…" : `${data?.total || 0} products`}</strong>{query ? <span>Results for “{query}”</span> : <span>Supplier-ready global catalog</span>}</div><label className="sort-control"><span>Sort by</span><select value={sort} onChange={event => setSort(event.target.value)}><option value="recommended">Recommended</option><option value="cheapest">Lowest price</option><option value="fastest">Fastest delivery</option><option value="highest_rated">Highest rated</option><option value="name">Name A–Z</option></select></label></div>
-        {loading ? <div className="compact-grid">{Array.from({ length: 8 }).map((_, index) => <div className="product-skeleton" key={index} />)}</div> : error ? <div className="market-empty"><strong>Unable to load products</strong><span>{error}</span></div> : !data?.items.length ? <div className="market-empty"><strong>No matching products</strong><span>Reset filters or search using the marketplace bar above.</span></div> : <div className="compact-grid">{data.items.map((product, index) => <ProductCard key={product.id} product={product} imagePriority={index < 4} selectable selected={compare.includes(product.id)} onSelect={toggle} />)}</div>}
+        {loading ? <div className="compact-grid">{Array.from({ length: 8 }).map((_, index) => <div className="product-skeleton" key={index} />)}</div> : error ? <div className="market-empty"><strong>Unable to load products</strong><span>{error}</span><button type="button" className="button button--ghost" onClick={() => setRetryToken((value) => value + 1)}>Try again</button></div> : !data?.items.length ? <div className="market-empty"><strong>No products found</strong><span>Try another keyword, category, or sourcing country.</span><button type="button" className="button button--ghost" onClick={reset}>Reset all filters</button></div> : <div className="compact-grid">{data.items.map((product, index) => <ProductCard key={product.id} product={product} imagePriority={index < 4} selectable selected={compare.includes(product.id)} onSelect={toggle} />)}</div>}
         {data && data.pages > 1 ? <div className="pagination"><button disabled={page === 1} onClick={() => setPage(value => value - 1)}>Previous</button><span>Page {page} of {data.pages}</span><button disabled={page === data.pages} onClick={() => setPage(value => value + 1)}>Next</button></div> : null}
       </section>
     </div>
-    {compare.length ? <div className="compare-dock"><span><strong>{compare.length}</strong> selected</span><button onClick={() => setCompare([])}>Clear</button>{catalogPreview ? <button type="button" className="compare-unavailable" disabled>Compare unavailable</button> : <Link href={`/quote?products=${compare.join(",")}`}>Compare sourcing</Link>}</div> : null}
+    {compare.length ? <div className="compare-dock"><span><strong>{compare.length}</strong> selected</span><button onClick={() => setCompare([])}>Clear</button>{catalogPreview ? <button type="button" className="compare-unavailable" disabled>Compare unavailable</button> : compare.length < 2 ? <button type="button" className="compare-unavailable" disabled>Select 1 more</button> : <Link href={`/compare?products=${compare.join(",")}` as Route}>Compare products</Link>}</div> : null}
   </main>;
 }
