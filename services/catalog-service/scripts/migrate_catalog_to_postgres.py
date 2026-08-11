@@ -38,6 +38,14 @@ CATALOG_TABLE_NAMES = {
 }
 
 
+def _psycopg_url(value: str) -> str:
+    if value.startswith("postgres://"):
+        return value.replace("postgres://", "postgresql+psycopg://", 1)
+    if value.startswith("postgresql://"):
+        return value.replace("postgresql://", "postgresql+psycopg://", 1)
+    return value
+
+
 def catalog_tables() -> list[Any]:
     tables = [
         table
@@ -76,7 +84,7 @@ def _validated_engines(source_url: str, target_url: str) -> tuple[Engine, Engine
     source_path = Path(str(source_parsed.database)).expanduser().resolve()
     if not source_path.is_file():
         raise ValueError("The SQLite source database does not exist")
-    return create_engine(source_url), create_engine(target_url)
+    return create_engine(source_url), create_engine(_psycopg_url(target_url))
 
 
 def _copy_rows(

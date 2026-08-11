@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from scripts.migrate_catalog_to_postgres import (
     CATALOG_TABLE_NAMES,
+    _psycopg_url,
     catalog_tables,
 )
 
@@ -31,3 +32,15 @@ def test_catalog_migration_tables_follow_foreign_key_order() -> None:
         "sourcing_seller_offers"
     )
     assert names.index("sourcing_countries") < names.index("sourcing_sellers")
+
+
+def test_catalog_migration_uses_the_installed_psycopg_v3_driver() -> None:
+    assert _psycopg_url("postgres://user:secret@db/catalog") == (
+        "postgresql+psycopg://user:secret@db/catalog"
+    )
+    assert _psycopg_url("postgresql://user:secret@db/catalog") == (
+        "postgresql+psycopg://user:secret@db/catalog"
+    )
+    assert _psycopg_url("postgresql+psycopg://user:secret@db/catalog") == (
+        "postgresql+psycopg://user:secret@db/catalog"
+    )
