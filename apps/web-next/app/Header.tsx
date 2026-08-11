@@ -38,7 +38,7 @@ export function Header() {
   const isAdmin = currentUser?.role === "admin";
   const nav: Array<[Route, string, AppIconName]> = isPrivileged
     ? [["/admin", bn ? "ড্যাশবোর্ড" : "Dashboard", "grid"], ["/admin/orders", bn ? "অর্ডার" : "Orders", "orders"], ["/admin/catalog", bn ? "ক্যাটালগ" : "Catalog", "package"], ...(isAdmin ? [["/research", bn ? "রিসার্চ" : "Research", "globe"] as [Route, string, AppIconName]] : [])]
-    : [["/products", bn ? "পণ্য" : "Products", "package"], ["/categories", bn ? "ক্যাটাগরি" : "Categories", "grid"], ["/quote", bn ? "কোট নিন" : "Get a quote", "globe"], ["/account/orders", bn ? "আমার অর্ডার" : "My orders", "orders"]];
+    : [["/products", bn ? "পণ্য" : "Products", "package"], ["/categories", bn ? "ক্যাটাগরি" : "Categories", "grid"], ["/account/orders", bn ? "আমার অর্ডার" : "My orders", "orders"]];
   const accountHref: Route = isPrivileged ? "/admin" : "/account";
 
   return <div className="header-stack"><header className={currentUser ? "site-header site-header--authenticated" : "site-header"}>

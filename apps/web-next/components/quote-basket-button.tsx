@@ -32,11 +32,18 @@ export function QuoteBasketButton({ mobile = false }: { mobile?: boolean }) {
     };
   }, [open]);
 
-  if (mobile) return <Link className="nav-link mobile-account-link" href={"/sourcing-basket" as Route}><AppIcon name="package" size={17} /><span>{sourcingText(locale, "basket")}</span>{itemCount ? <strong className="basket-count basket-count--inline">{itemCount}</strong> : null}</Link>;
+  const hasItems = itemCount > 0;
+  const compactLabel = hasItems ? (locale === "bn" ? "বাস্কেট" : "Quote basket") : sourcingText(locale, "getQuote");
+  const accessibleLabel = hasItems ? `${sourcingText(locale, "basket")}: ${itemCount}` : sourcingText(locale, "getQuote");
+  const icon = hasItems ? "package" : "globe";
+
+  if (mobile) return <Link className="nav-link mobile-account-link" href={(hasItems ? "/sourcing-basket" : "/quote") as Route} aria-label={accessibleLabel}><AppIcon name={icon} size={17} /><span>{compactLabel}</span>{hasItems ? <strong className="basket-count basket-count--inline">{itemCount}</strong> : null}</Link>;
+
+  if (!hasItems) return <div className="quote-basket-control"><Link className="quote-basket-button" href={"/quote" as Route} aria-label={accessibleLabel}><AppIcon name={icon} size={19} /><span className="quote-basket-button__label">{compactLabel}</span></Link></div>;
 
   return <div className="quote-basket-control" ref={controlRef}>
-    <button className="quote-basket-button" type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-haspopup="dialog" aria-controls="quote-basket-preview" aria-label={`${sourcingText(locale, "basket")}: ${itemCount}`}>
-      <AppIcon name="package" size={19} /><span className="quote-basket-button__label">{locale === "bn" ? "বাস্কেট" : "Quote basket"}</span>{itemCount ? <strong className="basket-count">{itemCount}</strong> : null}
+    <button className="quote-basket-button" type="button" onClick={() => setOpen((value) => !value)} aria-expanded={open} aria-haspopup="dialog" aria-controls="quote-basket-preview" aria-label={accessibleLabel}>
+      <AppIcon name={icon} size={19} /><span className="quote-basket-button__label">{compactLabel}</span><strong className="basket-count">{itemCount}</strong>
     </button>
     {open ? <div className="quote-basket-preview" id="quote-basket-preview" role="dialog" aria-label={sourcingText(locale, "basket")}>
       <div className="quote-basket-preview__header"><strong>{sourcingText(locale, "basket")}</strong><button type="button" onClick={() => setOpen(false)} aria-label={locale === "bn" ? "বাস্কেট প্রিভিউ বন্ধ করুন" : "Close basket preview"}>×</button></div>

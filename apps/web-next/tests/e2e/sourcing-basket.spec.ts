@@ -7,6 +7,13 @@ test.beforeEach(async ({ page }) => {
 
 test("@public product cards support a persistent sourcing basket", async ({ page }) => {
   await page.goto("/products?q=1080p%20USB%20Webcam");
+  const mobileMenu = page.getByRole("button", { name: "Open navigation" });
+  const mobileNavigation = await mobileMenu.isVisible();
+  if (mobileNavigation) await mobileMenu.click();
+  const emptyQuoteControl = page.locator('[aria-label="Get a quote"]:visible');
+  await expect(emptyQuoteControl).toHaveCount(1);
+  await expect(emptyQuoteControl).toHaveAttribute("href", "/quote");
+  if (mobileNavigation) await page.getByRole("button", { name: "Close navigation" }).click();
   const card = page.getByRole("article").filter({ hasText: "1080p USB Webcam" });
   await expect(card).toBeVisible();
   await expect(card.getByText(/From.*\$16\.20/)).toBeVisible();
@@ -15,6 +22,7 @@ test("@public product cards support a persistent sourcing basket", async ({ page
   await card.getByRole("button", { name: "Add to quote" }).click();
   const toast = page.getByRole("status").filter({ hasText: "Added to sourcing basket" });
   await expect(toast).toBeVisible();
+  await expect(emptyQuoteControl).toHaveCount(0);
   await expect(page.locator('[aria-label="Sourcing basket: 1"]:visible')).toHaveCount(1);
 
   await expect(toast.getByRole("link", { name: "View basket" })).toHaveAttribute("href", "/sourcing-basket");
