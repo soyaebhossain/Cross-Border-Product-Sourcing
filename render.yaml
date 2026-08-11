@@ -1,18 +1,8 @@
-databases:
-  - name: cross-border-product-sourcing-db
-    databaseName: cross_border
-    user: cross_border
-    plan: basic-256mb
-    diskSizeGB: 5
-    postgresMajorVersion: "16"
-    ipAllowList: []
-    region: singapore
-
 services:
   - type: web
     name: cross-border-product-sourcing-api
     runtime: docker
-    plan: starter
+    plan: free
     region: singapore
     numInstances: 1
     dockerfilePath: ./services/catalog-service/Dockerfile
@@ -25,9 +15,7 @@ services:
       - key: PORT
         value: "8000"
       - key: CATALOG_DATABASE_URL
-        fromDatabase:
-          name: cross-border-product-sourcing-db
-          property: connectionString
+        sync: false
       - key: CATALOG_JWT_SECRET
         generateValue: true
       - key: CATALOG_MFA_ENCRYPTION_KEY
