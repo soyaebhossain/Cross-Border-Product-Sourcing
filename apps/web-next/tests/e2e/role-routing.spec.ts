@@ -6,12 +6,11 @@ const customerPassword = process.env.E2E_CUSTOMER_PASSWORD;
 const adminIdentifier = process.env.E2E_ADMIN_IDENTIFIER;
 const adminPassword = process.env.E2E_ADMIN_PASSWORD;
 
-async function login(page: Page, portal: "Customer" | "Admin / operator", identifier: string, password: string) {
-  await page.goto(portal === "Customer" ? "/login" : "/login?portal=admin");
-  await page.getByRole("button", { name: portal }).click();
+async function login(page: Page, portal: "customer" | "admin", identifier: string, password: string) {
+  await page.goto(portal === "customer" ? "/login" : "/login?portal=admin");
   await page.getByLabel("Username, email or phone").fill(identifier);
   await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: portal === "Customer" ? "Sign in securely" : "Open admin dashboard" }).click();
+  await page.getByRole("button", { name: portal === "customer" ? "Sign in securely" : "Open admin dashboard" }).click();
 }
 
 test.describe("@roles live role-routing contract", () => {
@@ -57,7 +56,7 @@ test.describe("@roles live role-routing contract", () => {
 
   test("customer lands in customer account and is kept out of admin", async ({ page }) => {
     test.skip(!customerIdentifier || !customerPassword, "Set E2E_CUSTOMER_IDENTIFIER and E2E_CUSTOMER_PASSWORD");
-    await login(page, "Customer", customerIdentifier!, customerPassword!);
+    await login(page, "customer", customerIdentifier!, customerPassword!);
     await expect(page).toHaveURL(/\/account(?:\/|$)/);
     await page.goto("/admin");
     await expect(page).toHaveURL(/\/(?:account|login)(?:\/|\?|$)/);
@@ -65,7 +64,7 @@ test.describe("@roles live role-routing contract", () => {
 
   test("administrator lands in control center and is kept out of customer account", async ({ page }) => {
     test.skip(!adminIdentifier || !adminPassword, "Set E2E_ADMIN_IDENTIFIER and E2E_ADMIN_PASSWORD");
-    await login(page, "Admin / operator", adminIdentifier!, adminPassword!);
+    await login(page, "admin", adminIdentifier!, adminPassword!);
     await expect(page).toHaveURL(/\/admin(?:\/|$)/);
     await expect(page.getByRole("navigation", { name: "Admin navigation" })).toBeVisible();
     await page.goto("/account");

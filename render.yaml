@@ -36,5 +36,23 @@ services:
         value: production
       - key: CATALOG_ERROR_MONITORING_DSN
         sync: false
+      - key: CATALOG_RESEND_API_KEY
+        sync: false
+      - key: CATALOG_RESEND_FROM_EMAIL
+        sync: false
+      - key: CATALOG_SMTP_HOST
+        sync: false
+      - key: CATALOG_SMTP_PORT
+        value: "587"
+      - key: CATALOG_SMTP_USERNAME
+        sync: false
+      - key: CATALOG_SMTP_PASSWORD
+        sync: false
+      - key: CATALOG_SMTP_FROM_EMAIL
+        sync: false
+      - key: CATALOG_SMTP_STARTTLS
+        value: "true"
+      - key: CATALOG_PASSWORD_RESET_SECONDS
+        value: "1800"
       - key: CATALOG_PAYMENT_PROOF_ALLOWED_HOSTS
         sync: false

@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from pydantic import field_validator
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
     google_client_secret: str | None = None
     secure_cookies: bool | None = None
     auth_body_max_bytes: int = 16_384
-    password_min_characters: int = 12
+    password_min_characters: int = 8
     password_max_characters: int = 128
     login_failure_limit: int = 5
     login_lockout_seconds: int = 900
@@ -51,6 +51,13 @@ class Settings(BaseSettings):
     register_rate_window_seconds: int = 3600
     refresh_rate_limit: int = 60
     refresh_rate_window_seconds: int = 60
+    password_reset_seconds: int = 1800
+    password_reset_request_rate_limit: int = 5
+    password_reset_request_rate_window_seconds: int = 3600
+    password_reset_identifier_rate_limit: int = 3
+    password_reset_identifier_rate_window_seconds: int = 3600
+    password_reset_confirm_rate_limit: int = 10
+    password_reset_confirm_rate_window_seconds: int = 900
     access_token_minutes: int = 15
     refresh_token_days: int = 30
     privileged_mfa_required: bool = True
@@ -65,6 +72,8 @@ class Settings(BaseSettings):
     release_version: str | None = None
     notification_sender_name: str = "SourceAI"
     notification_dispatch_batch_size: int = 50
+    resend_api_key: SecretStr | None = None
+    resend_from_email: str | None = None
     smtp_host: str | None = None
     smtp_port: int = 587
     smtp_username: str | None = None
@@ -98,6 +107,21 @@ class Settings(BaseSettings):
         if value.startswith("postgresql://"):
             return value.replace("postgresql://", "postgresql+psycopg://", 1)
         return value
+
+    @property
+    def password_reset_email_configured(self) -> bool:
+        """Report reset-email capability without exposing provider settings."""
+
+        return self.resend_email_configured or self.smtp_email_configured
+
+    @property
+    def resend_email_configured(self) -> bool:
+        api_key = self.resend_api_key.get_secret_value().strip() if self.resend_api_key else ""
+        return bool(api_key and (self.resend_from_email or "").strip())
+
+    @property
+    def smtp_email_configured(self) -> bool:
+        return bool((self.smtp_host or "").strip() and (self.smtp_from_email or "").strip())
 
     def resolved_media_path(self) -> Path:
         if self.media_path:
@@ -183,6 +207,8 @@ class Settings(BaseSettings):
                 errors.append("CATALOG_MFA_ENCRYPTION_KEY must be distinct from CATALOG_JWT_SECRET")
         if not 8 <= self.password_min_characters <= self.password_max_characters <= 256:
             errors.append("Password length bounds are invalid")
+        if not 300 <= self.password_reset_seconds <= 86_400:
+            errors.append("CATALOG_PASSWORD_RESET_SECONDS must be between 300 and 86400")
         if self.login_failure_limit < 3 or self.login_lockout_seconds < 60:
             errors.append("Persistent account lockout settings are too weak")
         if not self.allowed_browser_origins:
@@ -197,6 +223,16 @@ class Settings(BaseSettings):
             errors.append("CATALOG_ERROR_MONITORING_TRACES_SAMPLE_RATE must be between 0 and 1")
         if not 1 <= self.notification_dispatch_batch_size <= 50:
             errors.append("CATALOG_NOTIFICATION_DISPATCH_BATCH_SIZE must be between 1 and 50")
+        resend_key = self.resend_api_key.get_secret_value().strip() if self.resend_api_key else ""
+        resend_sender = (self.resend_from_email or "").strip()
+        if bool(resend_key) != bool(resend_sender):
+            errors.append("CATALOG_RESEND_API_KEY and CATALOG_RESEND_FROM_EMAIL must be configured together")
+        if resend_key and (not resend_key.startswith("re_") or resend_key == "re_xxxxxxxxx"):
+            errors.append("CATALOG_RESEND_API_KEY must be a non-placeholder Resend API key")
+        if resend_sender and ("\r" in resend_sender or "\n" in resend_sender or "@" not in resend_sender):
+            errors.append("CATALOG_RESEND_FROM_EMAIL must be a valid sender email")
+        if resend_sender.lower().endswith("@resend.dev"):
+            errors.append("CATALOG_RESEND_FROM_EMAIL must use a verified production domain")
         if self.smtp_host and not self.smtp_from_email:
             errors.append("CATALOG_SMTP_FROM_EMAIL is required when SMTP is configured")
         if self.smtp_host and not self.smtp_starttls:

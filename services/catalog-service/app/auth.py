@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .db import get_session
-from .models import AccountUser, AuthChallenge, RefreshSession, SocialIdentity
+from .models import AccountUser, AdminAuditEvent, AuthChallenge, RefreshSession, SocialIdentity
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login/", auto_error=False)
@@ -525,6 +525,100 @@ def revoke_all_user_sessions(session: Session, user_id: int, *, reason: str) -> 
         .values(revoked_at=_now(), revoke_reason=reason)
     )
     session.commit()
+
+
+def create_password_reset_challenge(session: Session, user: AccountUser) -> str:
+    """Issue one opaque reset credential while persisting only its SHA-256 digest."""
+
+    now = _now()
+    session.execute(
+        update(AuthChallenge)
+        .where(
+            AuthChallenge.user_id == user.id,
+            AuthChallenge.purpose == "password_reset",
+            AuthChallenge.consumed_at.is_(None),
+        )
+        .values(consumed_at=now)
+    )
+    token = secrets.token_urlsafe(48)
+    session.add(
+        AuthChallenge(
+            id=_token_hash(token),
+            user_id=user.id,
+            purpose="password_reset",
+            remember=False,
+            expires_at=now + timedelta(seconds=get_settings().password_reset_seconds),
+        )
+    )
+    session.commit()
+    return token
+
+
+def complete_password_reset(
+    session: Session,
+    *,
+    token: str,
+    password: str,
+    request_id: str | None = None,
+) -> dict[str, Any]:
+    """Atomically replace a password and invalidate every outstanding auth credential."""
+
+    now = _now()
+    challenge = session.scalar(
+        select(AuthChallenge)
+        .where(AuthChallenge.id == _token_hash(token))
+        .with_for_update()
+    )
+    if (
+        challenge is None
+        or challenge.purpose != "password_reset"
+        or challenge.consumed_at is not None
+        or _as_utc(challenge.expires_at) <= now
+    ):
+        raise ValueError("This reset link is invalid, expired, or already used")
+
+    user = session.scalar(
+        select(AccountUser)
+        .where(AccountUser.id == challenge.user_id, AccountUser.is_active.is_(True))
+        .with_for_update()
+    )
+    if user is None:
+        raise ValueError("This reset link is invalid, expired, or already used")
+
+    validate_password_strength(password, (user.username, user.email, user.phone))
+    if check_password(password, user.password_hash):
+        raise ValueError("New password must differ from the current password")
+
+    user.password_hash = make_password(password)
+    user.auth_version += 1
+    user.failed_login_attempts = 0
+    user.locked_until = None
+    user.last_failed_login_at = None
+    session.execute(
+        update(RefreshSession)
+        .where(RefreshSession.user_id == user.id, RefreshSession.revoked_at.is_(None))
+        .values(revoked_at=now, revoke_reason="password_reset")
+    )
+    session.execute(
+        update(AuthChallenge)
+        .where(AuthChallenge.user_id == user.id, AuthChallenge.consumed_at.is_(None))
+        .values(consumed_at=now)
+    )
+    session.add(
+        AdminAuditEvent(
+            actor_user_id=user.id,
+            actor_role=user.role,
+            action="auth.password_reset.completed",
+            entity_type="account",
+            entity_id=str(user.id),
+            request_id=request_id,
+            after_data={"auth_version": user.auth_version, "sessions_revoked": True},
+            note="Self-service password reset completed; authentication state invalidated.",
+        )
+    )
+    session.commit()
+    session.refresh(user)
+    return _user_to_dict(user)
 
 
 def create_mfa_challenge(

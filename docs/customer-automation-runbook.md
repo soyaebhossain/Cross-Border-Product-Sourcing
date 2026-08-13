@@ -143,7 +143,28 @@ idempotency should remain enabled.
 
 ## Provider settings
 
-Email:
+Email (recommended Resend API provider):
+
+- `CATALOG_RESEND_API_KEY` (sending-only key stored in the deployment secret manager)
+- `CATALOG_RESEND_FROM_EMAIL` (sender on a verified domain)
+
+Resend is selected when both values are configured. The API adapter sends text
+and escaped HTML, records the provider message ID, and uses a stable
+`sourceai-outbox-{id}` idempotency key. Never commit or log an API key. The
+`onboarding@resend.dev` sender is for sandbox testing only and must not be used
+for production password recovery.
+
+After adding runtime secrets, verify one delivery from the catalog-service
+directory without passing the API key on the command line:
+
+```powershell
+python scripts/send_test_email.py
+```
+
+The command prompts for the recipient and reports only a safe result/provider
+message ID. It never prints the API key.
+
+Email (optional SMTP fallback):
 
 - `CATALOG_SMTP_HOST`
 - `CATALOG_SMTP_PORT` (default `587`)

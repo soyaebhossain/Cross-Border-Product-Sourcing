@@ -18,8 +18,13 @@ import {
   type MfaRequired,
 } from "../../lib/api";
 import { useLocale } from "../../lib/locale-context";
+import {
+  getRememberedIdentifier,
+  updateRememberedIdentifier,
+  type LoginPortal,
+} from "../../lib/remembered-login";
 
-type Portal = "customer" | "admin";
+type Portal = LoginPortal;
 type Enrollment = { secret: string; otpauth_uri: string };
 type ServiceState = "checking" | "ready" | "offline";
 
@@ -48,7 +53,10 @@ export default function LoginPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("portal") === "admin") setPortal("admin");
+    const initialPortal: Portal = params.get("portal") === "admin" ? "admin" : "customer";
+    setPortal(initialPortal);
+    const rememberedIdentifier = getRememberedIdentifier(initialPortal);
+    if (rememberedIdentifier) setIdentifier(rememberedIdentifier);
     if (params.get("social_error")) setError("Google sign-in was not completed. Please try again or use email and password.");
     void checkService();
   }, []);
@@ -72,6 +80,9 @@ export default function LoginPage() {
 
   const selectPortal = (nextPortal: Portal) => {
     setPortal(nextPortal);
+    setIdentifier(getRememberedIdentifier(nextPortal));
+    setPassword("");
+    setShowPassword(false);
     setError("");
     setErrorReference("");
     const params = new URLSearchParams(window.location.search);
@@ -138,6 +149,7 @@ export default function LoginPage() {
     setErrorReference("");
     try {
       const result = await loginWithCredentials(identifier, password, remember, portal);
+      updateRememberedIdentifier(portal, identifier, remember);
       if ("mfa_required" in result) {
         setMfa(result);
         setPassword("");
@@ -244,26 +256,48 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="shell shell--narrow">
-      <section className="auth-card">
-        <div>
-          <p className="eyebrow">{portal === "admin" ? (bn ? "Operations access" : "Operations access") : (bn ? "নিরাপদ account" : "Secure account")}</p>
-          <h1>{portal === "admin" ? (bn ? "Admin sign in" : "Admin sign in") : (bn ? "SourceAI-এ sign in" : "Sign in to SourceAI")}</h1>
-          <p>{portal === "admin" ? (bn ? "Admin ও operator account-এর জন্য আলাদা, MFA-সুরক্ষিত প্রবেশ।" : "Separate, MFA-protected access for admin and operator accounts.") : (bn ? "কোট তুলনা, অর্ডার এবং delivery track করুন।" : "Manage quotes, orders and delivery tracking.")}</p>
-          <div className="login-role-switch" role="group" aria-label={bn ? "Login-এর ধরন" : "Choose login type"}>
-            <button type="button" className={portal === "customer" ? "login-role-switch__active" : ""} aria-pressed={portal === "customer"} onClick={() => selectPortal("customer")}><AppIcon name="user" size={17} />{bn ? "Customer" : "Customer"}</button>
-            <button type="button" className={portal === "admin" ? "login-role-switch__active" : ""} aria-pressed={portal === "admin"} onClick={() => selectPortal("admin")}><AppIcon name="shield" size={17} />{bn ? "Admin / operator" : "Admin / operator"}</button>
+    <main className="shell shell--narrow auth-page">
+      <section className="auth-card auth-card--login" aria-labelledby="login-title">
+        <aside className={`auth-login-brand auth-login-brand--${portal}`}>
+          <div>
+            <Link className="auth-brand-lockup" href="/" aria-label={bn ? "SourceAI হোম" : "SourceAI home"}>
+              <span aria-hidden>S</span>
+              <div><strong>Source<span>AI</span></strong><small>{bn ? "Sourcing decision platform" : "Sourcing decision platform"}</small></div>
+            </Link>
+            <div className="auth-login-brand__content">
+              <p className="eyebrow">{portal === "admin" ? (bn ? "নিয়ন্ত্রিত operations access" : "Controlled operations access") : (bn ? "নিরাপদ sourcing workspace" : "Secure sourcing workspace")}</p>
+              <h2>{portal === "admin" ? (bn ? "নিয়ন্ত্রণ, স্বচ্ছতা ও জবাবদিহির সঙ্গে পরিচালনা করুন।" : "Operate with control, clarity, and accountability.") : (bn ? "আত্মবিশ্বাসের সঙ্গে global sourcing পরিচালনা করুন।" : "Source globally with confidence and control.")}</h2>
+              <p>{portal === "admin" ? (bn ? "অনুমোদিত operations team-এর জন্য সুরক্ষিত control center access।" : "Secure control-center access for authorized operations teams.") : (bn ? "একটি account থেকে quote, order, payment ও delivery progress পরিচালনা করুন।" : "Manage quotes, orders, payments, and delivery progress from one account.")}</p>
+              <ul className="auth-benefits">
+                {portal === "admin" ? <>
+                  <li><AppIcon name="check" size={16} />{bn ? "MFA-সুরক্ষিত privileged access" : "MFA-protected privileged access"}</li>
+                  <li><AppIcon name="check" size={16} />{bn ? "Role-based permissions" : "Role-based permissions"}</li>
+                  <li><AppIcon name="check" size={16} />{bn ? "Auditable operational actions" : "Auditable operational actions"}</li>
+                </> : <>
+                  <li><AppIcon name="check" size={16} />{bn ? "Saved quote ও comparison" : "Saved quotes and comparisons"}</li>
+                  <li><AppIcon name="check" size={16} />{bn ? "Order ও payment tracking" : "Order and payment tracking"}</li>
+                  <li><AppIcon name="check" size={16} />{bn ? "Delivery ও account notifications" : "Delivery and account notifications"}</li>
+                </>}
+              </ul>
+            </div>
           </div>
-          <div className={`auth-service-status auth-service-status--${serviceState}`} role="status">
+          <div className="auth-login-brand__footer"><AppIcon name="shield" size={18} /><span><strong>{bn ? "Security by design" : "Security by design"}</strong><small>{bn ? "Encrypted session · Secure recovery" : "Protected sessions · Secure recovery"}</small></span></div>
+        </aside>
+        <form className="auth-login-form" name={`${portal}-login`} aria-labelledby="login-title" autoComplete="on" onSubmit={submit}>
+          <header className="auth-login-form__header">
+            <span className={`auth-portal-badge auth-portal-badge--${portal}`}><AppIcon name={portal === "admin" ? "shield" : "user"} size={15} />{portal === "admin" ? (bn ? "Admin portal" : "Admin portal") : (bn ? "Customer account" : "Customer account")}</span>
+            <p className="eyebrow">{portal === "admin" ? (bn ? "Restricted access" : "Restricted access") : (bn ? "Welcome back" : "Welcome back")}</p>
+            <h1 id="login-title">{portal === "admin" ? (bn ? "Admin sign in" : "Admin sign in") : (bn ? "SourceAI-এ sign in" : "Sign in to SourceAI")}</h1>
+            <p>{portal === "admin" ? (bn ? "আপনার অনুমোদিত admin/operator credential ব্যবহার করুন।" : "Use your authorized admin or operator credentials.") : (bn ? "আপনার sourcing workspace-এ নিরাপদে ফিরে যান।" : "Continue securely to your sourcing workspace.")}</p>
+          </header>
+          {serviceState !== "ready" ? <div className={`auth-service-status auth-service-status--${serviceState}`} role="status">
             <span aria-hidden />
             <div>
-              <strong>{serviceState === "ready" ? (bn ? "Account service online" : "Account service online") : serviceState === "checking" ? (bn ? "নিরাপদ সংযোগ যাচাই হচ্ছে…" : "Checking secure connection…") : (bn ? "Account service offline" : "Account service offline")}</strong>
-              {serviceState === "offline" ? <small>{bn ? "Catalog দেখা যাবে, কিন্তু live login-এর জন্য backend চালু করতে হবে।" : "The catalog remains available, but live sign-in needs the production backend."}</small> : null}
+              <strong>{serviceState === "checking" ? (bn ? "নিরাপদ সংযোগ যাচাই হচ্ছে…" : "Checking secure connection…") : (bn ? "Sign in service পাওয়া যাচ্ছে না" : "Sign-in service unavailable")}</strong>
+              {serviceState === "offline" ? <small>{bn ? "আপনার credential ভুল নয়। সংযোগ ফিরে এলে আবার চেষ্টা করুন।" : "Your credentials were not rejected. Retry when the connection is restored."}</small> : null}
             </div>
             {serviceState === "offline" ? <button type="button" onClick={() => void checkService()}><AppIcon name="refresh" size={15} />{bn ? "Retry" : "Retry"}</button> : null}
-          </div>
-        </div>
-        <form onSubmit={submit}>
+          </div> : null}
           {portal === "customer" ? <>
             <button className="social-login-button" type="button" disabled={socialLoading || serviceState !== "ready"} onClick={async () => {
               setSocialLoading(true); setError("");
@@ -276,13 +310,24 @@ export default function LoginPage() {
             }}><GoogleIcon />{socialLoading ? (bn ? "Google-এ সংযোগ হচ্ছে…" : "Connecting to Google…") : (bn ? "Google দিয়ে চালিয়ে যান" : "Continue with Google")}</button>
             <div className="auth-divider"><span>{bn ? "অথবা email / account credential" : "or use email / account credentials"}</span></div>
           </> : null}
-          <label className="auth-field"><span><AppIcon name="user" size={16} />{bn ? "Username, email অথবা phone" : "Username, email or phone"}</span><div className="auth-input"><input autoCapitalize="none" autoComplete="username" spellCheck={false} value={identifier} onChange={event => setIdentifier(event.target.value)} required /></div></label>
-          <label className="auth-field"><span><AppIcon name="lock" size={16} />{bn ? "Password" : "Password"}</span><div className="auth-input"><input type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required /><button type="button" className="auth-password-toggle" aria-label={showPassword ? (bn ? "Password লুকান" : "Hide password") : (bn ? "Password দেখুন" : "Show password")} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}><AppIcon name={showPassword ? "eye-off" : "eye"} size={18} /></button></div></label>
-          <label className="remember-login"><input type="checkbox" checked={remember} onChange={event => setRemember(event.target.checked)} /><span>{bn ? "এই device-এ sign in রাখা হবে" : "Keep me signed in on this device"}</span></label>
+          <label className="auth-field" htmlFor="login-identifier"><span><AppIcon name="user" size={16} />{bn ? "Username, email অথবা phone" : "Username, email or phone"}</span><div className="auth-input"><input id="login-identifier" name="username" type="text" autoCapitalize="none" autoComplete="username" spellCheck={false} value={identifier} onChange={event => setIdentifier(event.target.value)} required /></div></label>
+          <label className="auth-field" htmlFor="login-password"><span><AppIcon name="lock" size={16} />{bn ? "Password" : "Password"}</span><div className="auth-input"><input id="login-password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} required /><button type="button" className="auth-password-toggle" aria-label={showPassword ? (bn ? "Password লুকান" : "Hide password") : (bn ? "Password দেখুন" : "Show password")} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}><AppIcon name={showPassword ? "eye-off" : "eye"} size={18} /></button></div></label>
+          <div className="auth-login-options">
+            <label className="remember-login"><input name="remember" type="checkbox" checked={remember} onChange={event => setRemember(event.target.checked)} /><span><strong>{bn ? "Sign in রাখা হবে" : "Keep me signed in"}</strong><small>{bn ? "এই device-এ ID মনে রাখুন" : "Remember my ID on this device"}</small></span></label>
+            <Link href="/forgot-password">{bn ? "Password ভুলে গেছেন?" : "Forgot password?"}</Link>
+          </div>
           {error ? <div className="form-error" role="alert">{error}</div> : null}
           {errorReference ? <small className="auth-error-reference">{bn ? "Support reference" : "Support reference"}: <code>{errorReference}</code></small> : null}
-          <button className="market-button auth-submit" disabled={loading || socialLoading || serviceState === "checking"}>{loading ? (bn ? "Sign in হচ্ছে…" : "Signing in…") : portal === "admin" ? <><AppIcon name="shield" size={18} />{bn ? "Admin dashboard খুলুন" : "Open admin dashboard"}</> : <><AppIcon name="lock" size={18} />{bn ? "নিরাপদে sign in" : "Sign in securely"}</>}</button>
-          {portal === "customer" ? <small>{bn ? "নতুন customer?" : "New customer?"} <Link className="nav-link" href="/signup">{bn ? "Account তৈরি করুন" : "Create an account"}</Link></small> : <small>{bn ? "শুধু অনুমোদিত admin/operator account প্রবেশ করতে পারবে। MFA প্রয়োজন।" : "Only authorized admin/operator accounts can enter. MFA is required."}</small>}
+          <button className="market-button auth-submit" type="submit" disabled={loading || socialLoading || serviceState === "checking"}>{loading ? (bn ? "Sign in হচ্ছে…" : "Signing in…") : portal === "admin" ? <><AppIcon name="shield" size={18} />{bn ? "Admin dashboard খুলুন" : "Open admin dashboard"}</> : <><AppIcon name="lock" size={18} />{bn ? "নিরাপদে sign in" : "Sign in securely"}</>}</button>
+          <footer className="auth-login-form__footer">
+            {portal === "customer" ? <>
+              <p>{bn ? "SourceAI-এ নতুন?" : "New to SourceAI?"} <Link href="/signup">{bn ? "Account তৈরি করুন" : "Create an account"}</Link></p>
+              <Link className="auth-portal-link" href="/login?portal=admin" onClick={() => selectPortal("admin")}><AppIcon name="shield" size={16} /><span>{bn ? "Admin / operator access" : "Admin / operator access"}</span><AppIcon name="arrow-right" size={15} /></Link>
+            </> : <>
+              <p><AppIcon name="shield" size={15} />{bn ? "Password-এর পর MFA verification প্রয়োজন।" : "MFA verification follows password validation."}</p>
+              <Link className="auth-portal-link" href="/login" onClick={() => selectPortal("customer")}><AppIcon name="arrow-left" size={15} /><span>{bn ? "Customer sign in-এ ফিরুন" : "Back to customer sign in"}</span></Link>
+            </>}
+          </footer>
         </form>
       </section>
     </main>

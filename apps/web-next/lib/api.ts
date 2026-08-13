@@ -369,6 +369,7 @@ export function isApiServiceUnavailable(error: unknown): boolean {
 export type AuthServiceStatus = {
   available: boolean;
   status: "ready" | "unavailable";
+  passwordResetEmailConfigured: boolean;
   httpStatus: number | null;
   requestId: string | null;
 };
@@ -585,6 +586,12 @@ export function loginWithCredentials(identifier: string, password: string, remem
 export function registerAccount(payload: { username: string; email?: string; phone?: string; password: string }) {
   return postJson<{ user: CurrentUser; message: string }>("/api/auth/register/", payload);
 }
+export function requestPasswordReset(identifier: string) {
+  return postJson<{ message: string }>("/api/auth/password-reset/request/", { identifier });
+}
+export function confirmPasswordReset(token: string, password: string) {
+  return postJson<{ message: string }>("/api/auth/password-reset/confirm/", { token, password });
+}
 export function getCurrentUser() { return fetchJson<CurrentUser>("/api/auth/me/"); }
 export async function getAuthServiceStatus(timeoutMs = 5000): Promise<AuthServiceStatus> {
   const controller = new AbortController();
@@ -595,10 +602,14 @@ export async function getAuthServiceStatus(timeoutMs = 5000): Promise<AuthServic
       credentials: "include",
       signal: controller.signal,
     });
-    const payload = await response.json().catch(() => ({})) as { status?: string };
+    const payload = await response.json().catch(() => ({})) as {
+      status?: string;
+      password_reset_email_configured?: boolean;
+    };
     return {
       available: response.ok && payload.status === "ready",
       status: response.ok && payload.status === "ready" ? "ready" : "unavailable",
+      passwordResetEmailConfigured: payload.password_reset_email_configured === true,
       httpStatus: response.status,
       requestId: response.headers.get("x-request-id"),
     };
@@ -606,6 +617,7 @@ export async function getAuthServiceStatus(timeoutMs = 5000): Promise<AuthServic
     return {
       available: false,
       status: "unavailable",
+      passwordResetEmailConfigured: false,
       httpStatus: null,
       requestId: null,
     };

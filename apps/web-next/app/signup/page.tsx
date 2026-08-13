@@ -12,22 +12,30 @@ import {
 } from "../../lib/api";
 import { useLocale } from "../../lib/locale-context";
 
+const PASSWORD_MIN_LENGTH = 8;
+
 export default function SignupPage() {
   const [form, setForm] = useState({ username: "", email: "", phone: "", password: "" });
   const [confirmation, setConfirmation] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [accountExists, setAccountExists] = useState(false);
   const [serviceState, setServiceState] = useState<"checking" | "ready" | "offline">("checking");
   const router = useRouter();
   const { locale } = useLocale();
   const bn = locale === "bn";
+  const identifierFragments = [form.username, form.email, form.phone]
+    .map(value => value.trim().toLocaleLowerCase().split("@", 1)[0])
+    .filter(value => value.length >= 4);
+  const normalizedPassword = form.password.toLocaleLowerCase();
   const passwordChecks = {
-    length: form.password.length >= 12,
+    length: form.password.length >= PASSWORD_MIN_LENGTH,
     upper: /[A-Z]/.test(form.password),
     lower: /[a-z]/.test(form.password),
     number: /\d/.test(form.password),
     symbol: /[^A-Za-z0-9]/.test(form.password),
+    identity: Boolean(form.password) && identifierFragments.every(value => !normalizedPassword.includes(value)),
   };
   const passwordValid = Object.values(passwordChecks).every(Boolean);
   const passwordMatches = Boolean(form.password) && form.password === confirmation;
@@ -57,6 +65,7 @@ export default function SignupPage() {
     }
     setLoading(true);
     setError("");
+    setAccountExists(false);
     try {
       await registerAccount({
         username: form.username.trim(),
@@ -74,6 +83,9 @@ export default function SignupPage() {
           : "The account service is not connected. Your information was not saved.");
       } else if (reason instanceof ApiError && reason.status === 429) {
         setError(bn ? "অনেকবার চেষ্টা করা হয়েছে। কিছুক্ষণ পর আবার চেষ্টা করুন।" : "Too many attempts. Please wait before trying again.");
+      } else if (reason instanceof ApiError && reason.status === 400 && /already exists/i.test(reason.message)) {
+        setAccountExists(true);
+        setError(bn ? "এই account আগে থেকেই আছে। Sign in করুন অথবা password reset করুন।" : "This account already exists. Sign in or reset its password.");
       } else {
         setError(reason instanceof Error ? reason.message : (bn ? "Account তৈরি করা যায়নি।" : "Account could not be created."));
       }
@@ -90,16 +102,18 @@ export default function SignupPage() {
           <label className="auth-field"><span><AppIcon name="user" size={16} />{bn ? "Username" : "Username"}</span><div className="auth-input"><input autoCapitalize="none" autoComplete="username" minLength={3} maxLength={150} spellCheck={false} value={form.username} onChange={(event) => setForm((value) => ({ ...value, username: event.target.value }))} required /></div></label>
           <label className="auth-field"><span><AppIcon name="user" size={16} />{bn ? "Email" : "Email"}</span><div className="auth-input"><input type="email" autoComplete="email" maxLength={254} value={form.email} onChange={(event) => setForm((value) => ({ ...value, email: event.target.value }))} required /></div></label>
           <label className="auth-field"><span><AppIcon name="user" size={16} />{bn ? "Phone (ঐচ্ছিক)" : "Phone (optional)"}</span><div className="auth-input"><input autoComplete="tel" inputMode="tel" maxLength={40} value={form.phone} onChange={(event) => setForm((value) => ({ ...value, phone: event.target.value }))} /></div></label>
-          <label className="auth-field"><span><AppIcon name="lock" size={16} />{bn ? "Password" : "Password"}</span><div className="auth-input"><input type={showPassword ? "text" : "password"} autoComplete="new-password" minLength={12} maxLength={128} aria-describedby="password-policy" value={form.password} onChange={(event) => setForm((value) => ({ ...value, password: event.target.value }))} required /><button type="button" className="auth-password-toggle" aria-label={showPassword ? (bn ? "Password লুকান" : "Hide password") : (bn ? "Password দেখুন" : "Show password")} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}><AppIcon name={showPassword ? "eye-off" : "eye"} size={18} /></button></div></label>
+          <label className="auth-field"><span><AppIcon name="lock" size={16} />{bn ? "Password" : "Password"}</span><div className="auth-input"><input type={showPassword ? "text" : "password"} autoComplete="new-password" minLength={PASSWORD_MIN_LENGTH} maxLength={128} aria-describedby="password-policy" value={form.password} onChange={(event) => setForm((value) => ({ ...value, password: event.target.value }))} required /><button type="button" className="auth-password-toggle" aria-label={showPassword ? (bn ? "Password লুকান" : "Hide password") : (bn ? "Password দেখুন" : "Show password")} aria-pressed={showPassword} onClick={() => setShowPassword(value => !value)}><AppIcon name={showPassword ? "eye-off" : "eye"} size={18} /></button></div></label>
           <ul id="password-policy" className="password-policy" aria-label={bn ? "Password-এর নিয়ম" : "Password requirements"}>
-            <li className={passwordChecks.length ? "password-policy--met" : ""}>{bn ? "কমপক্ষে ১২ অক্ষর" : "At least 12 characters"}</li>
+            <li className={passwordChecks.length ? "password-policy--met" : ""}>{bn ? "কমপক্ষে ৮ অক্ষর" : "At least 8 characters"}</li>
             <li className={passwordChecks.upper ? "password-policy--met" : ""}>{bn ? "একটি বড় হাতের অক্ষর" : "One uppercase letter"}</li>
             <li className={passwordChecks.lower ? "password-policy--met" : ""}>{bn ? "একটি ছোট হাতের অক্ষর" : "One lowercase letter"}</li>
             <li className={passwordChecks.number ? "password-policy--met" : ""}>{bn ? "একটি সংখ্যা" : "One number"}</li>
             <li className={passwordChecks.symbol ? "password-policy--met" : ""}>{bn ? "একটি symbol" : "One symbol"}</li>
+            <li className={passwordChecks.identity ? "password-policy--met" : ""}>{bn ? "Username/email/phone-এর অংশ নয়" : "No username/email/phone fragment"}</li>
           </ul>
-          <label className="auth-field"><span><AppIcon name="lock" size={16} />{bn ? "Password নিশ্চিত করুন" : "Confirm password"}</span><div className={`auth-input${confirmation && !passwordMatches ? " auth-input--invalid" : ""}`}><input type={showPassword ? "text" : "password"} autoComplete="new-password" minLength={12} maxLength={128} value={confirmation} onChange={event => setConfirmation(event.target.value)} aria-invalid={Boolean(confirmation && !passwordMatches)} required /></div></label>
+          <label className="auth-field"><span><AppIcon name="lock" size={16} />{bn ? "Password নিশ্চিত করুন" : "Confirm password"}</span><div className={`auth-input${confirmation && !passwordMatches ? " auth-input--invalid" : ""}`}><input type={showPassword ? "text" : "password"} autoComplete="new-password" minLength={PASSWORD_MIN_LENGTH} maxLength={128} value={confirmation} onChange={event => setConfirmation(event.target.value)} aria-invalid={Boolean(confirmation && !passwordMatches)} required /></div></label>
           {error ? <div className="form-error" role="alert">{error}</div> : null}
+          {accountExists ? <div className="auth-account-exists-actions"><Link className="button button--ghost" href="/login">{bn ? "Sign in" : "Sign in"}</Link><Link className="button button--ghost" href="/forgot-password">{bn ? "Password reset" : "Reset password"}</Link></div> : null}
           <button className="market-button auth-submit" disabled={loading || serviceState === "checking" || !passwordValid || !passwordMatches}>{loading ? (bn ? "Account তৈরি হচ্ছে…" : "Creating account…") : <><AppIcon name="shield" size={18} />{bn ? "নিরাপদ account তৈরি করুন" : "Create secure account"}</>}</button>
           <small>{bn ? "আগে থেকেই account আছে?" : "Already registered?"} <Link className="nav-link" href="/login">{bn ? "Sign in" : "Sign in"}</Link></small>
         </form>

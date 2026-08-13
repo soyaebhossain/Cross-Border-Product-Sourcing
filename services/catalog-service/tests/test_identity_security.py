@@ -5,7 +5,7 @@ import time
 
 import jwt
 import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
@@ -28,7 +28,7 @@ def settings(monkeypatch) -> Settings:
         database_url="sqlite:///:memory:",
         jwt_secret="identity-test-secret-with-more-than-thirty-two-characters",
         mfa_encryption_key=TEST_MFA_KEY,
-        password_min_characters=12,
+        password_min_characters=8,
         login_failure_limit=3,
         login_lockout_seconds=120,
         mfa_challenge_attempt_limit=3,
@@ -59,6 +59,97 @@ def _user(session: Session, *, role: str = "admin") -> dict:
 
 def _current_totp(secret: str) -> str:
     return auth._totp(secret, int(time.time() // 30))
+
+
+def test_password_policy_accepts_eight_characters_and_rejects_seven(
+    settings: Settings,
+) -> None:
+    auth.validate_password_strength("Aa1!bcde")
+
+    with pytest.raises(ValueError, match="at least 8 characters"):
+        auth.validate_password_strength("Aa1!bcd")
+
+
+@pytest.mark.parametrize(
+    "password",
+    [
+        "aa1!bcde",
+        "AA1!BCDE",
+        "Aa!!bcde",
+        "Aa12bcde",
+    ],
+)
+def test_eight_character_password_keeps_every_composition_requirement(
+    settings: Settings,
+    password: str,
+) -> None:
+    with pytest.raises(ValueError, match="Password must contain"):
+        auth.validate_password_strength(password)
+
+
+def test_registration_route_accepts_exactly_eight_strong_characters(
+    monkeypatch,
+    settings: Settings,
+) -> None:
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(engine)
+    session = Session(engine, expire_on_commit=False)
+    monkeypatch.setattr(auth_routes, "settings", settings)
+    auth_routes.auth_rate_limiter.clear()
+
+    def override_session():
+        yield session
+
+    app = FastAPI()
+    app.include_router(auth_routes.router)
+    app.dependency_overrides[get_session] = override_session
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/auth/register/",
+            json={
+                "username": "eight-char-user",
+                "email": "eight-char-user@example.test",
+                "password": "Aa1!bcde",
+            },
+        )
+
+    assert response.status_code == 201
+    assert response.json()["user"]["username"] == "eight-char-user"
+    session.close()
+    engine.dispose()
+
+
+def test_remember_me_controls_secure_cookie_persistence(monkeypatch, settings: Settings) -> None:
+    monkeypatch.setattr(auth_routes, "settings", settings)
+    tokens = {"access": "access-token", "refresh": "refresh-token"}
+
+    persistent_response = Response()
+    auth_routes._set_auth_cookies(
+        persistent_response,
+        tokens,
+        secure=True,
+        persistent=True,
+    )
+    persistent_cookies = persistent_response.headers.getlist("set-cookie")
+    assert len(persistent_cookies) == 2
+    assert all("HttpOnly" in cookie and "SameSite=lax" in cookie and "Secure" in cookie for cookie in persistent_cookies)
+    assert any(f"Max-Age={settings.access_token_minutes * 60}" in cookie for cookie in persistent_cookies)
+    assert any(f"Max-Age={settings.refresh_token_days * 86400}" in cookie for cookie in persistent_cookies)
+
+    session_response = Response()
+    auth_routes._set_auth_cookies(
+        session_response,
+        tokens,
+        secure=True,
+        persistent=False,
+    )
+    session_cookies = session_response.headers.getlist("set-cookie")
+    assert len(session_cookies) == 2
+    assert all("Max-Age=" not in cookie and "Expires=" not in cookie for cookie in session_cookies)
 
 
 def test_social_callback_uses_the_configured_frontend_origin(monkeypatch) -> None:

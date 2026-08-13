@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, status
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
 
+from ...config import Settings, get_settings
 from ...db import get_session
 from ...serializers import serialize_category, serialize_country, serialize_product
 from ...services.ai_insights import build_ai_insights
@@ -29,8 +30,16 @@ def health() -> dict[str, str]:
     return {"status": "ok", "service": "catalog-service"}
 
 
+def _runtime_settings(request: Request) -> Settings:
+    return getattr(request.app.state, "catalog_settings", None) or get_settings()
+
+
 @router.get("/api/ready", response_model=None)
-def readiness(session: Session = Depends(get_session)) -> dict[str, str] | JSONResponse:
+def readiness(
+    session: Session = Depends(get_session),
+    runtime_settings: Settings = Depends(_runtime_settings),
+) -> dict[str, str | bool] | JSONResponse:
+    password_reset_email_configured = runtime_settings.password_reset_email_configured
     try:
         for statement in READINESS_QUERIES:
             session.execute(text(statement))
@@ -41,12 +50,14 @@ def readiness(session: Session = Depends(get_session)) -> dict[str, str] | JSONR
                 "status": "unavailable",
                 "service": "catalog-service",
                 "database": "unavailable",
+                "password_reset_email_configured": password_reset_email_configured,
             },
         )
     return {
         "status": "ready",
         "service": "catalog-service",
         "database": "ready",
+        "password_reset_email_configured": password_reset_email_configured,
     }
 
 

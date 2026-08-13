@@ -8,19 +8,23 @@ import secrets
 from typing import Any
 from urllib.parse import parse_qs
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from ...auth import (
     AccountLockedError,
+    AmbiguousLoginIdentifierError,
     authenticate_user,
     begin_mfa_enrollment,
     build_token_response,
     confirm_mfa_enrollment,
     create_mfa_challenge,
+    create_password_reset_challenge,
     create_user,
+    complete_password_reset,
+    find_unique_user_by_identifier,
     get_or_create_social_user,
     get_current_user_detail,
     refresh_access_token,
@@ -35,14 +39,20 @@ from ...schemas import (
     MFAChallengeIn,
     MFAEnrollmentConfirmIn,
     MFAVerifyIn,
+    PasswordResetConfirmIn,
+    PasswordResetRequestIn,
     RegisterIn,
 )
 from ...security import auth_rate_limiter, client_rate_key
+from ...services.notifications import send_password_changed_email, send_password_reset_email
 from ...social import SocialAuthError, exchange_google_code, google_authorization_url
 
 
 router = APIRouter()
 settings = get_settings()
+PASSWORD_RESET_REQUEST_MESSAGE = (
+    "If an eligible account matches, a reset link has been sent. Check your spam folder too."
+)
 
 
 def _set_auth_cookies(response: Response, tokens: dict[str, Any], *, secure: bool, persistent: bool = True) -> None:
@@ -155,6 +165,97 @@ async def _read_login_payload(request: Request) -> LoginIn:
             "portal": form.get("portal") or "customer",
         },
     )
+
+
+async def _read_json_payload(request: Request, model_type):
+    if "application/json" not in request.headers.get("content-type", ""):
+        raise HTTPException(status_code=415, detail="Authentication requests require application/json")
+    body = await _bounded_body(request)
+    try:
+        data = json.loads(body.decode() or "{}")
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid JSON body") from exc
+    return _model_or_422(model_type, data)
+
+
+@router.post("/api/auth/password-reset/request/", status_code=status.HTTP_202_ACCEPTED)
+async def request_password_reset(
+    request: Request,
+    response: Response,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
+) -> dict[str, str]:
+    payload = await _read_json_payload(request, PasswordResetRequestIn)
+    identifier = payload.identifier.strip()
+    auth_rate_limiter.enforce(
+        client_rate_key(request, "password-reset-request"),
+        limit=settings.password_reset_request_rate_limit,
+        window_seconds=settings.password_reset_request_rate_window_seconds,
+    )
+    auth_rate_limiter.enforce(
+        client_rate_key(request, "password-reset-identifier", identifier),
+        limit=settings.password_reset_identifier_rate_limit,
+        window_seconds=settings.password_reset_identifier_rate_window_seconds,
+    )
+    if not settings.password_reset_email_configured:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Password reset email is temporarily unavailable",
+        )
+
+    user = None
+    try:
+        user = find_unique_user_by_identifier(session, identifier, for_update=True)
+    except AmbiguousLoginIdentifierError:
+        pass
+    if user is not None and user.is_active and user.email:
+        token = create_password_reset_challenge(session, user)
+        reset_url = f"{settings.frontend_url.rstrip('/')}/reset-password#token={token}"
+        background_tasks.add_task(
+            send_password_reset_email,
+            user.email,
+            reset_url,
+            settings=settings,
+        )
+
+    response.headers["Cache-Control"] = "no-store"
+    return {"message": PASSWORD_RESET_REQUEST_MESSAGE}
+
+
+@router.post("/api/auth/password-reset/confirm/")
+async def confirm_password_reset(
+    request: Request,
+    response: Response,
+    background_tasks: BackgroundTasks,
+    session: Session = Depends(get_session),
+) -> dict[str, str]:
+    auth_rate_limiter.enforce(
+        client_rate_key(request, "password-reset-confirm"),
+        limit=settings.password_reset_confirm_rate_limit,
+        window_seconds=settings.password_reset_confirm_rate_window_seconds,
+    )
+    payload = await _read_json_payload(request, PasswordResetConfirmIn)
+    _validate_password_length(payload.password, registration=True)
+    try:
+        user = complete_password_reset(
+            session,
+            token=payload.token,
+            password=payload.password,
+            request_id=getattr(request.state, "request_id", None),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    if user.get("email"):
+        background_tasks.add_task(
+            send_password_changed_email,
+            str(user["email"]),
+            settings=settings,
+        )
+    response.delete_cookie("sourceai_access", path="/")
+    response.delete_cookie("sourceai_refresh", path="/api/auth/")
+    response.headers["Cache-Control"] = "no-store"
+    return {"message": "Password updated. All existing sessions have been signed out."}
 
 
 @router.post("/api/auth/login/")

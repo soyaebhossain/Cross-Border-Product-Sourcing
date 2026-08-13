@@ -45,10 +45,12 @@ test.beforeEach(async ({ page }) => {
 test("@public login exposes separate customer and admin portals", async ({ page }) => {
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "Sign in to SourceAI" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Customer" })).toBeVisible();
-  await page.getByRole("button", { name: "Admin / operator" }).click();
+  const adminAccess = page.getByRole("link", { name: "Admin / operator access" });
+  await expect(adminAccess).toHaveAttribute("href", "/login?portal=admin");
+  await adminAccess.click();
   await expect(page.getByRole("heading", { name: "Admin sign in" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Open admin dashboard" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Back to customer sign in" })).toHaveAttribute("href", "/login");
 });
 
 test("@public primary customer navigation is keyboard reachable", async ({ page }) => {

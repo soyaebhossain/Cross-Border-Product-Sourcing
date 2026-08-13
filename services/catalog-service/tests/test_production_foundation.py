@@ -144,17 +144,68 @@ def test_invalid_incoming_request_id_is_replaced(caplog) -> None:
 def test_readiness_checks_database_and_required_schema() -> None:
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
+    configured = _settings(
+        resend_api_key="re_test_only_not_a_secret",
+        resend_from_email="security@example.test",
+    )
 
     with Session(engine) as session:
-        result = readiness(session)
+        result = readiness(session, configured)
     assert result["status"] == "ready"
+    assert result["password_reset_email_configured"] is True
+    assert "re_test_only_not_a_secret" not in json.dumps(result)
+    assert "security@example.test" not in json.dumps(result)
 
     with engine.begin() as connection:
         connection.execute(text("DROP TABLE admin_audit_events"))
     with Session(engine) as session:
-        unavailable = readiness(session)
+        unavailable = readiness(session, _settings())
     assert unavailable.status_code == 503
-    assert json.loads(unavailable.body)["database"] == "unavailable"
+    unavailable_payload = json.loads(unavailable.body)
+    assert unavailable_payload["database"] == "unavailable"
+    assert unavailable_payload["password_reset_email_configured"] is False
+
+
+def test_password_reset_email_capability_requires_host_and_sender() -> None:
+    assert _settings().password_reset_email_configured is False
+    assert _settings(resend_api_key="re_test_only").password_reset_email_configured is False
+    assert _settings(resend_from_email="security@example.test").password_reset_email_configured is False
+    resend = _settings(
+        resend_api_key="re_test_only",
+        resend_from_email="security@example.test",
+    )
+    assert resend.resend_email_configured is True
+    assert resend.password_reset_email_configured is True
+    assert "re_test_only" not in repr(resend)
+    assert _settings(smtp_host="smtp.example.test").password_reset_email_configured is False
+    assert _settings(smtp_from_email="security@example.test").password_reset_email_configured is False
+    assert _settings(
+        smtp_host="smtp.example.test",
+        smtp_from_email="security@example.test",
+    ).password_reset_email_configured is True
+
+
+def test_production_rejects_partial_placeholder_and_sandbox_resend_configuration() -> None:
+    for values, message in (
+        ({"resend_api_key": "re_test_only"}, "configured together"),
+        ({"resend_from_email": "security@example.test"}, "configured together"),
+        (
+            {"resend_api_key": "re_xxxxxxxxx", "resend_from_email": "security@example.test"},
+            "non-placeholder",
+        ),
+        (
+            {"resend_api_key": "re_test_only", "resend_from_email": "onboarding@resend.dev"},
+            "verified production domain",
+        ),
+    ):
+        settings = _settings(environment="production", **values)
+        try:
+            settings.validate_runtime_security()
+        except RuntimeError as exc:
+            assert message in str(exc)
+            assert "re_test_only" not in str(exc)
+        else:
+            raise AssertionError("Expected invalid Resend production configuration")
 
 
 def test_production_lifespan_never_bootstraps_schema_or_seed(monkeypatch) -> None:

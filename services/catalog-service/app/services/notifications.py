@@ -6,11 +6,16 @@ import ssl
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
+from html import escape
 from typing import Any, Protocol
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 from uuid import uuid4
+from types import SimpleNamespace
 
+import resend
+from resend.exceptions import NoContentError, ResendError
 from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
 
@@ -52,7 +57,7 @@ class SMTPEmailAdapter:
 
     @property
     def configured(self) -> bool:
-        return bool(self.settings.smtp_host and self.settings.smtp_from_email)
+        return self.settings.smtp_email_configured
 
     def send(self, outbox: NotificationOutbox) -> DeliveryReceipt:
         if not self.configured:
@@ -84,6 +89,157 @@ class SMTPEmailAdapter:
             # records because they can echo credentials or destinations.
             raise DeliveryError("provider_delivery_failed", "Email provider rejected the delivery") from None
         return DeliveryReceipt()
+
+
+class ResendEmailAdapter:
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+
+    @property
+    def configured(self) -> bool:
+        return self.settings.resend_email_configured
+
+    def send(self, outbox: NotificationOutbox) -> DeliveryReceipt:
+        if not self.configured or self.settings.resend_api_key is None:
+            raise DeliveryError("provider_not_configured", "Email provider is not configured")
+        # The SDK uses a module-level key. SourceAI has one immutable provider key per process.
+        resend.api_key = self.settings.resend_api_key.get_secret_value()
+        title = str(outbox.payload.get("title") or "SourceAI notification")
+        body = str(outbox.payload.get("body") or "")
+        action_url = str(outbox.payload.get("action_url") or "")
+        sender = f"{self.settings.notification_sender_name} <{self.settings.resend_from_email}>"
+        try:
+            response = resend.Emails.send(
+                {
+                    "from": sender,
+                    "to": [outbox.destination],
+                    "subject": title,
+                    "text": body,
+                    "html": _render_transactional_email_html(title, body, action_url=action_url),
+                },
+                {"idempotency_key": f"sourceai-outbox-{outbox.id}"},
+            )
+            provider_id = str(response.get("id") or "").strip()
+            if not provider_id:
+                raise DeliveryError(
+                    "provider_delivery_failed",
+                    "Email provider rejected the delivery",
+                )
+        except DeliveryError:
+            raise
+        except (ResendError, NoContentError, OSError, ValueError, TypeError):
+            # Provider exceptions can echo the API key, recipient, or reset URL.
+            raise DeliveryError(
+                "provider_delivery_failed",
+                "Email provider rejected the delivery",
+            ) from None
+        return DeliveryReceipt(provider_message_id=provider_id)
+
+
+def _render_transactional_email_html(title: str, body: str, *, action_url: str = "") -> str:
+    safe_title = escape(title)
+    safe_body = escape(body).replace("\n", "<br>")
+    parsed_action = urlsplit(action_url)
+    safe_action = ""
+    if (
+        parsed_action.scheme in {"http", "https"}
+        and parsed_action.netloc
+        and not parsed_action.username
+        and not parsed_action.password
+    ):
+        safe_action = escape(action_url, quote=True)
+    action_markup = (
+        '<tr><td style="padding:0 32px 28px">'
+        f'<a href="{safe_action}" style="display:inline-block;border-radius:9px;background:#2563eb;'
+        'padding:13px 20px;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none">'
+        "Open secure link</a></td></tr>"
+        if safe_action
+        else ""
+    )
+    return f"""<!doctype html>
+<html lang="en">
+  <body style="margin:0;background:#f4f7fb;color:#172033;font-family:Arial,sans-serif">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding:32px 16px;background:#f4f7fb">
+      <tr><td align="center">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:600px;border:1px solid #dbe3ef;border-radius:16px;background:#ffffff">
+          <tr><td style="padding:28px 32px 12px;font-size:18px;font-weight:700;color:#12336b">Source<span style="color:#2563eb">AI</span></td></tr>
+          <tr><td style="padding:12px 32px 8px"><h1 style="margin:0;font-size:24px;line-height:1.25;color:#0b1730">{safe_title}</h1></td></tr>
+          <tr><td style="padding:8px 32px 28px;font-size:15px;line-height:1.7;color:#475569">{safe_body}</td></tr>
+          {action_markup}
+          <tr><td style="padding:18px 32px;border-top:1px solid #e6ebf2;font-size:12px;color:#8491a5">Security notice from SourceAI</td></tr>
+        </table>
+      </td></tr>
+    </table>
+  </body>
+</html>"""
+
+
+def email_adapter_for(settings: Settings) -> NotificationAdapter:
+    if settings.resend_email_configured:
+        return ResendEmailAdapter(settings)
+    return SMTPEmailAdapter(settings)
+
+
+def send_password_reset_email(
+    destination: str,
+    reset_url: str,
+    *,
+    settings: Settings | None = None,
+) -> bool:
+    """Send a reset link without persisting the bearer token in the notification tables."""
+
+    runtime_settings = settings or get_settings()
+    adapter = email_adapter_for(runtime_settings)
+    if not adapter.configured:
+        return False
+    minutes = max(1, runtime_settings.password_reset_seconds // 60)
+    message = SimpleNamespace(
+        id=f"password-reset-{uuid4().hex}",
+        destination=destination,
+        payload={
+            "title": "Reset your SourceAI password",
+            "body": (
+                "A password reset was requested for your SourceAI account.\n\n"
+                f"Open this secure link within {minutes} minutes:\n{reset_url}\n\n"
+                "If you did not request this, you can safely ignore this email."
+            ),
+            "action_url": reset_url,
+        },
+    )
+    try:
+        adapter.send(message)
+    except DeliveryError:
+        return False
+    return True
+
+
+def send_password_changed_email(
+    destination: str,
+    *,
+    settings: Settings | None = None,
+) -> bool:
+    """Send a token-free security notice after a successful reset."""
+
+    runtime_settings = settings or get_settings()
+    adapter = email_adapter_for(runtime_settings)
+    if not adapter.configured:
+        return False
+    message = SimpleNamespace(
+        id=f"password-changed-{uuid4().hex}",
+        destination=destination,
+        payload={
+            "title": "Your SourceAI password was changed",
+            "body": (
+                "Your SourceAI password was changed and all existing sessions were signed out.\n\n"
+                "If you did not make this change, contact support immediately."
+            ),
+        },
+    )
+    try:
+        adapter.send(message)
+    except DeliveryError:
+        return False
+    return True
 
 
 class WebhookNotificationAdapter:
@@ -150,7 +306,7 @@ class WebhookNotificationAdapter:
 
 def _adapter_for(channel: str, settings: Settings) -> NotificationAdapter:
     if channel == "email":
-        return SMTPEmailAdapter(settings)
+        return email_adapter_for(settings)
     if channel == "sms":
         return WebhookNotificationAdapter(
             channel="sms",

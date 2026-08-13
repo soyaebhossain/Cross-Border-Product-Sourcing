@@ -24,6 +24,15 @@ class RegisterIn(BaseModel):
     role: str = "customer"
 
 
+class PasswordResetRequestIn(BaseModel):
+    identifier: str = Field(min_length=1, max_length=320)
+
+
+class PasswordResetConfirmIn(BaseModel):
+    token: str = Field(min_length=32, max_length=512)
+    password: str = Field(min_length=8, max_length=128)
+
+
 class MFAChallengeIn(BaseModel):
     mfa_token: str = Field(min_length=32, max_length=4096)
 
