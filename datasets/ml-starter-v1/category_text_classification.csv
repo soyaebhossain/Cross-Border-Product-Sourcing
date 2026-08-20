@@ -1,0 +1,611 @@
+example_id,split,product_id,product_name,model,target_category_slug,target_category_name,feature_source,label_source,is_synthetic
+category-1,validation,1,iPhone 14,A2649,phones,Phones,seed_derived,catalog_taxonomy,1
+category-2,train,2,NVIDIA RTX 4070,4070-12G,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-3,train,3,"Xiaomi Power Bank 20,000mAh",PB200ZM,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-4,train,4,Buttom Phones,Nokia 1100,phones,Phones,seed_derived,catalog_taxonomy,1
+category-5,train,5,Light,Nokia 1100,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-6,train,6,Fan,Nova air,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-7,train,7,Haircare SKU0,SKU0,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-8,train,8,Skincare SKU1,SKU1,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-9,train,9,Haircare SKU2,SKU2,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-10,train,10,Skincare SKU3,SKU3,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-11,train,11,Skincare SKU4,SKU4,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-12,test,12,Haircare SKU5,SKU5,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-13,train,13,Skincare SKU6,SKU6,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-14,train,14,Cosmetics SKU7,SKU7,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-15,validation,15,Cosmetics SKU8,SKU8,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-16,train,16,Skincare SKU9,SKU9,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-17,train,17,Skincare SKU10,SKU10,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-18,train,18,Skincare SKU11,SKU11,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-19,train,19,Haircare SKU12,SKU12,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-20,test,20,Skincare SKU13,SKU13,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-21,train,21,Skincare SKU14,SKU14,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-22,test,22,Skincare SKU15,SKU15,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-23,train,23,Skincare SKU16,SKU16,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-24,validation,24,Cosmetics SKU17,SKU17,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-25,validation,25,Haircare SKU18,SKU18,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-26,test,26,Skincare SKU19,SKU19,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-27,validation,27,Skincare SKU20,SKU20,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-28,test,28,Cosmetics SKU21,SKU21,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-29,test,29,Haircare SKU22,SKU22,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-30,train,30,Cosmetics SKU23,SKU23,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-31,train,31,Haircare SKU24,SKU24,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-32,train,32,Haircare SKU25,SKU25,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-33,train,33,Haircare SKU26,SKU26,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-34,train,34,Cosmetics SKU27,SKU27,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-35,validation,35,Cosmetics SKU28,SKU28,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-36,train,36,Cosmetics SKU29,SKU29,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-37,train,37,Haircare SKU30,SKU30,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-38,train,38,Skincare SKU31,SKU31,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-39,validation,39,Skincare SKU32,SKU32,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-40,train,40,Cosmetics SKU33,SKU33,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-41,train,41,Skincare SKU34,SKU34,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-42,train,42,Cosmetics SKU35,SKU35,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-43,train,43,Skincare SKU36,SKU36,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-44,train,44,Skincare SKU37,SKU37,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-45,test,45,Cosmetics SKU38,SKU38,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-46,test,46,Skincare SKU39,SKU39,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-47,train,47,Skincare SKU40,SKU40,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-48,train,48,Skincare SKU41,SKU41,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-49,test,49,Skincare SKU42,SKU42,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-50,train,50,Haircare SKU43,SKU43,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-51,test,51,Cosmetics SKU44,SKU44,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-52,test,52,Haircare SKU45,SKU45,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-53,train,53,Haircare SKU46,SKU46,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-54,test,54,Skincare SKU47,SKU47,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-55,train,55,Haircare SKU48,SKU48,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-56,train,56,Cosmetics SKU49,SKU49,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-57,train,57,Cosmetics SKU50,SKU50,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-58,train,58,Haircare SKU51,SKU51,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-59,train,59,Skincare SKU52,SKU52,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-60,train,60,Skincare SKU53,SKU53,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-61,train,61,Haircare SKU54,SKU54,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-62,validation,62,Haircare SKU55,SKU55,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-63,validation,63,Skincare SKU56,SKU56,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-64,test,64,Haircare SKU57,SKU57,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-65,train,65,Skincare SKU58,SKU58,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-66,train,66,Cosmetics SKU59,SKU59,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-67,train,67,Skincare SKU60,SKU60,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-68,train,68,Haircare SKU61,SKU61,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-69,test,69,Cosmetics SKU62,SKU62,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-70,train,70,Skincare SKU63,SKU63,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-71,train,71,Skincare SKU64,SKU64,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-72,validation,72,Skincare SKU65,SKU65,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-73,train,73,Skincare SKU66,SKU66,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-74,train,74,Skincare SKU67,SKU67,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-75,train,75,Haircare SKU68,SKU68,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-76,train,76,Skincare SKU69,SKU69,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-77,train,77,Haircare SKU70,SKU70,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-78,train,78,Cosmetics SKU71,SKU71,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-79,test,79,Cosmetics SKU72,SKU72,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-80,train,80,Cosmetics SKU73,SKU73,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-81,train,81,Haircare SKU74,SKU74,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-82,validation,82,Skincare SKU75,SKU75,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-83,validation,83,Haircare SKU76,SKU76,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-84,train,84,Haircare SKU77,SKU77,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-85,train,85,Haircare SKU78,SKU78,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-86,train,86,Haircare SKU79,SKU79,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-87,train,87,Skincare SKU80,SKU80,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-88,validation,88,Haircare SKU81,SKU81,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-89,validation,89,Skincare SKU82,SKU82,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-90,train,90,Haircare SKU83,SKU83,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-91,test,91,Haircare SKU84,SKU84,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-92,train,92,Cosmetics SKU85,SKU85,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-93,train,93,Skincare SKU86,SKU86,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-94,validation,94,Haircare SKU87,SKU87,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-95,train,95,Cosmetics SKU88,SKU88,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-96,train,96,Cosmetics SKU89,SKU89,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-97,train,97,Skincare SKU90,SKU90,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-98,train,98,Cosmetics SKU91,SKU91,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-99,train,99,Cosmetics SKU92,SKU92,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-100,train,100,Haircare SKU93,SKU93,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-101,train,101,Cosmetics SKU94,SKU94,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-102,train,102,Haircare SKU95,SKU95,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-103,train,103,Cosmetics SKU96,SKU96,cosmetics,Cosmetics,seed_derived,catalog_taxonomy,1
+category-104,test,104,Haircare SKU97,SKU97,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-105,train,105,Skincare SKU98,SKU98,skincare,Skincare,seed_derived,catalog_taxonomy,1
+category-106,train,106,Haircare SKU99,SKU99,haircare,Haircare,seed_derived,catalog_taxonomy,1
+category-107,train,107,Samsung Galaxy S24 Ultra,SM-S928B,phones,Phones,seed_derived,catalog_taxonomy,1
+category-108,train,108,Samsung Galaxy A55,SM-A556B,phones,Phones,seed_derived,catalog_taxonomy,1
+category-109,train,109,Samsung Galaxy M14,SM-M146B,phones,Phones,seed_derived,catalog_taxonomy,1
+category-110,validation,110,Xiaomi 14 Ultra,23116PN5BC,phones,Phones,seed_derived,catalog_taxonomy,1
+category-111,train,111,Xiaomi Redmi Note 13 Pro,23090RA98G,phones,Phones,seed_derived,catalog_taxonomy,1
+category-112,train,112,Xiaomi Redmi 13C,23100RN82L,phones,Phones,seed_derived,catalog_taxonomy,1
+category-113,validation,113,OPPO Reno 11 Pro,CPH2599,phones,Phones,seed_derived,catalog_taxonomy,1
+category-114,test,114,OPPO A79 5G,CPH2557,phones,Phones,seed_derived,catalog_taxonomy,1
+category-115,test,115,Vivo V29 Pro,V2250,phones,Phones,seed_derived,catalog_taxonomy,1
+category-116,test,116,Vivo Y100,V2321,phones,Phones,seed_derived,catalog_taxonomy,1
+category-117,train,117,Realme 12 Pro Plus,RMX3840,phones,Phones,seed_derived,catalog_taxonomy,1
+category-118,train,118,Realme C67,RMX3890,phones,Phones,seed_derived,catalog_taxonomy,1
+category-119,train,119,Tecno Spark 20 Pro,KJ6,phones,Phones,seed_derived,catalog_taxonomy,1
+category-120,train,120,Tecno Camon 20,CK6,phones,Phones,seed_derived,catalog_taxonomy,1
+category-121,train,121,Infinix Note 40 Pro,X6850,phones,Phones,seed_derived,catalog_taxonomy,1
+category-122,train,122,Infinix Hot 40i,X6528B,phones,Phones,seed_derived,catalog_taxonomy,1
+category-123,train,123,Motorola Edge 50 Pro,XT2429-1,phones,Phones,seed_derived,catalog_taxonomy,1
+category-124,test,124,Motorola Moto G85,XT2357-1,phones,Phones,seed_derived,catalog_taxonomy,1
+category-125,test,125,Nokia G42 5G,TA-1581,phones,Phones,seed_derived,catalog_taxonomy,1
+category-126,train,126,Sony Xperia 10 VI,XQ-ES54,phones,Phones,seed_derived,catalog_taxonomy,1
+category-127,train,127,Google Pixel 8a,G9GVN,phones,Phones,seed_derived,catalog_taxonomy,1
+category-128,train,128,OnePlus 12R,CPH2609,phones,Phones,seed_derived,catalog_taxonomy,1
+category-129,train,129,Honor 90 Smart,WDY-LX1,phones,Phones,seed_derived,catalog_taxonomy,1
+category-130,validation,130,"Apple iPad Air M2 11""",MUWD3LL/A,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-131,train,131,Samsung Galaxy Tab S9 FE,SM-X510,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-132,train,132,Sony WH-1000XM5 Headphones,WH1000XM5/B,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-133,train,133,JBL Charge 5 Speaker,JBLCHARGE5BLK,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-134,train,134,Apple Watch Series 9 45mm,MR993LL/A,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-135,test,135,Samsung Galaxy Watch 6,SM-R930NZAAXFE,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-136,test,136,Garmin Forerunner 265,010-02810-01,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-137,test,137,Anker 737 Power Bank 24K,A1289,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-138,test,138,Baseus 65W GaN Charger,CCGP140201,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-139,train,139,"Xiaomi Smart TV A2 43""",L43M8-A2EU,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-140,test,140,"Philips 27"" 4K Monitor",27E1N5500,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-141,train,141,Logitech MX Master 3S Mouse,910-006556,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-142,validation,142,Keychron K2 Pro Keyboard,K2P-B2,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-143,train,143,JBL Earbuds Live Pro 2,JBLLIVEPRO2TWS,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-144,train,144,Xiaomi Smart Band 8 Pro,BHR7208GL,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-145,train,145,TP-Link Deco XE75 Mesh WiFi,DECO XE75,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-146,train,146,Canon EOS R50 Camera,5811C002,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-147,train,147,DJI Mini 4 Pro Drone,CP.MA.00000731.01,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-148,train,148,Nintendo Switch OLED,HEG-001,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-149,validation,149,Xiaomi Portable Laser Projector,BHR5594GL,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-150,train,150,Anker Soundcore Liberty 4 NC,A3947,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-151,train,151,Belkin BoostCharge Pro 3-in-1,WIZ017dqWH,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-152,train,152,NVIDIA GeForce RTX 4060 Ti,RTX 4060 Ti 8GB,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-153,train,153,AMD Radeon RX 7600 XT,RX 7600 XT 16GB,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-154,test,154,Intel Core i9-14900K,BX8071514900K,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-155,validation,155,AMD Ryzen 9 7950X,100-100000514WOF,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-156,test,156,Intel Core i5-14600K,BX8071514600K,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-157,train,157,AMD Ryzen 5 7600X,100-100000593WOF,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-158,validation,158,Kingston Fury Beast 32GB DDR5,KF556C40BBK2-32,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-159,train,159,Corsair Vengeance 16GB DDR5,CMK16GX5M1B5200C40,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-160,train,160,Samsung 980 Pro 2TB NVMe SSD,MZ-V8P2T0B/AM,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-161,test,161,WD Black SN850X 1TB SSD,WDS100T2X0E,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-162,train,162,Seagate Barracuda 4TB HDD,ST4000DM004,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-163,test,163,ASUS ROG Strix B650-F Gaming,90MB1BN0-M0EAY0,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-164,train,164,MSI MAG B760 Tomahawk WiFi,MAG B760 TOMAHAWK WIFI,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-165,train,165,Corsair RM1000x 1000W PSU,CP-9020201-EU,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-166,train,166,Seasonic Focus GX-850,SSR-850FX,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-167,train,167,Noctua NH-D15 CPU Cooler,NH-D15,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-168,train,168,Corsair iCUE H150i Elite LCD,CW-9060060-WW,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-169,train,169,Fractal Design Torrent Case,FD-C-TOR1A-01,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-170,train,170,Lian Li O11 Dynamic EVO,PC-O11DEX-3,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-171,train,171,Crucial T700 2TB PCIe 5.0 SSD,CT2000T700SSD3,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-172,train,172,G.Skill Trident Z5 RGB 64GB,F5-6400J3239G32GX2-TZ5RK,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-173,validation,173,ASUS ProArt PA329CRV 4K Monitor,PA329CRV,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-174,test,174,Razer Blade 16 RTX 4090,RZ09-0483,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-175,train,175,Elgato 4K60 Pro MK.2 Capture,10GAS9901,pc-components,PC Components,seed_derived,catalog_taxonomy,1
+category-176,train,176,Xiaomi Mi Smart Tower Fan,ZLBPLDS05ZM,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-177,validation,177,Dyson Cool AM07 Tower Fan,300172-01,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-178,train,178,TP-Link Tapo Smart Ceiling Fan,TF10,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-179,train,179,"Orient Airmax Ceiling Fan 56""",AIRMAX-56-WH,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-180,validation,180,"Panasonic F-M15H5 Desk Fan 6""",F-M15H5,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-181,train,181,"Midea MAF14 14"" Stand Fan",MAF14,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-182,train,182,Walton WPF-16E Pedestal Fan,WPF-16E,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-183,train,183,"Vision Rechargeable Fan 12""",VRF-1200,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-184,train,184,Haier HF-14BLW Stand Fan,HF-14BLW,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-185,test,185,Samsung WindFree 1.5 Ton AC,AR18BYHYBWKNFE,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-186,test,186,General 1.5 Ton Split AC,ASGA18FMTA,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-187,train,187,Gree 1 Ton Inverter AC,GS-12XPUV32,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-188,validation,188,Xiaomi Mijia DC Inverter Fan,BPLDS05DM,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-189,train,189,Rowenta VU5670 Turbo Silence,VU5670,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-190,train,190,Honeywell HT-900 TurboForce Fan,HT-900,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-191,test,191,Vornado 630 Whole Room Fan,CR1-0121-06,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-192,train,192,"KDK 56"" Industrial Ceiling Fan",K14X9-BK,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-193,train,193,Bajaj Esteem 1200mm Ceiling Fan,252241,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-194,train,194,Crompton Energion Ceiling Fan,ENERGION-1200,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-195,train,195,Polar Windmill 900mm Table Fan,WM-900,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-196,train,196,Usha Striker Marvel Exhaust Fan,STRIKER-MARVEL,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-197,train,197,Havells Stealth Air Ceiling Fan,FHCSSTWOWH48,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-198,train,198,"Mistral 16"" Rechargeable Fan",MRF1613RB,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-199,test,199,"Midea MAF20 20"" Industrial Fan",MAF20-IND,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-200,test,200,Sharp PJ-A19RV Air Purifier Fan,PJ-A19RV,electronic,Fan,seed_derived,catalog_taxonomy,1
+category-201,train,201,Siemens S7-1200 PLC CPU 1214C,6ES7214-1AG40-0XB0,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-202,test,202,Mitsubishi MELSEC FX5U-32MT PLC,FX5U-32MT/ES,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-203,train,203,Delta DVP32ES2 PLC,DVP32ES200T,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-204,validation,204,ABB ACS355-03E-07A3-4 VFD,ACS355-03E-07A3-4,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-205,train,205,Schneider Altivar ATV320U07N4B VFD,ATV320U07N4B,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-206,train,206,Keyence FS-N11P Fiber Sensor,FS-N11P,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-207,test,207,Omron E3Z-D61 Photoelectric Sensor,E3Z-D61,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-208,train,208,Sick DT35-B15251 Distance Sensor,DT35-B15251,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-209,train,209,Fanuc Alpha Series Servo Motor,A06B-0235-B605,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-210,train,210,Yaskawa SGMJV-04A Servo Drive,SGDV-2R8A01A002000,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-211,train,211,Beckhoff EK1100 EtherCAT Coupler,EK1100,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-212,train,212,Festo DSBC-63-100-PPSA Cylinder,DSBC-63-100-PPSA-N3,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-213,test,213,SMC AF40-N04D Air Filter,AF40-N04D,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-214,train,214,Phoenix Contact MKDS 3/2 Terminal,1715021,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-215,validation,215,IFM AL1321 IO-Link Master,AL1321,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-216,train,216,Cognex In-Sight 2000 Vision System,IS2000M-120-30-000,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-217,train,217,Turck Bi5U-M18-AP6X Inductive Sensor,Bi5U-M18-AP6X,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-218,train,218,Rexnord 1060-60 Gear Drive,1060-60,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-219,train,219,Leuze DDLS 200.1-2 Optical Sensor,DDLS 200.1-2,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-220,validation,220,Pepperl+Fuchs UB500-18GM75-E5-V1,UB500-18GM75-E5-V1,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-221,test,221,Bosch Rexroth Ball Screw R160520501,R160520501,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-222,train,222,Nord SK 072.1-71L4/TF Gearbox,SK 072.1-71L4/TF,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-223,train,223,Weidmuller WRS 1.5 Terminal Block,1020080000,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-224,test,224,Banner QS30LPQD Photoelectric,QS30LPQD,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-225,train,225,Parker D1VW001CNJB Hydraulic Valve,D1VW001CNJB,industrial-automation,Industrial Automation,seed_derived,catalog_taxonomy,1
+category-226,train,226,Philips IntelliVue MX40 Monitor,866064,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-227,test,227,GE Healthcare MAC 800 ECG Machine,2032005-001,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-228,train,228,Mindray DC-30 Ultrasound,DC-30,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-229,train,229,Omron HEM-7600T Blood Pressure,HEM-7600T,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-230,train,230,Nonin 9590 Onyx II Pulse Oximeter,9590,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-231,validation,231,Welch Allyn 3.5V PanOptic Ophthalmoscope,11810,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-232,train,232,Masimo Radical-7 Pulse Oximeter,7360,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-233,train,233,Draeger Evita 600 Ventilator,MS31350,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-234,train,234,Medtronic Puritan Bennett 980,10074093,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-235,train,235,Carefusion Alaris 8015 Infusion Pump,8015,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-236,test,236,Nihon Kohden EEG-2100G Machine,EEG-2100G,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-237,train,237,Spacelabs 91369 Patient Monitor,91369,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-238,train,238,Philips HeartStart FRx AED,861304,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-239,validation,239,Zoll AED 3 Defibrillator,8600-001000-01,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-240,train,240,Edan iM50 Portable Monitor,01.21.064765,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-241,test,241,Contec CMS8000 ICU Monitor,CMS8000,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-242,validation,242,Bionet FC1400 Fetal Monitor,FC1400,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-243,train,243,Siemens ADVIA 120 Hematology Analyzer,10133601,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-244,test,244,Roche COBAS e411 Immunoassay Analyzer,05994183001,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-245,train,245,Abbott i-STAT 1 Handheld Analyzer,03P95-25,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-246,train,246,Nihon Kohden NKT-115 Telemetry,NKT-115,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-247,test,247,BPL Cardiart 6108T ECG,Cardiart 6108T,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-248,train,248,Mindray MEC-1200 Bedside Monitor,MEC-1200,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-249,train,249,Nellcor PM10N Pulse Oximeter,PM10N,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-250,train,250,CareFusion LTV 1200 Ventilator,18190-001,medical-equipment,Medical Equipment,seed_derived,catalog_taxonomy,1
+category-251,train,251,DJI Agras T40 Agricultural Drone,CP.AG.00000064.01,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-252,train,252,DJI Agras T20P Spray Drone,CP.AG.00000057.01,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-253,train,253,Trimble EZ-Guide 250 GPS System,57505-00,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-254,train,254,Soil NPK IoT Sensor RS485,JXBS-3001-NPK,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-255,train,255,Minolta SPAD-502Plus Chlorophyll,SPAD-502Plus,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-256,train,256,Grain Moisture Meter PM-8188A,PM-8188A,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-257,train,257,Davis Vantage Pro2 Weather Station,6152,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-258,validation,258,Irritrol Drip Irrigation Controller,RAIBIRD-6,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-259,test,259,Priva Connext Greenhouse Controller,Connext-4,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-260,test,260,LED Grow Light 600W Samsung LM301,GL600-LM301H,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-261,train,261,Hydroponic NFT 72-Site System,NFT-72-CH,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-262,train,262,Precision Vacuum Seeder 6-Row,PS-6R-VACUUM,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-263,test,263,Root Zone Temperature Sensor DS18B20,DS18B20-PROBE-IP68,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-264,train,264,Plant Disease AI Camera,PlantCam-AI-V2,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-265,validation,265,Poultry Environment Controller,PEC-8CH-V3,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-266,train,266,Aquaculture Water Quality Monitor,AQM-4IN1,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-267,validation,267,Aquaponics Complete Starter System,APS-200L,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-268,test,268,GPS Livestock Ear Tag Tracker,LT-GPS-EAR-4G,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-269,train,269,DJI D-RTK 2 Mobile Station,CP.AG.00000015.02,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-270,train,270,Cold Room Controller EBM-20,EBM-20-230VAC,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-271,test,271,Fruit Brix Refractometer Digital,PAL-BX|ACID97,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-272,train,272,Automated Fertigation Controller,FC-6ZONE-PRO,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-273,train,273,Soil Moisture Sensor Capacitive v2,CAP-SOIL-V2,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-274,train,274,Vertical Farm Rack LED System,VF-RACK-1200W,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-275,train,275,Solar Powered Irrigation Pump 24V,SIP-750W-24V,agricultural-tech,Agricultural Tech,seed_derived,catalog_taxonomy,1
+category-276,test,276,Growatt SPF 5000ES Solar Inverter,SPF 5000 ES,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-277,train,277,Huawei SUN2000-10KTL-M1 Inverter,SUN2000-10KTL-M1,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-278,train,278,SMA Sunny Boy 3.6-1AV-41 Inverter,SB3.6-1AV-41,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-279,train,279,Deye SUN-8K-SG04LP3 Hybrid Inverter,SUN-8K-SG04LP3-EU,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-280,train,280,KSTAR BluE-S 6KT Hybrid Inverter,BluE-S 6KT,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-281,test,281,EV AC Charger Wallbox Pulsar Plus 22kW,PLP1-0-2-4-9-002-C,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-282,test,282,EV DC Fast Charger 50kW CCS CHAdeMO,EVC-50-DC-DUAL,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-283,train,283,CATL LiFePO4 280Ah Grade A Cell,EVE-LF280K,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-284,train,284,BYD Battery Box Premium LVS 4.0,BYD-LVS-4.0,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-285,train,285,Solar Panel 550W Mono PERC Risen,RSM110-8-550M,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-286,test,286,Solar Panel 400W Bifacial Longi,LR5-54HTH-400M,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-287,train,287,Victron MPPT 100/50 Charge Controller,SCC020050200,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-288,train,288,Victron MultiPlus-II 48/3000/35-32,PMP482305010,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-289,train,289,CATL 10kWh LiFePO4 Home Battery,CATL-HBS-10,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-290,validation,290,Lithium Pack 48V 200Ah LiFePO4,LP48V200AH-BMS,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-291,validation,291,EV Conversion Kit 72V 3000W,EVCK-72V-3000W-BLDC,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-292,train,292,E-Bike Rear Hub Motor Kit 1000W,EBHM-1000W-48V-RR,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-293,train,293,Solar Street Light 100W All-in-One,SSL-100W-AIO-6M,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-294,train,294,Heat Pump Water Heater 200L,HPWH-200L-3.8COP,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-295,train,295,Portable Power Station Jackery 1000,Explorer-1000-Pro,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-296,validation,296,Wind Turbine 1kW 24V Horizontal,WT-1000W-H24V-3B,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-297,train,297,EV Charging RFID Card Controller,EV-OCPP-16A-RFID,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-298,train,298,Solar Panel Mounting Rail 4m,SOLAR-RAIL-AL-4M,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-299,train,299,48V 60Ah LiFePO4 E-Rickshaw Battery,LP48V60AH-EV-BMS,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-300,test,300,EV Charge Point OCPP Cloud Manager,EV-CLOUD-OCPP-16,clean-energy-ev,Clean Energy & EV,seed_derived,catalog_taxonomy,1
+category-301,validation,301,Rigol DS1054Z Digital Oscilloscope,DS1054Z,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-302,validation,302,Siglent SDG2042X Function Generator,SDG2042X,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-303,train,303,Fluke 87V Industrial Multimeter,87V,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-304,train,304,GW Instek LCR-819 Precision Meter,LCR-819,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-305,validation,305,Rigol DSA875-TG Spectrum Analyzer,DSA875-TG,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-306,train,306,NanoVNA-F V2 4.4GHz Vector Analyzer,NANOVNA-F-V2,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-307,train,307,Korad KA3005P Bench Power Supply,KA3005P,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-308,train,308,Hakko FX-951 Soldering Station,FX951-66,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-309,train,309,T962A PCB Reflow Oven 300x320mm,T962A,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-310,train,310,Sartorius ME235S Analytical Balance,ME235S,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-311,train,311,Hanna HI98130 pH/EC/TDS Meter,HI98130,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-312,test,312,Shimadzu UV-1900i Spectrophotometer,UV-1900i,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-313,train,313,Trinocular Microscope BM2000,BM2000-T-LED,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-314,train,314,Dino-Lite AM7515MT8A Digital Microscope,AM7515MT8A,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-315,test,315,FLIR One Pro iOS Thermal Camera,435-0011-03,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-316,test,316,Saleae Logic Pro 16 USB Analyzer,LOGIC-PRO-16,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-317,train,317,Segger J-Link BASE Compact,8.19.00,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-318,train,318,Weiss Technik WK 3-40/40 Chamber,WK 3-40/40,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-319,train,319,MSA Altair 4XR Gas Detector,10128840,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-320,train,320,PCE-322A Sound Level Meter,PCE-322A,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-321,train,321,Keysight 34461A Bench Multimeter,34461A-G,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-322,train,322,Siglent SDS1202X-E Oscilloscope,SDS1202X-E,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-323,test,323,Extech AN200 Anemometer,AN200,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-324,train,324,Endress+Hauser Prosonic M FMU40,FMU40-ARB2A2,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-325,test,325,Rohde Schwarz RTM3004 Oscilloscope,RTM3004,scientific-instruments,Scientific Instruments,seed_derived,catalog_taxonomy,1
+category-326,train,326,Bambu Lab X1 Carbon 3D Printer,X1C-Combo,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-327,test,327,Creality K1 Max FDM 3D Printer,K1-Max,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-328,train,328,Elegoo Saturn 3 Ultra MSLA Printer,Saturn-3-Ultra,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-329,test,329,Prusa MK4 3D Printer Kit,MK4S,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-330,train,330,Bambu Lab P1S 3D Printer,P1S-Combo,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-331,validation,331,AnkerMake M5C 3D Printer,M5C,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-332,validation,332,Formlabs Form 3L SLA Printer,Form 3L,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-333,train,333,Bambu Lab AMS Multi-filament Unit,AMS,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-334,train,334,Raspberry Pi 5 8GB RAM,SC1112,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-335,test,335,NVIDIA Jetson Orin Nano 8GB,945-13766-0050-000,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-336,train,336,NVIDIA Jetson Nano 4GB Developer Kit,945-13450-0000-100,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-337,train,337,Arduino Mega 2560 R3 Official,A000067,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-338,train,338,Raspberry Pi Pico 2 W,SC1632,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-339,train,339,xTool D1 Pro 20W Laser Engraver,D1-Pro-20W,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-340,validation,340,CNC 3018 Pro Max Router GRBL,3018-ProMax,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-341,train,341,PLA+ Filament 3kg Bundle Bambu,PLA-PLUS-3KG-WHITE,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-342,train,342,PETG Carbon Fiber Filament 1kg,PETG-CF-1KG,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-343,train,343,TPU 95A Flexible Filament 1kg,TPU95A-1KG-BLK,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-344,train,344,Elegoo 405nm ABS-Like UV Resin 1L,EL-3D-RESIN-1L,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-345,test,345,Google Coral USB Accelerator TPU,G950-06809-01,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-346,train,346,Intel RealSense D435i Depth Camera,82635AWGDVKPRQ,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-347,train,347,Luxonis OAK-D Lite Spatial Camera,OAK-D-LITE-FF,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-348,train,348,Creality Ender 3 V3 KE 3D Printer,Ender-3-V3-KE,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-349,train,349,ESP32-S3 Dev Kit N16R8,ESP32-S3-DevKitC-1,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-350,test,350,Jetson Xavier NX 16GB Module,900-83668-0030-000,3d-printing-maker,3D Printing & Maker,seed_derived,catalog_taxonomy,1
+category-351,train,351,Digital Clinical Thermometer,MED-001,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-352,train,352,Infrared Forehead Thermometer,MED-002,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-353,train,353,Fingertip Pulse Oximeter,MED-003,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-354,test,354,Automatic Blood Pressure Monitor,MED-004,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-355,validation,355,Aneroid Blood Pressure Kit,MED-005,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-356,test,356,Dual-Head Stethoscope,MED-006,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-357,train,357,Blood Glucose Monitoring Kit,MED-007,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-358,train,358,Glucose Test Strip Pack,MED-008,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-359,train,359,Portable Compressor Nebulizer,MED-009,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-360,train,360,Personal Steam Inhaler,MED-010,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-361,train,361,Comprehensive First Aid Kit,MED-011,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-362,train,362,Cotton Bandage Roll,MED-012,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-363,train,363,Adhesive Bandage Assortment,MED-013,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-364,train,364,Sterile Gauze Pad Pack,MED-014,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-365,train,365,Medical Adhesive Tape,MED-015,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-366,train,366,Elastic Crepe Bandage,MED-016,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-367,train,367,Adjustable Knee Support,MED-017,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-368,validation,368,Compression Ankle Support,MED-018,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-369,validation,369,Wrist Support Brace,MED-019,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-370,train,370,Lumbar Support Belt,MED-020,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-371,test,371,Soft Cervical Collar,MED-021,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-372,train,372,Adjustable Arm Sling,MED-022,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-373,train,373,Aluminum Underarm Crutches,MED-023,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-374,train,374,Height-Adjustable Walking Cane,MED-024,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-375,train,375,Foldable Walking Frame,MED-025,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-376,validation,376,Lightweight Manual Wheelchair,MED-026,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-377,validation,377,Adjustable Shower Chair,MED-027,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-378,test,378,Portable Commode Chair,MED-028,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-379,train,379,Safety Bed Rail,MED-029,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-380,train,380,Anti-Decubitus Air Mattress,MED-030,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-381,test,381,Reusable Hot and Cold Pack,MED-031,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-382,train,382,Electric Heating Pad,MED-032,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-383,validation,383,Reusable Ice Bag,MED-033,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-384,test,384,Disposable Adult Face Mask,MED-034,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-385,train,385,Disposable Child Face Mask,MED-035,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-386,train,386,Protective Face Shield,MED-036,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-387,train,387,Nitrile Examination Gloves,MED-037,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-388,test,388,Latex Examination Gloves,MED-038,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-389,train,389,Touchless Sanitizer Dispenser,MED-039,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-390,test,390,Weekly Pill Organizer,MED-040,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-391,test,391,Lockable Medicine Storage Box,MED-041,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-392,train,392,Tablet Cutter,MED-042,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-393,train,393,Tablet Crusher,MED-043,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-394,validation,394,Hearing Aid Battery Pack,MED-044,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-395,train,395,Thermometer Probe Cover Pack,MED-045,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-396,train,396,Manual Nasal Aspirator,MED-046,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-397,train,397,Digital Baby Weighing Scale,MED-047,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-398,train,398,Digital Body Weight Scale,MED-048,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-399,train,399,Medical Measuring Tape,MED-049,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-400,train,400,Reusable Diagnostic Penlight,MED-050,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-401,train,401,Neurological Reflex Hammer,MED-051,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-402,validation,402,Medical Tuning Fork Set,MED-052,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-403,train,403,Portable Otoscope Set,MED-053,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-404,train,404,Portable Ophthalmoscope Set,MED-054,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-405,train,405,LED Examination Light,MED-055,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-406,train,406,Portable Suction Machine,MED-056,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-407,train,407,Oxygen Mask Kit,MED-057,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-408,validation,408,Oxygen Nasal Cannula,MED-058,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-409,train,409,Handheld Incentive Spirometer,MED-059,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-410,train,410,Peak Flow Meter,MED-060,medical-products-accessories,Medical Products & Accessories,seed_derived,catalog_taxonomy,1
+category-411,validation,411,Gold Cable Chain Necklace,JPM-001,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-412,validation,412,Gold Figaro Chain Necklace,JPM-002,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-413,train,413,Gold Rope Chain Necklace,JPM-003,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-414,test,414,Gold Pendant Necklace,JPM-004,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-415,train,415,Gold Link Bracelet,JPM-005,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-416,train,416,Gold Cuff Bracelet,JPM-006,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-417,test,417,Gold Classic Bangle,JPM-007,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-418,validation,418,Gold Stackable Ring,JPM-008,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-419,train,419,Gold Signet Ring,JPM-009,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-420,train,420,Gold Wedding Band,JPM-010,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-421,train,421,Gold Stud Earrings,JPM-011,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-422,train,422,Gold Hoop Earrings,JPM-012,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-423,train,423,Gold Bullion Bar,JPM-013,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-424,train,424,Gold Bullion Coin,JPM-014,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-425,train,425,Silver Cable Chain Necklace,JPM-015,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-426,train,426,Silver Figaro Chain Necklace,JPM-016,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-427,train,427,Silver Rope Chain Necklace,JPM-017,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-428,train,428,Silver Pendant Necklace,JPM-018,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-429,train,429,Silver Link Bracelet,JPM-019,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-430,test,430,Silver Cuff Bracelet,JPM-020,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-431,validation,431,Silver Classic Bangle,JPM-021,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-432,train,432,Silver Stackable Ring,JPM-022,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-433,train,433,Silver Signet Ring,JPM-023,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-434,train,434,Silver Wedding Band,JPM-024,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-435,train,435,Silver Stud Earrings,JPM-025,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-436,train,436,Silver Hoop Earrings,JPM-026,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-437,validation,437,Silver Bullion Bar,JPM-027,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-438,train,438,Silver Bullion Coin,JPM-028,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-439,test,439,Platinum Chain Necklace,JPM-029,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-440,train,440,Platinum Link Bracelet,JPM-030,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-441,train,441,Platinum Wedding Band,JPM-031,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-442,train,442,Platinum Stud Earrings,JPM-032,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-443,train,443,Palladium Wedding Band,JPM-033,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-444,train,444,Rose Gold Bracelet,JPM-034,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-445,validation,445,White Gold Pendant Setting,JPM-035,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-446,train,446,Two-Tone Gold Ring,JPM-036,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-447,train,447,Round-Cut Diamond Stone,JPM-037,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-448,train,448,Princess-Cut Diamond Stone,JPM-038,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-449,train,449,Emerald-Cut Diamond Stone,JPM-039,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-450,validation,450,Oval-Cut Diamond Stone,JPM-040,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-451,train,451,Pear-Cut Diamond Stone,JPM-041,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-452,train,452,Marquise-Cut Diamond Stone,JPM-042,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-453,test,453,Cushion-Cut Diamond Stone,JPM-043,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-454,train,454,Radiant-Cut Diamond Stone,JPM-044,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-455,train,455,Asscher-Cut Diamond Stone,JPM-045,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-456,train,456,Heart-Cut Diamond Stone,JPM-046,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-457,validation,457,Diamond Solitaire Pendant,JPM-047,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-458,train,458,Diamond Tennis Bracelet,JPM-048,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-459,test,459,Diamond Stud Earrings,JPM-049,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-460,train,460,Diamond Cluster Ring,JPM-050,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-461,train,461,Ruby Gemstone,JPM-051,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-462,train,462,Blue Sapphire Gemstone,JPM-052,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-463,train,463,Emerald Gemstone,JPM-053,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-464,train,464,Amethyst Gemstone,JPM-054,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-465,test,465,Aquamarine Gemstone,JPM-055,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-466,train,466,Citrine Gemstone,JPM-056,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-467,train,467,Garnet Gemstone,JPM-057,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-468,test,468,Opal Gemstone,JPM-058,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-469,validation,469,Peridot Gemstone,JPM-059,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-470,test,470,Tanzanite Gemstone,JPM-060,jewelry-gems-precious-metals,"Jewelry, Gems & Precious Metals",seed_derived,catalog_taxonomy,1
+category-471,test,471,Adjustable Phone Stand,MOB-001,mobile-accessories,Mobile Accessories,seed_derived,catalog_taxonomy,1
+category-472,test,472,Magnetic Phone Grip,MOB-002,mobile-accessories,Mobile Accessories,seed_derived,catalog_taxonomy,1
+category-473,train,473,Shockproof Phone Case,MOB-003,mobile-accessories,Mobile Accessories,seed_derived,catalog_taxonomy,1
+category-474,train,474,Tempered Glass Screen Protector,MOB-004,mobile-accessories,Mobile Accessories,seed_derived,catalog_taxonomy,1
+category-475,validation,475,USB-C Wall Charger,MOB-005,mobile-accessories,Mobile Accessories,seed_derived,catalog_taxonomy,1
+category-476,train,476,USB-C Mobile Data Cable,MOB-006,mobile-accessories,Mobile Accessories,seed_derived,catalog_taxonomy,1
+category-477,train,477,Eight-Pin Mobile Data Cable,MOB-007,mobile-accessories,Mobile Accessories,seed_derived,catalog_taxonomy,1
+category-478,train,478,Braided Multi-Connector Cable,MOB-008,mobile-accessories,Mobile Accessories,seed_derived,catalog_taxonomy,1
+category-479,test,479,Waterproof Phone Pouch,MOB-009,mobile-accessories,Mobile Accessories,seed_derived,catalog_taxonomy,1
+category-480,train,480,Car Dashboard Phone Mount,MOB-010,mobile-accessories,Mobile Accessories,seed_derived,catalog_taxonomy,1
+category-481,train,481,Bicycle Phone Mount,MOB-011,mobile-accessories,Mobile Accessories,seed_derived,catalog_taxonomy,1
+category-482,train,482,Mobile Cable Organizer Kit,MOB-012,mobile-accessories,Mobile Accessories,seed_derived,catalog_taxonomy,1
+category-483,train,483,Adjustable Laptop Stand,LPC-001,laptop-pc-accessories,Laptop & PC Accessories,seed_derived,catalog_taxonomy,1
+category-484,train,484,Padded Laptop Sleeve,LPC-002,laptop-pc-accessories,Laptop & PC Accessories,seed_derived,catalog_taxonomy,1
+category-485,train,485,1080p USB Webcam,LPC-003,laptop-pc-accessories,Laptop & PC Accessories,seed_derived,catalog_taxonomy,1
+category-486,train,486,Wireless Computer Mouse,LPC-004,laptop-pc-accessories,Laptop & PC Accessories,seed_derived,catalog_taxonomy,1
+category-487,test,487,Compact USB Keyboard,LPC-005,laptop-pc-accessories,Laptop & PC Accessories,seed_derived,catalog_taxonomy,1
+category-488,train,488,USB-C Multiport Hub,LPC-006,laptop-pc-accessories,Laptop & PC Accessories,seed_derived,catalog_taxonomy,1
+category-489,train,489,USB Mini Condenser Microphone,LPC-007,laptop-pc-accessories,Laptop & PC Accessories,seed_derived,catalog_taxonomy,1
+category-490,test,490,Foldable Laptop Riser,LPC-008,laptop-pc-accessories,Laptop & PC Accessories,seed_derived,catalog_taxonomy,1
+category-491,train,491,Webcam Privacy Cover Pack,LPC-009,laptop-pc-accessories,Laptop & PC Accessories,seed_derived,catalog_taxonomy,1
+category-492,test,492,Desk Cable Management Tray,LPC-010,laptop-pc-accessories,Laptop & PC Accessories,seed_derived,catalog_taxonomy,1
+category-493,train,493,Extended Desk Mouse Pad,LPC-011,laptop-pc-accessories,Laptop & PC Accessories,seed_derived,catalog_taxonomy,1
+category-494,validation,494,Laptop Cooling Pad,LPC-012,laptop-pc-accessories,Laptop & PC Accessories,seed_derived,catalog_taxonomy,1
+category-495,train,495,Geometry Instrument Set,EDU-001,educational-academic-tools,Educational & Academic Tools,seed_derived,catalog_taxonomy,1
+category-496,test,496,Dry-Erase Student Lapboard,EDU-002,educational-academic-tools,Educational & Academic Tools,seed_derived,catalog_taxonomy,1
+category-497,train,497,Magnetic Letter Learning Set,EDU-003,educational-academic-tools,Educational & Academic Tools,seed_derived,catalog_taxonomy,1
+category-498,train,498,Educational Flash Card Set,EDU-004,educational-academic-tools,Educational & Academic Tools,seed_derived,catalog_taxonomy,1
+category-499,train,499,Document Reading Stand,EDU-005,educational-academic-tools,Educational & Academic Tools,seed_derived,catalog_taxonomy,1
+category-500,validation,500,Undated Academic Planner,EDU-006,educational-academic-tools,Educational & Academic Tools,seed_derived,catalog_taxonomy,1
+category-501,train,501,Protective Calculator Case,EDU-007,educational-academic-tools,Educational & Academic Tools,seed_derived,catalog_taxonomy,1
+category-502,train,502,Digital Classroom Timer,EDU-008,educational-academic-tools,Educational & Academic Tools,seed_derived,catalog_taxonomy,1
+category-503,train,503,Retractable Map Pointer,EDU-009,educational-academic-tools,Educational & Academic Tools,seed_derived,catalog_taxonomy,1
+category-504,train,504,Adjustable Book Stand,EDU-010,educational-academic-tools,Educational & Academic Tools,seed_derived,catalog_taxonomy,1
+category-505,test,505,Student Mini Microscope,EDU-011,educational-academic-tools,Educational & Academic Tools,seed_derived,catalog_taxonomy,1
+category-506,test,506,Molecular Model Kit,EDU-012,educational-academic-tools,Educational & Academic Tools,seed_derived,catalog_taxonomy,1
+category-507,test,507,Desktop Microphone Arm,CRT-001,creator-content-tools,Creator & Content Tools,seed_derived,catalog_taxonomy,1
+category-508,train,508,Tabletop Camera Tripod,CRT-002,creator-content-tools,Creator & Content Tools,seed_derived,catalog_taxonomy,1
+category-509,train,509,Smartphone Video Rig,CRT-003,creator-content-tools,Creator & Content Tools,seed_derived,catalog_taxonomy,1
+category-510,train,510,Foldable Photography Reflector,CRT-004,creator-content-tools,Creator & Content Tools,seed_derived,catalog_taxonomy,1
+category-511,test,511,Photo Backdrop Support Stand,CRT-005,creator-content-tools,Creator & Content Tools,seed_derived,catalog_taxonomy,1
+category-512,test,512,Green Screen Backdrop Cloth,CRT-006,creator-content-tools,Creator & Content Tools,seed_derived,catalog_taxonomy,1
+category-513,train,513,Camera Cold Shoe Mount,CRT-007,creator-content-tools,Creator & Content Tools,seed_derived,catalog_taxonomy,1
+category-514,train,514,Teleprompter Phone Bracket,CRT-008,creator-content-tools,Creator & Content Tools,seed_derived,catalog_taxonomy,1
+category-515,train,515,LED Ring Light Kit,CRT-009,creator-content-tools,Creator & Content Tools,seed_derived,catalog_taxonomy,1
+category-516,train,516,Clip-on Lavalier Mini Microphone,CRT-010,creator-content-tools,Creator & Content Tools,seed_derived,catalog_taxonomy,1
+category-517,train,517,Adjustable Creator Phone Mount,CRT-011,creator-content-tools,Creator & Content Tools,seed_derived,catalog_taxonomy,1
+category-518,validation,518,Portable Light Diffuser,CRT-012,creator-content-tools,Creator & Content Tools,seed_derived,catalog_taxonomy,1
+category-519,train,519,Poly Mailer Pack,PKG-001,ecommerce-packaging-supplies,E-commerce Packaging Supplies,seed_derived,catalog_taxonomy,1
+category-520,train,520,Corrugated Shipping Box Set,PKG-002,ecommerce-packaging-supplies,E-commerce Packaging Supplies,seed_derived,catalog_taxonomy,1
+category-521,test,521,Padded Mailer Pack,PKG-003,ecommerce-packaging-supplies,E-commerce Packaging Supplies,seed_derived,catalog_taxonomy,1
+category-522,train,522,Paper Void Fill Roll,PKG-004,ecommerce-packaging-supplies,E-commerce Packaging Supplies,seed_derived,catalog_taxonomy,1
+category-523,train,523,Honeycomb Wrapping Paper Roll,PKG-005,ecommerce-packaging-supplies,E-commerce Packaging Supplies,seed_derived,catalog_taxonomy,1
+category-524,validation,524,Kraft Packing Tape Pack,PKG-006,ecommerce-packaging-supplies,E-commerce Packaging Supplies,seed_derived,catalog_taxonomy,1
+category-525,test,525,Tamper-Evident Label Roll,PKG-007,ecommerce-packaging-supplies,E-commerce Packaging Supplies,seed_derived,catalog_taxonomy,1
+category-526,test,526,Thermal Shipping Label Roll,PKG-008,ecommerce-packaging-supplies,E-commerce Packaging Supplies,seed_derived,catalog_taxonomy,1
+category-527,train,527,Packing Slip Envelope Pack,PKG-009,ecommerce-packaging-supplies,E-commerce Packaging Supplies,seed_derived,catalog_taxonomy,1
+category-528,train,528,Reusable Zip Shipping Bag,PKG-010,ecommerce-packaging-supplies,E-commerce Packaging Supplies,seed_derived,catalog_taxonomy,1
+category-529,train,529,Cardboard Corner Protector Pack,PKG-011,ecommerce-packaging-supplies,E-commerce Packaging Supplies,seed_derived,catalog_taxonomy,1
+category-530,train,530,Barcode Sticker Roll,PKG-012,ecommerce-packaging-supplies,E-commerce Packaging Supplies,seed_derived,catalog_taxonomy,1
+category-531,validation,531,Stackable Storage Bin,HOS-001,home-organization-storage,Home Organization & Storage,seed_derived,catalog_taxonomy,1
+category-532,train,532,Under-Bed Storage Bag,HOS-002,home-organization-storage,Home Organization & Storage,seed_derived,catalog_taxonomy,1
+category-533,train,533,Adjustable Drawer Divider Set,HOS-003,home-organization-storage,Home Organization & Storage,seed_derived,catalog_taxonomy,1
+category-534,test,534,Closet Shelf Organizer,HOS-004,home-organization-storage,Home Organization & Storage,seed_derived,catalog_taxonomy,1
+category-535,train,535,Hanging Wardrobe Organizer,HOS-005,home-organization-storage,Home Organization & Storage,seed_derived,catalog_taxonomy,1
+category-536,test,536,Foldable Fabric Storage Cube,HOS-006,home-organization-storage,Home Organization & Storage,seed_derived,catalog_taxonomy,1
+category-537,test,537,Cabinet Shelf Riser,HOS-007,home-organization-storage,Home Organization & Storage,seed_derived,catalog_taxonomy,1
+category-538,train,538,Clear Shoe Storage Box,HOS-008,home-organization-storage,Home Organization & Storage,seed_derived,catalog_taxonomy,1
+category-539,train,539,Cable Storage Box,HOS-009,home-organization-storage,Home Organization & Storage,seed_derived,catalog_taxonomy,1
+category-540,train,540,Bathroom Counter Organizer,HOS-010,home-organization-storage,Home Organization & Storage,seed_derived,catalog_taxonomy,1
+category-541,train,541,Vacuum Storage Bag Set,HOS-011,home-organization-storage,Home Organization & Storage,seed_derived,catalog_taxonomy,1
+category-542,train,542,Rolling Utility Cart,HOS-012,home-organization-storage,Home Organization & Storage,seed_derived,catalog_taxonomy,1
+category-543,test,543,Faux Leather Belt,FAS-001,fashion-accessories,Fashion Accessories,seed_derived,catalog_taxonomy,1
+category-544,train,544,Woven Fabric Belt,FAS-002,fashion-accessories,Fashion Accessories,seed_derived,catalog_taxonomy,1
+category-545,test,545,Casual Crossbody Bag,FAS-003,fashion-accessories,Fashion Accessories,seed_derived,catalog_taxonomy,1
+category-546,train,546,Cotton-Blend Baseball Cap,FAS-004,fashion-accessories,Fashion Accessories,seed_derived,catalog_taxonomy,1
+category-547,train,547,Unbranded Bucket Hat,FAS-005,fashion-accessories,Fashion Accessories,seed_derived,catalog_taxonomy,1
+category-548,train,548,Hair Claw Clip Set,FAS-006,fashion-accessories,Fashion Accessories,seed_derived,catalog_taxonomy,1
+category-549,validation,549,Fabric Headband Set,FAS-007,fashion-accessories,Fashion Accessories,seed_derived,catalog_taxonomy,1
+category-550,test,550,Non-Precious Brooch Set,FAS-008,fashion-accessories,Fashion Accessories,seed_derived,catalog_taxonomy,1
+category-551,train,551,Costume Jewelry Bracelet,FAS-009,fashion-accessories,Fashion Accessories,seed_derived,catalog_taxonomy,1
+category-552,train,552,Sunglasses Storage Case,FAS-010,fashion-accessories,Fashion Accessories,seed_derived,catalog_taxonomy,1
+category-553,train,553,Unbranded Fashion Wallet,FAS-011,fashion-accessories,Fashion Accessories,seed_derived,catalog_taxonomy,1
+category-554,train,554,School Backpack,FAS-012,fashion-accessories,Fashion Accessories,seed_derived,catalog_taxonomy,1
+category-555,train,555,Makeup Brush Set,BTY-001,beauty-tools-accessories,Beauty Tools & Accessories,seed_derived,catalog_taxonomy,1
+category-556,train,556,Cosmetic Sponge Set,BTY-002,beauty-tools-accessories,Beauty Tools & Accessories,seed_derived,catalog_taxonomy,1
+category-557,train,557,Eyelash Curler,BTY-003,beauty-tools-accessories,Beauty Tools & Accessories,seed_derived,catalog_taxonomy,1
+category-558,validation,558,Precision Tweezers Set,BTY-004,beauty-tools-accessories,Beauty Tools & Accessories,seed_derived,catalog_taxonomy,1
+category-559,test,559,Manual Facial Cleansing Brush,BTY-005,beauty-tools-accessories,Beauty Tools & Accessories,seed_derived,catalog_taxonomy,1
+category-560,train,560,Hair Sectioning Clip Set,BTY-006,beauty-tools-accessories,Beauty Tools & Accessories,seed_derived,catalog_taxonomy,1
+category-561,train,561,Manicure Tool Organizer,BTY-007,beauty-tools-accessories,Beauty Tools & Accessories,seed_derived,catalog_taxonomy,1
+category-562,train,562,Nail File Set,BTY-008,beauty-tools-accessories,Beauty Tools & Accessories,seed_derived,catalog_taxonomy,1
+category-563,train,563,Scalp Massage Brush,BTY-009,beauty-tools-accessories,Beauty Tools & Accessories,seed_derived,catalog_taxonomy,1
+category-564,test,564,Refillable Travel Bottle Set,BTY-010,beauty-tools-accessories,Beauty Tools & Accessories,seed_derived,catalog_taxonomy,1
+category-565,test,565,Compact Vanity Mirror,BTY-011,beauty-tools-accessories,Beauty Tools & Accessories,seed_derived,catalog_taxonomy,1
+category-566,train,566,Cosmetic Organizer Tray,BTY-012,beauty-tools-accessories,Beauty Tools & Accessories,seed_derived,catalog_taxonomy,1
+category-567,train,567,Silicone Spatula Set,KIT-001,kitchen-utility-tools,Kitchen Utility Tools,seed_derived,catalog_taxonomy,1
+category-568,train,568,Measuring Spoon Set,KIT-002,kitchen-utility-tools,Kitchen Utility Tools,seed_derived,catalog_taxonomy,1
+category-569,test,569,Insulated Lunch Box,KIT-003,kitchen-utility-tools,Kitchen Utility Tools,seed_derived,catalog_taxonomy,1
+category-570,test,570,Vegetable Peeler,KIT-004,kitchen-utility-tools,Kitchen Utility Tools,seed_derived,catalog_taxonomy,1
+category-571,train,571,Fine Mesh Strainer,KIT-005,kitchen-utility-tools,Kitchen Utility Tools,seed_derived,catalog_taxonomy,1
+category-572,train,572,Collapsible Colander,KIT-006,kitchen-utility-tools,Kitchen Utility Tools,seed_derived,catalog_taxonomy,1
+category-573,train,573,Cutting Board Set,KIT-007,kitchen-utility-tools,Kitchen Utility Tools,seed_derived,catalog_taxonomy,1
+category-574,test,574,Food Storage Container Set,KIT-008,kitchen-utility-tools,Kitchen Utility Tools,seed_derived,catalog_taxonomy,1
+category-575,train,575,Spice Jar Organizer,KIT-009,kitchen-utility-tools,Kitchen Utility Tools,seed_derived,catalog_taxonomy,1
+category-576,validation,576,Kitchen Tongs,KIT-010,kitchen-utility-tools,Kitchen Utility Tools,seed_derived,catalog_taxonomy,1
+category-577,train,577,Manual Citrus Juicer,KIT-011,kitchen-utility-tools,Kitchen Utility Tools,seed_derived,catalog_taxonomy,1
+category-578,train,578,Dish Drying Rack,KIT-012,kitchen-utility-tools,Kitchen Utility Tools,seed_derived,catalog_taxonomy,1
+category-579,train,579,Desktop File Organizer,OFC-001,office-desk-accessories,Office & Desk Accessories,seed_derived,catalog_taxonomy,1
+category-580,train,580,Metal Mesh Pen Holder,OFC-002,office-desk-accessories,Office & Desk Accessories,seed_derived,catalog_taxonomy,1
+category-581,test,581,Stapler and Staple Set,OFC-003,office-desk-accessories,Office & Desk Accessories,seed_derived,catalog_taxonomy,1
+category-582,train,582,Desktop Tape Dispenser,OFC-004,office-desk-accessories,Office & Desk Accessories,seed_derived,catalog_taxonomy,1
+category-583,train,583,Document Letter Tray,OFC-005,office-desk-accessories,Office & Desk Accessories,seed_derived,catalog_taxonomy,1
+category-584,train,584,Monitor Riser Stand,OFC-006,office-desk-accessories,Office & Desk Accessories,seed_derived,catalog_taxonomy,1
+category-585,train,585,Under-Desk Cable Tray,OFC-007,office-desk-accessories,Office & Desk Accessories,seed_derived,catalog_taxonomy,1
+category-586,test,586,Desk Drawer Organizer,OFC-008,office-desk-accessories,Office & Desk Accessories,seed_derived,catalog_taxonomy,1
+category-587,train,587,Business Card Holder,OFC-009,office-desk-accessories,Office & Desk Accessories,seed_derived,catalog_taxonomy,1
+category-588,validation,588,Clipboard Set,OFC-010,office-desk-accessories,Office & Desk Accessories,seed_derived,catalog_taxonomy,1
+category-589,train,589,Desktop Whiteboard,OFC-011,office-desk-accessories,Office & Desk Accessories,seed_derived,catalog_taxonomy,1
+category-590,test,590,Under-Desk Footrest,OFC-012,office-desk-accessories,Office & Desk Accessories,seed_derived,catalog_taxonomy,1
+category-591,train,591,Packing Cube Set,TRV-001,travel-luggage-accessories,Travel & Luggage Accessories,seed_derived,catalog_taxonomy,1
+category-592,train,592,Luggage Organizer Pouch,TRV-002,travel-luggage-accessories,Travel & Luggage Accessories,seed_derived,catalog_taxonomy,1
+category-593,test,593,Travel Document Wallet,TRV-003,travel-luggage-accessories,Travel & Luggage Accessories,seed_derived,catalog_taxonomy,1
+category-594,test,594,Unbranded Passport Cover,TRV-004,travel-luggage-accessories,Travel & Luggage Accessories,seed_derived,catalog_taxonomy,1
+category-595,train,595,Luggage Tag Set,TRV-005,travel-luggage-accessories,Travel & Luggage Accessories,seed_derived,catalog_taxonomy,1
+category-596,train,596,Foldable Travel Hanger Set,TRV-006,travel-luggage-accessories,Travel & Luggage Accessories,seed_derived,catalog_taxonomy,1
+category-597,train,597,Shoe Travel Bag,TRV-007,travel-luggage-accessories,Travel & Luggage Accessories,seed_derived,catalog_taxonomy,1
+category-598,validation,598,Travel Cable Organizer,TRV-008,travel-luggage-accessories,Travel & Luggage Accessories,seed_derived,catalog_taxonomy,1
+category-599,train,599,Travel Neck Pillow,TRV-009,travel-luggage-accessories,Travel & Luggage Accessories,seed_derived,catalog_taxonomy,1
+category-600,train,600,Collapsible Travel Laundry Bag,TRV-010,travel-luggage-accessories,Travel & Luggage Accessories,seed_derived,catalog_taxonomy,1
+category-601,train,601,Pet Grooming Brush,PET-001,pet-care-accessories,Pet Care Accessories,seed_derived,catalog_taxonomy,1
+category-602,train,602,Pet Nail File,PET-002,pet-care-accessories,Pet Care Accessories,seed_derived,catalog_taxonomy,1
+category-603,train,603,Pet Feeding Mat,PET-003,pet-care-accessories,Pet Care Accessories,seed_derived,catalog_taxonomy,1
+category-604,train,604,Collapsible Pet Bowl,PET-004,pet-care-accessories,Pet Care Accessories,seed_derived,catalog_taxonomy,1
+category-605,test,605,Pet Toy Storage Basket,PET-005,pet-care-accessories,Pet Care Accessories,seed_derived,catalog_taxonomy,1
+category-606,test,606,Pet Waste Bag Dispenser,PET-006,pet-care-accessories,Pet Care Accessories,seed_derived,catalog_taxonomy,1
+category-607,train,607,Pet Hair Remover Roller,PET-007,pet-care-accessories,Pet Care Accessories,seed_derived,catalog_taxonomy,1
+category-608,train,608,Pet Bath Towel,PET-008,pet-care-accessories,Pet Care Accessories,seed_derived,catalog_taxonomy,1
+category-609,validation,609,Washable Pet Bed Cover,PET-009,pet-care-accessories,Pet Care Accessories,seed_derived,catalog_taxonomy,1
+category-610,train,610,Pet Travel Organizer Bag,PET-010,pet-care-accessories,Pet Care Accessories,seed_derived,catalog_taxonomy,1

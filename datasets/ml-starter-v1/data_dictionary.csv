@@ -1,0 +1,139 @@
+dataset,field,data_type,role,description,source,allowed_or_range,leakage_note
+catalog_bootstrap.csv,source_revision,string,metadata,Source revision,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,schema_version,string,metadata,Schema version,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,record_source,string,metadata,Record source,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,feature_source,string,metadata,Feature source,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,label_source,string,metadata,Label source,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,is_synthetic,boolean,metadata,Is synthetic,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,training_readiness,string,metadata,Training readiness,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,group_split,string,metadata,Group split,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,product_id,integer,identifier,Product id,public-catalog.snapshot.json,,Use as a key only; exclude from generalization-focused model features.
+catalog_bootstrap.csv,product_slug,string,identifier,Product slug,public-catalog.snapshot.json,,Use as a key only; exclude from generalization-focused model features.
+catalog_bootstrap.csv,product_name,string,feature,Product name,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,model,string,feature,Model,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,category_id,integer,feature,Category id,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,category_slug,string,feature,Category slug,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,category_name,string,feature,Category name,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,variant_id,integer,identifier,Variant id,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,variant_name,string,feature,Variant name,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,sku,string,feature,Sku,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,missing_sku,boolean,feature,Missing sku,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,weight_kg,number,feature,Weight kg,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,length_cm,string,feature,Length cm,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,width_cm,string,feature,Width cm,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,height_cm,string,feature,Height cm,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,volume_cm3,number,feature,Volume cm3,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,volumetric_weight_kg,number,feature,Volumetric weight kg,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,min_price_usd,number,feature,Min price usd,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,origin_country_codes,string,feature,Origin country codes,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,origin_count,integer,feature,Origin count,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,supplier_count,integer,feature,Supplier count,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,max_supplier_rating,number,feature,Max supplier rating,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,image_kind,string,feature,Image kind,public-catalog.snapshot.json,,
+catalog_bootstrap.csv,has_image,boolean,feature,Has image,public-catalog.snapshot.json,,
+category_text_classification.csv,example_id,integer,identifier,Example id,public-catalog.snapshot.json,,Use as a key only; exclude from generalization-focused model features.
+category_text_classification.csv,split,string,metadata,Split,public-catalog.snapshot.json,,
+category_text_classification.csv,product_id,integer,identifier,Product id,public-catalog.snapshot.json,,Use as a key only; exclude from generalization-focused model features.
+category_text_classification.csv,product_name,string,feature,Product name,public-catalog.snapshot.json,,
+category_text_classification.csv,model,string,feature,Model,public-catalog.snapshot.json,,
+category_text_classification.csv,target_category_slug,string,target,Target category slug,public-catalog.snapshot.json,,Never include this target in the input feature matrix.
+category_text_classification.csv,target_category_name,string,target,Target category name,public-catalog.snapshot.json,,Never include this target in the input feature matrix.
+category_text_classification.csv,feature_source,string,metadata,Feature source,public-catalog.snapshot.json,,
+category_text_classification.csv,label_source,string,metadata,Label source,public-catalog.snapshot.json,,
+category_text_classification.csv,is_synthetic,boolean,metadata,Is synthetic,public-catalog.snapshot.json,,
+offer_price_regression.csv,example_id,integer,identifier,Example id,general_goods_v1.json deterministic offer templates,,Use as a key only; exclude from generalization-focused model features.
+offer_price_regression.csv,split,string,metadata,Split,general_goods_v1.json deterministic offer templates,,
+offer_price_regression.csv,category_slug,string,feature,Category slug,general_goods_v1.json deterministic offer templates,,
+offer_price_regression.csv,weight_kg,number,feature,Weight kg,general_goods_v1.json deterministic offer templates,,
+offer_price_regression.csv,length_cm,string,feature,Length cm,general_goods_v1.json deterministic offer templates,,
+offer_price_regression.csv,width_cm,string,feature,Width cm,general_goods_v1.json deterministic offer templates,,
+offer_price_regression.csv,height_cm,string,feature,Height cm,general_goods_v1.json deterministic offer templates,,
+offer_price_regression.csv,volume_cm3,number,feature,Volume cm3,general_goods_v1.json deterministic offer templates,,
+offer_price_regression.csv,origin_country_code,string,feature,Origin country code,general_goods_v1.json deterministic offer templates,,
+offer_price_regression.csv,transport_mode,string,feature,Transport mode,general_goods_v1.json deterministic offer templates,,
+offer_price_regression.csv,stock,integer,feature,Stock,general_goods_v1.json deterministic offer templates,,
+offer_price_regression.csv,moq,integer,feature,Moq,general_goods_v1.json deterministic offer templates,,
+offer_price_regression.csv,supplier_rating,number,feature,Supplier rating,general_goods_v1.json deterministic offer templates,,
+offer_price_regression.csv,target_offer_price_usd,number,target,Target offer price usd,general_goods_v1.json deterministic offer templates,,Never include this target in the input feature matrix.
+offer_price_regression.csv,feature_source,string,metadata,Feature source,general_goods_v1.json deterministic offer templates,,
+offer_price_regression.csv,label_source,string,metadata,Label source,general_goods_v1.json deterministic offer templates,,
+offer_price_regression.csv,is_synthetic,boolean,metadata,Is synthetic,general_goods_v1.json deterministic offer templates,,
+product_countries.csv,source_revision,string,metadata,Source revision,public-catalog.snapshot.json,,
+product_countries.csv,product_id,integer,identifier,Product id,public-catalog.snapshot.json,,Use as a key only; exclude from generalization-focused model features.
+product_countries.csv,product_slug,string,identifier,Product slug,public-catalog.snapshot.json,,Use as a key only; exclude from generalization-focused model features.
+product_countries.csv,category_slug,string,feature,Category slug,public-catalog.snapshot.json,,
+product_countries.csv,country_code,string,feature,Country code,public-catalog.snapshot.json,,
+product_countries.csv,feature_source,string,metadata,Feature source,public-catalog.snapshot.json,,
+product_countries.csv,is_synthetic,boolean,metadata,Is synthetic,public-catalog.snapshot.json,,
+product_monthly_trends_synthetic.csv,row_id,integer,identifier,Row id,synthetic-demand-v1,,Use as a key only; exclude from generalization-focused model features.
+product_monthly_trends_synthetic.csv,feature_period_start,datetime,feature,Feature period start,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,target_period_start,datetime,feature,Target period start,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,split,string,metadata,Split,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,product_id,integer,identifier,Product id,synthetic-demand-v1,,Use as a key only; exclude from generalization-focused model features.
+product_monthly_trends_synthetic.csv,product_slug,string,identifier,Product slug,synthetic-demand-v1,,Use as a key only; exclude from generalization-focused model features.
+product_monthly_trends_synthetic.csv,category_slug,string,feature,Category slug,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,min_price_usd,number,feature,Min price usd,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,weight_kg,number,feature,Weight kg,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,volume_cm3,number,feature,Volume cm3,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,origin_count,integer,feature,Origin count,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,supplier_count,integer,feature,Supplier count,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,max_supplier_rating,number,feature,Max supplier rating,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,product_views,integer,feature,Product views,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,search_impressions,integer,feature,Search impressions,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,quote_requests,integer,feature,Quote requests,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,saved_quotes,integer,feature,Saved quotes,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,order_count,integer,feature,Order count,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,ordered_qty,integer,feature,Ordered qty,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,gmv_bdt,number,feature,Gmv bdt,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,cancelled_orders,string,feature,Cancelled orders,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,delivered_orders,string,feature,Delivered orders,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,on_time_delivery_count,integer,feature,On time delivery count,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,defect_count,integer,feature,Defect count,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,ordered_qty_lag_1,integer,feature,Ordered qty lag 1,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,ordered_qty_lag_2,integer,feature,Ordered qty lag 2,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,ordered_qty_lag_3,integer,feature,Ordered qty lag 3,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,ordered_qty_trailing_mean_3,string,feature,Ordered qty trailing mean 3,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,gmv_trailing_mean_3,number,feature,Gmv trailing mean 3,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,quote_to_order_rate,number,feature,Quote to order rate,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,target_next_month_order_qty,integer,target,Target next month order qty,synthetic-demand-v1,,Never include this target in the input feature matrix.
+product_monthly_trends_synthetic.csv,target_next_month_gmv_bdt,number,target,Target next month gmv bdt,synthetic-demand-v1,,Never include this target in the input feature matrix.
+product_monthly_trends_synthetic.csv,target_next_month_trend,string,target,Target next month trend,synthetic-demand-v1,,Never include this target in the input feature matrix.
+product_monthly_trends_synthetic.csv,feature_source,string,metadata,Feature source,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,label_source,string,metadata,Label source,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,is_synthetic,boolean,metadata,Is synthetic,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,simulation_version,string,metadata,Simulation version,synthetic-demand-v1,,
+product_monthly_trends_synthetic.csv,simulation_seed,integer,metadata,Simulation seed,synthetic-demand-v1,,
+real_sourcing_outcomes_template.csv,event_id,integer,identifier,Event id,future observed application events,,Use as a key only; exclude from generalization-focused model features.
+real_sourcing_outcomes_template.csv,anonymous_quote_key,string,feature,Anonymous quote key,future observed application events,,
+real_sourcing_outcomes_template.csv,anonymous_order_key,string,feature,Anonymous order key,future observed application events,,
+real_sourcing_outcomes_template.csv,quote_captured_at_utc,datetime,feature,Quote captured at utc,future observed application events,,
+real_sourcing_outcomes_template.csv,outcome_observed_at_utc,datetime,feature,Outcome observed at utc,future observed application events,,
+real_sourcing_outcomes_template.csv,product_id,integer,feature,Product id,future observed application events,,Use as a key only; exclude from generalization-focused model features.
+real_sourcing_outcomes_template.csv,variant_id,integer,feature,Variant id,future observed application events,,
+real_sourcing_outcomes_template.csv,category_slug,string,feature,Category slug,future observed application events,,
+real_sourcing_outcomes_template.csv,country_code,string,feature,Country code,future observed application events,,
+real_sourcing_outcomes_template.csv,transport_mode,string,feature,Transport mode,future observed application events,,
+real_sourcing_outcomes_template.csv,delivery_type,string,feature,Delivery type,future observed application events,,
+real_sourcing_outcomes_template.csv,quantity,integer,feature,Quantity,future observed application events,,
+real_sourcing_outcomes_template.csv,unit_weight_kg,number,feature,Unit weight kg,future observed application events,,
+real_sourcing_outcomes_template.csv,unit_price_origin,number,feature,Unit price origin,future observed application events,,
+real_sourcing_outcomes_template.csv,origin_currency,string,feature,Origin currency,future observed application events,,
+real_sourcing_outcomes_template.csv,fx_rate_to_bdt_at_quote,number,feature,Fx rate to bdt at quote,future observed application events,,
+real_sourcing_outcomes_template.csv,stock_at_quote,string,feature,Stock at quote,future observed application events,,
+real_sourcing_outcomes_template.csv,moq_at_quote,string,feature,Moq at quote,future observed application events,,
+real_sourcing_outcomes_template.csv,supplier_rating_at_quote,number,feature,Supplier rating at quote,future observed application events,,
+real_sourcing_outcomes_template.csv,estimated_landed_cost_bdt,number,feature,Estimated landed cost bdt,future observed application events,,
+real_sourcing_outcomes_template.csv,promised_eta_min_days,integer,feature,Promised eta min days,future observed application events,,
+real_sourcing_outcomes_template.csv,promised_eta_max_days,integer,feature,Promised eta max days,future observed application events,,
+real_sourcing_outcomes_template.csv,converted_to_order,string,target,Converted to order,future observed application events,,Never include this target in the input feature matrix.
+real_sourcing_outcomes_template.csv,payment_approved,string,target,Payment approved,future observed application events,,Never include this target in the input feature matrix.
+real_sourcing_outcomes_template.csv,actual_landed_cost_bdt,number,target,Actual landed cost bdt,future observed application events,,Never include this target in the input feature matrix.
+real_sourcing_outcomes_template.csv,actual_delivery_days,integer,target,Actual delivery days,future observed application events,,Never include this target in the input feature matrix.
+real_sourcing_outcomes_template.csv,delayed_flag,boolean,target,Delayed flag,future observed application events,,Never include this target in the input feature matrix.
+real_sourcing_outcomes_template.csv,cancelled_flag,boolean,target,Cancelled flag,future observed application events,,Never include this target in the input feature matrix.
+real_sourcing_outcomes_template.csv,refunded_flag,boolean,target,Refunded flag,future observed application events,,Never include this target in the input feature matrix.
+real_sourcing_outcomes_template.csv,quality_defect_flag,boolean,target,Quality defect flag,future observed application events,,Never include this target in the input feature matrix.
+real_sourcing_outcomes_template.csv,dispute_flag,boolean,target,Dispute flag,future observed application events,,Never include this target in the input feature matrix.
+real_sourcing_outcomes_template.csv,feature_source,string,metadata,Feature source,future observed application events,,
+real_sourcing_outcomes_template.csv,label_source,string,metadata,Label source,future observed application events,,
+real_sourcing_outcomes_template.csv,is_synthetic,boolean,metadata,Is synthetic,future observed application events,,

@@ -23,6 +23,23 @@ electrical, food-contact, purity, grade, certification, origin, HS
 classification, and import requirements require independent verification.
 Runtime database files are ignored and must never be committed.
 
+## Machine-learning starter datasets
+
+The reproducible, PII-free tutorial pack is in `datasets/ml-starter-v1`.
+It contains static catalog features, category-classification examples,
+formula-labelled offer-price examples, a clearly marked synthetic monthly demand
+series, a field dictionary, source/file checksums, and an empty contract for
+collecting real quote-to-delivery outcomes. These datasets are for pipeline and
+coursework prototypes only; they are not observed marketplace history and must
+not be used to claim production model accuracy.
+
+Generate or validate the pack from the repository root:
+
+```powershell
+python services/catalog-service/scripts/export_ml_starter_datasets.py
+python services/catalog-service/scripts/export_ml_starter_datasets.py --check
+```
+
 ## Run locally on Windows
 
 Install the backend and frontend dependencies once:

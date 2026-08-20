@@ -1,0 +1,82 @@
+{
+  "contains_observed_outcomes": false,
+  "contains_pii": false,
+  "dataset_revision": "ml-starter-v1",
+  "files": {
+    "README.md": {
+      "columns": null,
+      "purpose": "Dataset card",
+      "rows": null,
+      "sha256": "3b65168b253dd7079f218635e2874fcf1581fc59e3f9e30700a929454686d9f7"
+    },
+    "catalog_bootstrap.csv": {
+      "columns": 32,
+      "purpose": "Static catalog features; bootstrap only",
+      "rows": 610,
+      "sha256": "ecd0ee2b78abd1d2cfa7dfd11c8657d61502264deb06d5a2066a90aa2b09b94f"
+    },
+    "category_text_classification.csv": {
+      "columns": 10,
+      "purpose": "Catalog taxonomy tutorial",
+      "rows": 610,
+      "sha256": "ab3570eeaf95f1a126373601133fa47f302b71dedc5a143ca97358811a3f9d12"
+    },
+    "data_dictionary.csv": {
+      "columns": 8,
+      "purpose": "Field definitions and leakage notes",
+      "rows": 138,
+      "sha256": "64e6f37bd123e94e13a752d330f03cf2fabb0bfac25c9b733b760fe3190dc7aa"
+    },
+    "offer_price_regression.csv": {
+      "columns": 17,
+      "purpose": "Formula-label price regression tutorial",
+      "rows": 560,
+      "sha256": "69767b908fb9e707765555e13b678e359c0b05d58a4a79a062835e445b81504c"
+    },
+    "product_countries.csv": {
+      "columns": 7,
+      "purpose": "Product-origin relationship table",
+      "rows": 1930,
+      "sha256": "6d71804cd1cad169e07b8417327b33150ab8d0aed98d5c385aad7c29f6daa69f"
+    },
+    "product_monthly_trends_synthetic.csv": {
+      "columns": 38,
+      "purpose": "Synthetic next-month forecasting tutorial",
+      "rows": 23790,
+      "sha256": "325bb53ae7ef7ecc0a8ac6b097c8b246af51974d1f7402e4c0eacd1687ff917c"
+    },
+    "real_sourcing_outcomes_template.csv": {
+      "columns": 34,
+      "purpose": "PII-free future observed-outcome contract",
+      "rows": 0,
+      "sha256": "3e729e3a3b71867a0a5b41b959e9ee2177694e4803aae1b34d93ce8873e94965"
+    }
+  },
+  "schema_version": 1,
+  "simulation": {
+    "feature_period_end": "2026-06-01",
+    "feature_period_start": "2023-04-01",
+    "is_real_history": false,
+    "seed": 20260730,
+    "target_period_end": "2026-07-01",
+    "version": "synthetic-demand-v1"
+  },
+  "sources": [
+    {
+      "path": "apps/web-next/data/public-catalog.snapshot.json",
+      "sha256": "9a51689d2798f4a51856efb09925fbb7ba24870eedee8d0025269500b995ab6a",
+      "source_revision": "20260730_04"
+    },
+    {
+      "path": "services/catalog-service/app/seed_data/general_goods_v1.json",
+      "sha256": "80285229e6627bccc1b81cbbbcd0b91a93256cc71dda655c033dc4a36350c20d",
+      "source_revision": "general-goods-v2-media-2026-07-30"
+    }
+  ],
+  "training_readiness": "tutorial_only",
+  "warnings": [
+    "Seed-derived and simulated rows are not observed marketplace outcomes.",
+    "Do not use this pack to claim production model accuracy or live market performance.",
+    "Do not mix pseudo/synthetic labels into an observed validation or test set."
+  ]
+}
