@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from ..models import (
     AIDecisionExplanation,
     AdminAuditEvent,
+    CustomerAddress,
     ManualPaymentProof,
     Order,
     OrderItem,
@@ -156,6 +157,7 @@ def save_quote_record(session: Session, payload: SaveQuoteIn, current_user: Curr
         )
     snapshot["status"] = "requested"
     snapshot["expires_at"] = expires_at.isoformat()
+    snapshot["response_language"] = payload.language
     saved_quote = SavedQuote(
         user_id=current_user["sub"],
         variant_id=variant.id,
@@ -176,9 +178,14 @@ def save_quote_record(session: Session, payload: SaveQuoteIn, current_user: Curr
             snapshot,
             country_code=payload.country,
             mode=payload.mode,
+            language=payload.language,
         )
         fallback = fallback_explanation(context)
-        explanation = validated_explanation(client_explanation, fallback)
+        explanation = validated_explanation(
+            client_explanation,
+            fallback,
+            language=payload.language,
+        )
         metadata = payload.response.get("ai_metadata")
         metadata = metadata if isinstance(metadata, dict) else {}
         provider = (
@@ -207,6 +214,7 @@ def save_quote_record(session: Session, payload: SaveQuoteIn, current_user: Curr
 def list_saved_quotes_for_user(session: Session, current_user: CurrentUser) -> list[SavedQuote]:
     return session.scalars(
         select(SavedQuote)
+        .options(selectinload(SavedQuote.ai_explanation))
         .where(SavedQuote.user_id == current_user["sub"])
         .order_by(SavedQuote.created_at.desc())
     ).all()
@@ -294,6 +302,94 @@ def _existing_idempotent_order(
     )
 
 
+def _require_eligible_locked_offer(
+    session: Session,
+    *,
+    offer_id: int,
+    variant_id: int,
+    country_code: str,
+    mode: str,
+    qty: int,
+) -> SellerOffer:
+    offer = session.scalar(
+        select(SellerOffer).where(
+            SellerOffer.id == offer_id,
+            SellerOffer.variant_id == variant_id,
+            SellerOffer.mode == mode,
+            SellerOffer.stock >= qty,
+            SellerOffer.moq <= qty,
+            SellerOffer.is_active.is_(True),
+            SellerOffer.country.has(code=country_code.upper()),
+            SellerOffer.seller.has(is_active=True),
+        )
+    )
+    if not offer:
+        raise HTTPException(
+            status_code=409,
+            detail="The locked supplier offer is no longer eligible; request a new quote",
+        )
+    return offer
+
+
+def _require_checkout_addresses(session: Session, user_id: int) -> None:
+    """Require durable delivery and billing destinations before taking payment."""
+    defaults = session.execute(
+        select(
+            CustomerAddress.is_default_shipping,
+            CustomerAddress.is_default_billing,
+        ).where(
+            CustomerAddress.user_id == user_id,
+            CustomerAddress.archived_at.is_(None),
+            (
+                CustomerAddress.is_default_shipping.is_(True)
+                | CustomerAddress.is_default_billing.is_(True)
+            ),
+        )
+    ).all()
+    has_shipping = any(bool(row.is_default_shipping) for row in defaults)
+    has_billing = any(bool(row.is_default_billing) for row in defaults)
+    if has_shipping and has_billing:
+        return
+    missing = " and ".join(
+        label
+        for label, present in (
+            ("shipping", has_shipping),
+            ("billing", has_billing),
+        )
+        if not present
+    )
+    raise HTTPException(
+        status_code=409,
+        detail=(
+            f"Add a default {missing} address in your profile before placing an order"
+        ),
+    )
+
+
+def _payment_reference_exists(
+    session: Session,
+    *,
+    channel: str,
+    trx_normalized: str,
+) -> bool:
+    normalized_channel = channel.casefold()
+    current = session.scalar(
+        select(ManualPaymentProof.id).where(
+            func.lower(ManualPaymentProof.channel) == normalized_channel,
+            ManualPaymentProof.trx_normalized == trx_normalized,
+        )
+    )
+    if current:
+        return True
+    historical = session.scalar(
+        select(PaymentProofAttempt.id).where(
+            func.lower(PaymentProofAttempt.channel) == normalized_channel,
+            PaymentProofAttempt.trx_normalized == trx_normalized,
+        )
+    )
+    return bool(historical)
+
+
 def create_manual_order_record(
     session: Session,
     payload: CreateOrderIn,
@@ -310,6 +406,8 @@ def create_manual_order_record(
     existing = _existing_idempotent_order(session, int(current_user["sub"]), effective_key)
     if existing:
         return existing, True
+
+    _require_checkout_addresses(session, int(current_user["sub"]))
 
     quote: SavedQuote | None = None
     if payload.saved_quote_id:
@@ -346,20 +444,14 @@ def create_manual_order_record(
         if payload.offer_id and int(payload.offer_id) != int(selected_offer_id):
             raise HTTPException(status_code=409, detail="Selected offer does not match the saved quote")
         offer_id = int(selected_offer_id)
-        current_offer = session.scalar(
-            select(SellerOffer).where(
-                SellerOffer.id == offer_id,
-                SellerOffer.is_active.is_(True),
-                SellerOffer.stock >= quote.qty,
-                SellerOffer.moq <= quote.qty,
-                SellerOffer.seller.has(is_active=True),
-            )
+        _require_eligible_locked_offer(
+            session,
+            offer_id=offer_id,
+            variant_id=quote.variant_id,
+            country_code=quote.country_code,
+            mode=quote.mode,
+            qty=quote.qty,
         )
-        if not current_offer:
-            raise HTTPException(
-                status_code=409,
-                detail="The locked supplier offer is no longer available; request a new quote",
-            )
         order_country = quote.country_code.upper()
         order_mode = quote.mode
         order_delivery = quote.delivery_type
@@ -377,18 +469,36 @@ def create_manual_order_record(
         )
         breakdown = quote_result["breakdown"]
         variant = get_variant_or_404(session, payload.variant_id)
-        offer_id = payload.offer_id or quote_result.get("selected_offer_id")
+        selected_offer_id = quote_result.get("selected_offer_id")
+        if not selected_offer_id:
+            raise HTTPException(
+                status_code=409,
+                detail="The server-generated quote has no locked supplier offer",
+            )
+        if payload.offer_id and int(payload.offer_id) != int(selected_offer_id):
+            raise HTTPException(
+                status_code=409,
+                detail="Selected offer does not match the server-generated quote",
+            )
+        offer_id = int(selected_offer_id)
+        _require_eligible_locked_offer(
+            session,
+            offer_id=offer_id,
+            variant_id=payload.variant_id,
+            country_code=payload.country,
+            mode=payload.mode,
+            qty=payload.qty,
+        )
         order_country = payload.country.upper()
         order_mode = payload.mode
         order_delivery = payload.delivery_type
         order_qty = payload.qty
 
     trx_normalized = normalize_transaction_id(payload.trx_id)
-    duplicate_payment = session.scalar(
-        select(ManualPaymentProof.id).where(
-            func.lower(ManualPaymentProof.channel) == payload.channel.casefold(),
-            ManualPaymentProof.trx_normalized == trx_normalized,
-        )
+    duplicate_payment = _payment_reference_exists(
+        session,
+        channel=payload.channel,
+        trx_normalized=trx_normalized,
     )
     if duplicate_payment:
         raise HTTPException(status_code=409, detail="This payment transaction ID has already been submitted")
@@ -499,11 +609,10 @@ def create_manual_order_record(
         replay = _existing_idempotent_order(session, int(current_user["sub"]), effective_key)
         if replay:
             return replay, True
-        duplicate_payment = session.scalar(
-            select(ManualPaymentProof.id).where(
-                func.lower(ManualPaymentProof.channel) == payload.channel.casefold(),
-                ManualPaymentProof.trx_normalized == trx_normalized,
-            )
+        duplicate_payment = _payment_reference_exists(
+            session,
+            channel=payload.channel,
+            trx_normalized=trx_normalized,
         )
         if duplicate_payment:
             raise HTTPException(status_code=409, detail="This payment transaction ID has already been submitted") from exc

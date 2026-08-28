@@ -126,7 +126,7 @@ test("@public read-only catalog snapshot supports browse, search and detail", as
   await marketplaceSearch.getByRole("textbox", { name: "Search marketplace" }).fill("iPhone 14");
   await marketplaceSearch.getByRole("button", { name: "Search products" }).click();
   await expect(page).toHaveURL(/\/products\?q=iPhone%2014$/);
-  await expect(page.getByText("1 products", { exact: true })).toBeVisible();
+  await expect(page.getByText("1 product", { exact: true })).toBeVisible();
   const productCard = page.getByRole("article").filter({ hasText: "iPhone 14" });
   await expect(productCard.locator(".product-image img[data-nimg]")).toBeVisible();
   await expect(productCard.locator(".product-image__badge")).toContainText(

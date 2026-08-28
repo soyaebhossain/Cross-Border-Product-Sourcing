@@ -56,6 +56,7 @@ type LastMutation = {
 };
 
 const STORAGE_KEY = "sourceai-sourcing-basket-v1";
+export const MAX_SOURCING_QUANTITY = 100_000;
 const BasketContext = createContext<BasketContextValue | null>(null);
 
 function itemKey(productId: number, variantId: number, countryCode: string) {
@@ -64,7 +65,7 @@ function itemKey(productId: number, variantId: number, countryCode: string) {
 
 function normalizeQuantity(value: number, moq = 1) {
   if (!Number.isFinite(value)) return moq;
-  return Math.max(moq, Math.round(value));
+  return Math.min(MAX_SOURCING_QUANTITY, Math.max(moq, Math.round(value)));
 }
 
 function isStoredBasketItem(value: unknown): value is BasketItem {
@@ -87,7 +88,12 @@ export function SourcingBasketProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     try {
       const parsed = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "[]") as unknown;
-      if (Array.isArray(parsed)) setItems(parsed.filter(isStoredBasketItem));
+      if (Array.isArray(parsed)) {
+        setItems(parsed.filter(isStoredBasketItem).map((item) => ({
+          ...item,
+          quantity: normalizeQuantity(item.quantity, item.moq),
+        })));
+      }
     } catch {
       window.localStorage.removeItem(STORAGE_KEY);
     } finally {

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { AdminModal } from "../../../components/admin-modal";
+import { AppIcon } from "../../../components/app-icon";
 import {
   createCustomerAddress,
   deleteCustomerAddress,
@@ -30,7 +31,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState("");
-  const { locale } = useLocale();
+  const { locale, setLocale } = useLocale();
   const bn = locale === "bn";
 
   const applyProfile = (value: CustomerProfile) => {
@@ -59,7 +60,7 @@ export default function ProfilePage() {
   const saveProfile = async (event: React.FormEvent) => {
     event.preventDefault(); setSaving(true); setError("");
     try {
-      applyProfile(await updateCustomerProfile({
+      const updatedProfile = await updateCustomerProfile({
         full_name: fields.full_name.trim() || null,
         company_name: fields.company_name.trim() || null,
         company_registration_number: fields.company_registration_number.trim() || null,
@@ -67,8 +68,10 @@ export default function ProfilePage() {
         preferred_language: fields.preferred_language,
         preferred_currency: fields.preferred_currency.trim().toUpperCase(),
         timezone: fields.timezone.trim(),
-      }));
-      notify(bn ? "প্রোফাইল সংরক্ষিত হয়েছে।" : "Profile saved.");
+      });
+      applyProfile(updatedProfile);
+      setLocale(updatedProfile.preferences.language || fields.preferred_language);
+      notify(fields.preferred_language === "bn" ? "প্রোফাইল সংরক্ষিত হয়েছে।" : "Profile saved.");
     } catch (reason) { setError(reason instanceof Error ? reason.message : (bn ? "প্রোফাইল সংরক্ষণ করা যায়নি।" : "Profile could not be saved.")); }
     finally { setSaving(false); }
   };
@@ -119,7 +122,7 @@ export default function ProfilePage() {
 
     <section className="account-panel">
       <div className="account-panel__header"><div><h2>{bn ? "ঠিকানা বই" : "Address book"}</h2><p>{bn ? "Default shipping ও billing address checkout/invoice snapshot-এ ব্যবহৃত হয়।" : "Default shipping and billing addresses are used for checkout and invoice snapshots."}</p></div></div>
-      {addresses.length ? <div className="account-address-grid">{addresses.map(item => <article key={item.id} className="account-address-card"><div><strong>{item.label}</strong><span>{item.is_default_shipping ? (bn ? "Shipping" : "Shipping") : null}{item.is_default_shipping && item.is_default_billing ? " · " : null}{item.is_default_billing ? (bn ? "Billing" : "Billing") : null}</span></div><p>{item.recipient_name}{item.company_name ? ` · ${item.company_name}` : ""}<br />{item.line1}{item.line2 ? `, ${item.line2}` : ""}<br />{item.city}{item.region ? `, ${item.region}` : ""} {item.postal_code || ""} · {item.country_code}<br />{item.phone}</p><div><button className="button button--ghost" type="button" onClick={() => openEdit(item)}>{bn ? "সম্পাদনা" : "Edit"}</button><button className="button button--ghost button--danger-text" type="button" onClick={() => setDeleteTarget(item)}>{bn ? "সরান" : "Remove"}</button></div></article>)}</div> : <div className="empty-state"><strong>{bn ? "কোনো ঠিকানা নেই" : "No addresses yet"}</strong><span>{bn ? "প্রথম ঠিকানাটি shipping ও billing default হবে।" : "Your first address becomes the shipping and billing default."}</span></div>}
+      {addresses.length ? <div className="account-address-grid">{addresses.map(item => <article key={item.id} className="account-address-card"><div><strong>{item.label}</strong><span>{item.is_default_shipping ? (bn ? "Shipping" : "Shipping") : null}{item.is_default_shipping && item.is_default_billing ? " · " : null}{item.is_default_billing ? (bn ? "Billing" : "Billing") : null}</span></div><p>{item.recipient_name}{item.company_name ? ` · ${item.company_name}` : ""}<br />{item.line1}{item.line2 ? `, ${item.line2}` : ""}<br />{item.city}{item.region ? `, ${item.region}` : ""} {item.postal_code || ""} · {item.country_code}<br />{item.phone}</p><div><button className="button button--ghost" type="button" onClick={() => openEdit(item)}>{bn ? "সম্পাদনা" : "Edit"}</button><button className="button button--ghost button--danger-text" type="button" onClick={() => setDeleteTarget(item)}>{bn ? "সরান" : "Remove"}</button></div></article>)}</div> : <div className="account-address-empty"><span className="account-address-empty__icon"><AppIcon name="package" size={20} /></span><span className="account-address-empty__copy"><strong>{bn ? "কোনো ঠিকানা নেই" : "No addresses yet"}</strong><span>{bn ? "প্রথম ঠিকানাটি shipping ও billing default হবে।" : "Your first address becomes the shipping and billing default."}</span></span></div>}
     </section>
 
     <AdminModal open={addressTarget !== null} onClose={() => !saving && setAddressTarget(null)} title={addressTarget === "new" ? (bn ? "ঠিকানা যোগ করুন" : "Add address") : (bn ? "ঠিকানা সম্পাদনা" : "Edit address")} description={bn ? "Country code দুই অক্ষরের ISO code দিন, যেমন BD।" : "Use a two-letter ISO country code, such as BD."}>

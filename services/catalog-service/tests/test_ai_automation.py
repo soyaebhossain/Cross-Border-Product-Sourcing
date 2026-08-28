@@ -37,6 +37,8 @@ def test_unconfigured_automation_returns_deterministic_fallback() -> None:
     assert result.source == "deterministic-fallback"
     assert result.explanation["human_review_required"] is True
     assert result.explanation["confidence"] is None
+    assert result.explanation["language"] == "en"
+    assert result.explanation["summary"] == result.explanation["summary_bn"]
     assert "China" in result.explanation["summary_bn"]
 
 
@@ -58,9 +60,11 @@ def test_bangla_fallback_localizes_explanation_fields() -> None:
     )
 
     assert result.source == "deterministic-fallback"
+    assert result.explanation["language"] == "bn"
+    assert result.explanation["summary"] == result.explanation["summary_bn"]
     assert "বর্তমান যাচাইযোগ্য হিসাব" in result.explanation["summary_bn"]
     assert result.explanation["advantages"] == ["সর্বনিম্ন ল্যান্ডেড কস্ট"]
-    assert "Carrier-specific feed" in result.explanation["missing_information"][0]
+    assert "ক্যারিয়ার-নির্দিষ্ট তথ্য" in result.explanation["missing_information"][0]
 
 
 def test_automation_response_is_bounded_and_cannot_disable_required_review(monkeypatch) -> None:
@@ -102,6 +106,102 @@ def test_automation_response_is_bounded_and_cannot_disable_required_review(monke
     assert len(result.explanation["advantages"]) == 8
     assert result.explanation["confidence"] is None
     assert result.explanation["human_review_required"] is True
+
+
+def test_english_response_rejects_bangla_model_copy_field_by_field(monkeypatch) -> None:
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self, _limit):
+            return json.dumps(
+                {
+                    "explanation": {
+                        "summary": "সোর্সিং সিদ্ধান্তের ব্যাখ্যা",
+                        "language": "bn",
+                        "advantages": ["কম ল্যান্ডেড কস্ট"],
+                        "risks": ["Delivery time is long"],
+                        "missing_information": ["ক্যারিয়ার কোট অনুপস্থিত"],
+                        "recommended_checks": ["Verify the carrier quote"],
+                        "confidence": 0.7,
+                        "human_review_required": False,
+                    }
+                },
+                ensure_ascii=False,
+            ).encode("utf-8")
+
+    monkeypatch.setattr(automation, "urlopen", lambda *_args, **_kwargs: Response())
+    result = automation.explain_recommendation(
+        _recommendation(),
+        Settings(
+            database_url="sqlite://",
+            automation_webhook_url="http://n8n:5678/webhook/sourceai-quote-explanation",
+            automation_webhook_token="secret-token",
+        ),
+    )
+
+    assert result.automation_available is True
+    assert result.explanation["language"] == "en"
+    assert "Based on the current verifiable calculation" in result.explanation["summary"]
+    assert result.explanation["summary_bn"] == result.explanation["summary"]
+    assert result.explanation["advantages"] == ["lowest landed cost"]
+    assert result.explanation["risks"] == ["Delivery time is long"]
+    assert result.explanation["missing_information"] == ["Carrier quote is not live"]
+    assert result.explanation["recommended_checks"] == ["Verify the carrier quote"]
+
+
+def test_bangla_response_rejects_english_only_model_copy(monkeypatch) -> None:
+    class Response:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self, _limit):
+            return json.dumps(
+                {
+                    "explanation": {
+                        "summary": "English-only model summary",
+                        "language": "en",
+                        "advantages": ["lowest landed cost"],
+                        "risks": [],
+                        "missing_information": ["Carrier quote is not live"],
+                        "recommended_checks": ["Verify the carrier quote"],
+                        "confidence": 0.7,
+                        "human_review_required": False,
+                    }
+                }
+            ).encode()
+
+    monkeypatch.setattr(automation, "urlopen", lambda *_args, **_kwargs: Response())
+    recommendation = _recommendation()
+    recommendation["response_language"] = "bn"
+    result = automation.explain_recommendation(
+        recommendation,
+        Settings(
+            database_url="sqlite://",
+            automation_webhook_url="http://n8n:5678/webhook/sourceai-quote-explanation",
+            automation_webhook_token="secret-token",
+        ),
+    )
+
+    assert result.automation_available is True
+    assert result.explanation["language"] == "bn"
+    assert "বর্তমান যাচাইযোগ্য হিসাব" in result.explanation["summary"]
+    assert result.explanation["advantages"] == ["সর্বনিম্ন ল্যান্ডেড কস্ট"]
+    assert all(
+        any("\u0980" <= character <= "\u09ff" for character in item)
+        for key in ("advantages", "missing_information", "recommended_checks")
+        for item in result.explanation[key]
+    )
 
 
 def test_invalid_automation_json_falls_back(monkeypatch) -> None:

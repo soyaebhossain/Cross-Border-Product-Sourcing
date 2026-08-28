@@ -21,6 +21,7 @@ if str(SERVICE_ROOT) not in sys.path:
 from app.auth import make_password, validate_password_strength  # noqa: E402
 from app.config import get_settings  # noqa: E402
 from app.db import engine  # noqa: E402
+from app.identity import normalize_email_address, normalize_identifier_key, normalize_username  # noqa: E402
 from app.models import AccountUser  # noqa: E402
 
 
@@ -32,13 +33,18 @@ def _upsert_test_account(
     password: str,
     role: str,
 ) -> AccountUser:
+    username = normalize_username(username)
+    email = normalize_email_address(email)
     validate_password_strength(password, (username, email))
     account = session.scalar(select(AccountUser).where(AccountUser.username == username))
     if account is None:
         account = AccountUser(
             username=username,
+            username_normalized=normalize_identifier_key(username),
             email=email,
+            email_normalized=normalize_identifier_key(email),
             phone=None,
+            phone_normalized=None,
             password_hash=make_password(password),
             role=role,
             is_active=True,
@@ -47,7 +53,10 @@ def _upsert_test_account(
         )
         session.add(account)
     else:
+        account.username = username
+        account.username_normalized = normalize_identifier_key(username)
         account.email = email
+        account.email_normalized = normalize_identifier_key(email)
         account.password_hash = make_password(password)
         account.role = role
         account.is_active = True

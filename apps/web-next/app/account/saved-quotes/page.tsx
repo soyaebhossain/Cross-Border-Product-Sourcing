@@ -5,11 +5,26 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminModal } from "../../../components/admin-modal";
 import { deleteSavedQuote, getQuotePdfUrl, getSavedQuotes, updateSavedQuoteStatus, type SavedQuote } from "../../../lib/api";
+import { localizedAiItems, localizedAiSummary } from "../../../lib/ai-explanation-locale";
 import { formatBdt, formatDateTime } from "../../../lib/format";
 import { useLocale } from "../../../lib/locale-context";
 
 function isExpired(quote: SavedQuote) {
   return Boolean(quote.expires_at && new Date(quote.expires_at).getTime() < Date.now());
+}
+
+function explanationSource(quote: SavedQuote, bn: boolean) {
+  const metadata = quote.response?.ai_metadata;
+  const source = typeof metadata?.source === "string" ? metadata.source.trim() : "";
+  const model = typeof metadata?.model === "string" ? metadata.model.trim() : "";
+  if (metadata?.automation_available || source === "ollama-via-n8n") {
+    return model ? `Ollama · ${model}` : "Ollama via n8n";
+  }
+  if (source === "deterministic-fallback") {
+    return bn ? "নির্ধারিত ফলব্যাক" : "Deterministic fallback";
+  }
+  if (source) return model ? `${source} · ${model}` : source;
+  return bn ? "উৎসের তথ্য নেই" : "Source unavailable";
 }
 
 export default function SavedQuotesPage() {
@@ -87,13 +102,31 @@ export default function SavedQuotesPage() {
 
       {loading ? <div className="empty-state" aria-live="polite">{bn ? "সেভড কোট লোড হচ্ছে…" : "Loading saved quotes…"}</div>
         : !quotes.length ? <div className="empty-state"><strong>{bn ? "এখনও কোনো সেভড কোট নেই।" : "No saved quotes yet."}</strong><p>{bn ? "Quote screen থেকে Save for comparison চাপুন; কোটটি এখানে আসবে।" : "Choose Save for comparison on the quote screen; it will appear here."}</p><Link className="button button--primary" href="/quote">{bn ? "কোট নিন" : "Request a quote"}</Link></div>
-        : <div className="comparison-grid">{quotes.map(quote => {
+        : <div className="comparison-grid saved-quotes-grid">{quotes.map(quote => {
           const cost = quote.response?.breakdown;
           const expired = isExpired(quote);
           const ordered = Boolean(quote.order_ids?.length);
           const total = Number(cost?.total_bdt);
           const best = selected.has(quote.id) && lowestSelected !== null && total === lowestSelected;
-          return <article key={quote.id} className={`comparison-card ${selected.has(quote.id) ? "comparison-card--selected" : ""} ${expired ? "comparison-card--expired" : ""}`}>
+          const explanation = quote.response?.ai_explanation;
+          const explanationSummary = explanation
+            ? localizedAiSummary(
+                explanation,
+                locale,
+                bn ? "এই কোটের সুপারিশের সারাংশ এখন পাওয়া যাচ্ছে না।" : "The recommendation summary for this quote is not available yet.",
+              )
+            : "";
+          const advantages = explanation
+            ? localizedAiItems(explanation.advantages, locale, bn ? "কোনো সুবিধার তথ্য দেওয়া হয়নি।" : "No advantages were supplied.", explanation.language)
+            : [];
+          const risks = explanation
+            ? localizedAiItems(explanation.risks, locale, bn ? "অতিরিক্ত ঝুঁকির তথ্য দেওয়া হয়নি।" : "No additional risks were supplied.", explanation.language)
+            : [];
+          const recommendedChecks = explanation
+            ? localizedAiItems(explanation.recommended_checks, locale, bn ? "কোনো যাচাইয়ের তথ্য দেওয়া হয়নি।" : "No checks were supplied.", explanation.language)
+            : [];
+          const aiIsLive = Boolean(quote.response?.ai_metadata?.automation_available || quote.response?.ai_metadata?.source === "ollama-via-n8n");
+          return <article key={quote.id} className={`comparison-card saved-quote-card ${selected.has(quote.id) ? "comparison-card--selected" : ""} ${expired ? "comparison-card--expired" : ""}`}>
             <div className="comparison-card__top"><label className="comparison-select"><input type="checkbox" checked={selected.has(quote.id)} disabled={!selected.has(quote.id) && selected.size >= 3} onChange={event => setSelected(current => { const next = new Set(current); if (event.target.checked) next.add(quote.id); else next.delete(quote.id); return next; })} /><span>{bn ? "তুলনা করুন" : "Compare"}</span></label><div>{best ? <span className="badge">{bn ? "সেরা মূল্য" : "Best value"}</span> : null}<span className={`admin-status admin-status--${expired ? "expired" : (quote.status || "requested").toLowerCase()}`}>{expired ? "EXPIRED" : (quote.status || "requested").toUpperCase()}</span></div></div>
             <small>{bn ? "কোট" : "Quote"} #{quote.id} · {formatDateTime(quote.created_at, intlLocale)}</small>
             <h2>{quote.product_name}</h2><p>{quote.variant_name || "Standard"} · {bn ? "পরিমাণ" : "Qty"} {new Intl.NumberFormat(intlLocale).format(quote.qty)}</p>
@@ -106,6 +139,19 @@ export default function SavedQuotesPage() {
               <div><dt>ETA</dt><dd>{quote.response?.eta?.min_days ?? "—"}–{quote.response?.eta?.max_days ?? "—"} {bn ? "দিন" : "days"}</dd></div>
               <div><dt>{bn ? "মেয়াদ শেষ" : "Expires"}</dt><dd>{formatDateTime(quote.expires_at, intlLocale)}</dd></div>
             </dl>
+            {explanation ? <section className="workspace-ai" aria-labelledby={`saved-quote-ai-${quote.id}`}>
+              <div className="workspace-ai__header">
+                <div><span className="market-kicker">{bn ? "AI সিদ্ধান্ত সহায়তা" : "AI decision support"}</span><h3 id={`saved-quote-ai-${quote.id}`}>{bn ? "কেন এই কোটটি সুপারিশ করা হয়েছে" : "Why this quote is recommended"}</h3></div>
+                <span className={`workspace-ai__status${aiIsLive ? " workspace-ai__status--active" : ""}`}>{explanationSource(quote, bn)}</span>
+              </div>
+              {explanationSummary ? <p className="workspace-ai__summary">{explanationSummary}</p> : null}
+              <div className="workspace-ai__grid">
+                <div><strong>{bn ? "সুবিধা" : "Advantages"}</strong><ul>{advantages.length ? advantages.map(item => <li key={item}>{item}</li>) : <li>{bn ? "কোনো সুবিধার তথ্য দেওয়া হয়নি।" : "No advantages were supplied."}</li>}</ul></div>
+                <div><strong>{bn ? "ঝুঁকি" : "Risks"}</strong><ul>{risks.length ? risks.map(item => <li key={item}>{item}</li>) : <li>{bn ? "অতিরিক্ত ঝুঁকির তথ্য দেওয়া হয়নি।" : "No additional risks were supplied."}</li>}</ul></div>
+                <div><strong>{bn ? "যা যাচাই করবেন" : "Recommended checks"}</strong><ul>{recommendedChecks.length ? recommendedChecks.map(item => <li key={item}>{item}</li>) : <li>{bn ? "কোনো যাচাইয়ের তথ্য দেওয়া হয়নি।" : "No checks were supplied."}</li>}</ul></div>
+              </div>
+              <small>{bn ? "ল্যান্ডেড কস্ট ও র‍্যাঙ্কিং সার্ভারে হিসাব করা হয়; AI শুধু সিদ্ধান্তের ব্যাখ্যা দেয়।" : "Landed cost and ranking are calculated by the server; AI only explains the decision."}</small>
+            </section> : null}
             {ordered ? <div className="account-alert"><span>{bn ? `এই কোট থেকে অর্ডার #${quote.order_ids?.join(", #")} তৈরি হয়েছে।` : `Order #${quote.order_ids?.join(", #")} was created from this quote.`}</span></div> : null}
             <div className="form-actions">
               {expired || ordered ? <button className="button button--primary" type="button" disabled>{expired ? (bn ? "কোটের মেয়াদ শেষ" : "Quote expired") : (bn ? "অর্ডার তৈরি হয়েছে" : "Order created")}</button> : <Link className="button button--primary" href={`/account/saved-quotes/${quote.id}/order` as Route}>{bn ? "অর্ডার করুন" : "Proceed to order"}</Link>}

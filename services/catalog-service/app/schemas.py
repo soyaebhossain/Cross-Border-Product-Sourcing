@@ -5,6 +5,16 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from .identity import normalize_email_address, normalize_username
+
+
+# Catalog primary keys use database INTEGER columns, while the customer UI
+# intentionally caps a single sourcing request at 100,000 units.  Enforce the
+# same limits at every public quote/recommendation boundary so oversized Python
+# integers never reach SQLite/PostgreSQL drivers or monetary calculations.
+MAX_DATABASE_INTEGER = 2_147_483_647
+MAX_QUOTE_QUANTITY = 100_000
+
 
 class LoginIn(BaseModel):
     identifier: str | None = None
@@ -22,6 +32,16 @@ class RegisterIn(BaseModel):
     phone: str | None = None
     password: str = Field(min_length=8, max_length=128)
     role: str = "customer"
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str | None) -> str | None:
+        return normalize_username(value) if value is not None else None
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, value: str | None) -> str | None:
+        return normalize_email_address(value) if value is not None else None
 
 
 class PasswordResetRequestIn(BaseModel):
@@ -53,26 +73,26 @@ class MFAVerifyIn(MFAChallengeIn):
 
 
 class QuoteRequestIn(BaseModel):
-    variant_id: int
+    variant_id: int = Field(ge=1, le=MAX_DATABASE_INTEGER)
     country: str = Field(min_length=2, max_length=2, pattern="^[A-Za-z]{2}$")
     mode: Literal["LOCAL", "BULK"]
-    qty: int = Field(ge=1)
+    qty: int = Field(ge=1, le=MAX_QUOTE_QUANTITY)
     delivery_type: Literal["DOOR", "PICKUP"]
     language: Literal["en", "bn"] = "en"
 
 
 class QuoteRecommendIn(BaseModel):
-    variant_id: int
-    qty: int = Field(default=1, ge=1)
-    delivery_type: str = "DOOR"
+    variant_id: int = Field(ge=1, le=MAX_DATABASE_INTEGER)
+    qty: int = Field(default=1, ge=1, le=MAX_QUOTE_QUANTITY)
+    delivery_type: Literal["DOOR", "PICKUP"] = "DOOR"
     priority: str = "balanced"
 
 
 class CheapestCountryRecommendIn(BaseModel):
-    variant_id: int | None = None
+    variant_id: int | None = Field(default=None, ge=1, le=MAX_DATABASE_INTEGER)
     product_slug: str | None = None
-    qty: int = Field(default=1, ge=1)
-    delivery_type: str = "DOOR"
+    qty: int = Field(default=1, ge=1, le=MAX_QUOTE_QUANTITY)
+    delivery_type: Literal["DOOR", "PICKUP"] = "DOOR"
     priority: str = "balanced"
     countries: list[str] | None = None
     weights: dict[str, float] | None = None

@@ -76,6 +76,48 @@ async function expectMobileAuthPageFits(page: Page, path: "/login" | "/signup" |
   ).toBe(true);
 }
 
+const enrollmentSecret = "JBSWY3DPEHPK3PXPJBSWY3DPEHPK3PXP";
+const enrollmentUri = `otpauth://totp/SourceAI:e2e-admin?secret=${enrollmentSecret}&issuer=SourceAI&algorithm=SHA1&digits=6&period=30`;
+
+async function openMfaEnrollment(
+  page: Page,
+  options: { token?: string; secret?: string; uri?: string; expiresIn?: number } = {},
+) {
+  const token = options.token || "e2e-enrollment-token";
+  const secret = options.secret || enrollmentSecret;
+  const uri = options.uri || enrollmentUri;
+  const expiresIn = options.expiresIn ?? 300;
+
+  await mockReadiness(page, true);
+  await page.route("**/api/auth/login/", route =>
+    route.fulfill({
+      status: 202,
+      contentType: "application/json",
+      body: JSON.stringify({
+        mfa_required: true,
+        mfa_enrollment_required: true,
+        mfa_token: token,
+        expires_in: expiresIn,
+      }),
+    }),
+  );
+  await page.route("**/api/auth/mfa/enroll/start/", route =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ secret, otpauth_uri: uri, message: "Scan or enter the setup key." }),
+    }),
+  );
+
+  await page.goto("/login?portal=admin");
+  await expect(page.locator(".auth-service-status")).toHaveCount(0);
+  await page.getByLabel("Username, email or phone").fill("e2e-admin");
+  await page.getByLabel("Password", { exact: true }).fill("A9!Enrollment-Credential");
+  await page.getByRole("button", { name: "Open admin dashboard" }).click();
+  await expect(page.getByRole("heading", { name: "Connect an authenticator app" })).toBeVisible();
+  await expect(page.getByRole("img", { name: "Scan QR code with your authenticator app" })).toBeVisible();
+}
+
 test("@public offline login reports service availability without blaming credentials", async ({ page }) => {
   let releaseInitialCheck!: () => void;
   const initialCheckGate = new Promise<void>(resolve => {
@@ -402,6 +444,217 @@ test("@public signup exposes confirmation mismatch before registration", async (
   await expect(confirmation).toHaveAttribute("aria-invalid", "false");
   await expect(confirmation.locator("..")).not.toHaveClass(/auth-input--invalid/);
   await expect(submit).toBeEnabled();
+});
+
+test("@public MFA enrollment presents one scannable QR code with an accessible manual fallback", async ({ page }) => {
+  await openMfaEnrollment(page);
+
+  const section = page.locator('section[aria-labelledby="mfa-enrollment-title"]');
+  await expect(section).toBeVisible();
+  await expect(section.getByRole("heading", { name: "Scan QR code with your authenticator app" })).toHaveAttribute(
+    "id",
+    "mfa-enrollment-title",
+  );
+  const qrCode = section.getByRole("img", { name: "Scan QR code with your authenticator app" });
+  await expect(qrCode).toHaveCount(1);
+  await expect(qrCode).toHaveAttribute("aria-label", "Scan QR code with your authenticator app");
+  await expect(qrCode.locator("title")).toHaveText("Scan QR code with your authenticator app");
+
+  const manualFallback = section.getByText(/scan\? Use a setup key$/);
+  await expect(manualFallback).toBeVisible();
+  await manualFallback.click();
+  const setupKey = section.getByLabel("Authenticator setup key");
+  await expect(setupKey).toBeVisible();
+  await expect(setupKey).toHaveText(enrollmentSecret);
+  await expect(section.getByRole("button", { name: "Copy setup key" })).toBeVisible();
+  await expect(section.getByRole("link", { name: "Open in authenticator app" })).toHaveAttribute("href", enrollmentUri);
+
+  const code = page.getByLabel("Six-digit authenticator code");
+  await expect(code).toBeVisible();
+  await expect(code).toHaveAttribute("autocomplete", "one-time-code");
+  await expect(code).toHaveAttribute("inputmode", "numeric");
+  await expect(code).toHaveAttribute("pattern", "[0-9]{6}");
+  await expect(code).toHaveAttribute("minlength", "6");
+  await expect(code).toHaveAttribute("maxlength", "6");
+  await expect(page.locator(".mfa-challenge-expiry[role='status']")).toContainText(/expires/i);
+});
+
+test("@public MFA enrollment rotates an exposed QR only after explicit confirmation", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "chromium", "QR rotation transport contract");
+  const replacementSecret = "NB2W45DFOIZA2YTBOI======NB2W45DF";
+  const replacementUri = `otpauth://totp/SourceAI:e2e-admin?secret=${replacementSecret}&issuer=SourceAI&algorithm=SHA1&digits=6&period=30`;
+  const restartPayloads: Array<Record<string, unknown>> = [];
+  await page.route("**/api/auth/mfa/enroll/restart/", async route => {
+    restartPayloads.push(route.request().postDataJSON() as Record<string, unknown>);
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ secret: replacementSecret, otpauth_uri: replacementUri }),
+    });
+  });
+  await openMfaEnrollment(page);
+
+  const section = page.locator('section[aria-labelledby="mfa-enrollment-title"]');
+  const qrCode = section.getByRole("img", { name: "Scan QR code with your authenticator app" });
+  const originalQrFingerprint = await qrCode.locator("path").evaluateAll(paths =>
+    paths.map(path => path.getAttribute("d") || "").join("|"),
+  );
+  await section.getByText(/scan\? Use a setup key$/).click();
+  await expect(section.getByLabel("Authenticator setup key")).toHaveText(enrollmentSecret);
+  await page.getByLabel("Six-digit authenticator code").fill("123456");
+
+  await section.getByRole("button", { name: "Generate a new QR code" }).click();
+  const confirmation = section.getByRole("group", { name: "Confirm new QR code generation" });
+  await expect(confirmation).toBeVisible();
+  await expect(confirmation).toContainText("Replace the current QR code with a new one?");
+  await confirmation.getByRole("button", { name: "Keep current QR code" }).click();
+  await expect(confirmation).not.toBeVisible();
+  expect(restartPayloads).toHaveLength(0);
+  await expect(section.getByLabel("Authenticator setup key")).toHaveText(enrollmentSecret);
+
+  await section.getByRole("button", { name: "Generate a new QR code" }).click();
+  await confirmation.getByRole("button", { name: "Yes, generate new QR code" }).click();
+  await expect.poll(() => restartPayloads.length).toBe(1);
+  expect(restartPayloads).toEqual([{ mfa_token: "e2e-enrollment-token" }]);
+  await expect(section.getByLabel("Authenticator setup key")).toHaveText(replacementSecret);
+  await expect(section.getByRole("link", { name: "Open in authenticator app" })).toHaveAttribute("href", replacementUri);
+  await expect(page.getByLabel("Six-digit authenticator code")).toHaveValue("");
+  await expect(confirmation).not.toBeVisible();
+  await expect.poll(async () => qrCode.locator("path").evaluateAll(paths =>
+    paths.map(path => path.getAttribute("d") || "").join("|"),
+  )).not.toBe(originalQrFingerprint);
+
+  const browserStorage = await page.evaluate(() => JSON.stringify({
+    local: { ...window.localStorage },
+    session: { ...window.sessionStorage },
+  }));
+  expect(browserStorage).not.toContain(enrollmentSecret);
+  expect(browserStorage).not.toContain(replacementSecret);
+  expect(browserStorage).not.toContain("otpauth://");
+});
+
+test("@public expired MFA enrollment requires a fresh password-authenticated challenge", async ({ page }) => {
+  await mockReadiness(page, true);
+  const loginTokens = ["expired-enrollment-token", "fresh-enrollment-token"];
+  const secrets = [
+    "KRUGS4ZANFZSAYJAON2XEZJOORUXG5A1",
+    "KRUGS4ZANFZSAYJAON2XEZJOORUXG5A2",
+  ];
+  let loginAttempt = 0;
+  const startedTokens: string[] = [];
+  const confirmationPayloads: Array<Record<string, unknown>> = [];
+
+  await page.route("**/api/auth/login/", async route => {
+    const token = loginTokens[Math.min(loginAttempt, loginTokens.length - 1)];
+    loginAttempt += 1;
+    await route.fulfill({
+      status: 202,
+      contentType: "application/json",
+      body: JSON.stringify({
+        mfa_required: true,
+        mfa_enrollment_required: true,
+        mfa_token: token,
+        expires_in: 300,
+      }),
+    });
+  });
+  await page.route("**/api/auth/mfa/enroll/start/", async route => {
+    const payload = route.request().postDataJSON() as { mfa_token: string };
+    startedTokens.push(payload.mfa_token);
+    const index = payload.mfa_token === loginTokens[0] ? 0 : 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        secret: secrets[index],
+        otpauth_uri: `otpauth://totp/SourceAI:e2e-admin?secret=${secrets[index]}&issuer=SourceAI`,
+      }),
+    });
+  });
+  await page.route("**/api/auth/mfa/enroll/confirm/", async route => {
+    confirmationPayloads.push(route.request().postDataJSON() as Record<string, unknown>);
+    await route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: "MFA challenge expired or already used" }),
+    });
+  });
+
+  await page.goto("/login?portal=admin");
+  await page.getByLabel("Username, email or phone").fill("e2e-admin");
+  await page.getByLabel("Password", { exact: true }).fill("A9!Enrollment-Credential");
+  await page.getByRole("button", { name: "Open admin dashboard" }).click();
+  await expect(page.getByRole("img", { name: "Scan QR code with your authenticator app" })).toBeVisible();
+
+  await page.getByLabel("Six-digit authenticator code").fill("123456");
+  await page.getByRole("button", { name: "Enable and confirm MFA" }).click();
+  const expiredAlert = page.locator(".mfa-expired-error[role='alert']");
+  await expect(expiredAlert).toContainText(/(?:session|challenge).*expired|expired.*(?:session|challenge)/i);
+  const restart = page.getByRole("button", { name: "Start sign-in again" });
+  await expect(restart).toBeVisible();
+  await restart.click();
+
+  await expect(page).toHaveURL(url => url.pathname === "/login" && url.searchParams.get("portal") === "admin");
+  await expect(page.getByRole("heading", { name: "Admin sign in" })).toBeVisible();
+  await expect(page.getByLabel("Password", { exact: true })).toHaveValue("");
+  await page.getByLabel("Password", { exact: true }).fill("A9!Enrollment-Credential");
+  await page.getByRole("button", { name: "Open admin dashboard" }).click();
+  await expect(page.getByRole("img", { name: "Scan QR code with your authenticator app" })).toBeVisible();
+  await page.getByText(/scan\? Use a setup key$/).click();
+  await expect(page.getByLabel("Authenticator setup key")).toHaveText(secrets[1]);
+
+  expect(confirmationPayloads).toEqual([{ mfa_token: loginTokens[0], code: "123456" }]);
+  expect(startedTokens).toEqual(loginTokens);
+  expect(loginAttempt).toBe(2);
+});
+
+test("@public MFA enrollment fits the mobile viewport with the manual setup key expanded", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "mobile-chromium", "Mobile MFA enrollment layout contract");
+  await openMfaEnrollment(page);
+  await page.getByText(/scan\? Use a setup key$/).click();
+  await expect(page.getByLabel("Authenticator setup key")).toBeVisible();
+
+  const measurements = await page.evaluate(() => {
+    const card = document.querySelector<HTMLElement>(".auth-card--single");
+    const qr = document.querySelector<SVGElement>('[role="img"][aria-label="Scan QR code with your authenticator app"]');
+    const setupKey = document.querySelector<HTMLElement>('[aria-label="Authenticator setup key"]');
+    if (!card || !qr || !setupKey) return null;
+    const visibleElements = Array.from(card.querySelectorAll<HTMLElement>("input, button, a, output, svg[role='img']"))
+      .filter(element => {
+        const style = window.getComputedStyle(element);
+        const box = element.getBoundingClientRect();
+        return style.display !== "none" && style.visibility !== "hidden" && box.width > 0 && box.height > 0;
+      })
+      .map(element => {
+        const box = element.getBoundingClientRect();
+        return { left: box.left, right: box.right };
+      });
+    const cardBox = card.getBoundingClientRect();
+    const qrBox = qr.getBoundingClientRect();
+    const keyBox = setupKey.getBoundingClientRect();
+    return {
+      viewportWidth: window.innerWidth,
+      overflow: document.documentElement.scrollWidth - window.innerWidth,
+      card: { left: cardBox.left, right: cardBox.right },
+      qr: { width: qrBox.width, height: qrBox.height, left: qrBox.left, right: qrBox.right },
+      setupKey: { left: keyBox.left, right: keyBox.right, scrollWidth: setupKey.scrollWidth, width: keyBox.width },
+      visibleElements,
+    };
+  });
+
+  expect(measurements).not.toBeNull();
+  expect(measurements!.overflow).toBeLessThanOrEqual(1);
+  expect(measurements!.card.left).toBeGreaterThanOrEqual(-0.5);
+  expect(measurements!.card.right).toBeLessThanOrEqual(measurements!.viewportWidth + 0.5);
+  expect(measurements!.qr.width).toBeGreaterThan(0);
+  expect(Math.abs(measurements!.qr.width - measurements!.qr.height)).toBeLessThanOrEqual(1);
+  expect(measurements!.qr.left).toBeGreaterThanOrEqual(-0.5);
+  expect(measurements!.qr.right).toBeLessThanOrEqual(measurements!.viewportWidth + 0.5);
+  expect(measurements!.setupKey.left).toBeGreaterThanOrEqual(-0.5);
+  expect(measurements!.setupKey.right).toBeLessThanOrEqual(measurements!.viewportWidth + 0.5);
+  expect(measurements!.visibleElements.every(element =>
+    element.left >= -0.5 && element.right <= measurements!.viewportWidth + 0.5,
+  )).toBe(true);
 });
 
 test("@public MFA method selector exposes its selected state", async ({ page }) => {

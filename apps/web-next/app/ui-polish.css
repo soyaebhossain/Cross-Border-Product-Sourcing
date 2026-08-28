@@ -425,6 +425,348 @@ button:disabled {
   background: #fff7ed;
 }
 
+/* First-time MFA enrollment keeps the QR, manual fallback, and verification
+   controls in one calm, responsive setup surface. */
+.auth-card--mfa {
+  width: min(860px, 100%);
+  overflow: hidden;
+  border: 1px solid #d8e2ef;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.1);
+}
+
+.auth-card--mfa > div:first-child {
+  padding: 32px 36px 18px;
+}
+
+.auth-card--mfa > div:first-child h1 {
+  margin-bottom: 10px;
+}
+
+.mfa-challenge-expiry {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 0;
+  border-radius: 999px;
+  padding: 7px 11px;
+  background: #eff6ff;
+  color: #315477;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.mfa-challenge-expiry::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2f6bed;
+  content: "";
+}
+
+.auth-card--mfa .mfa-enrollment {
+  display: grid;
+  gap: 22px;
+  margin: 0 36px 26px;
+  border: 1px solid #d8e3f2;
+  border-radius: 18px;
+  padding: 24px;
+  background: linear-gradient(145deg, #f8fbff, #f4f8fe);
+}
+
+.mfa-enrollment__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.mfa-enrollment__header > div {
+  min-width: 0;
+}
+
+.mfa-enrollment__header h2,
+.mfa-enrollment__instructions h3 {
+  margin: 0;
+  color: #10203a;
+  letter-spacing: -0.02em;
+}
+
+.mfa-enrollment__header h2 {
+  font-size: clamp(18px, 2.4vw, 22px);
+}
+
+.mfa-enrollment__header p,
+.mfa-enrollment__instructions ol,
+.mfa-manual-setup p {
+  color: #526177;
+  line-height: 1.55;
+}
+
+.mfa-enrollment__header p {
+  margin: 6px 0 0;
+  font-size: 13px;
+}
+
+.mfa-enrollment__step {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.mfa-enrollment__grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.78fr) minmax(0, 1.22fr);
+  align-items: center;
+  gap: 28px;
+}
+
+.mfa-qr {
+  display: grid;
+  justify-items: center;
+  gap: 11px;
+  margin: 0;
+}
+
+.mfa-qr__surface {
+  display: grid;
+  width: min(240px, 100%);
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid #d4deeb;
+  border-radius: 16px;
+  padding: 10px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+
+.mfa-qr__surface svg {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
+
+.mfa-qr figcaption {
+  max-width: 34ch;
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.mfa-enrollment__instructions {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+
+.mfa-enrollment__instructions h3 {
+  font-size: 17px;
+}
+
+.mfa-enrollment__instructions ol {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding-left: 21px;
+  font-size: 13px;
+}
+
+.mfa-app-link {
+  margin-top: 4px;
+}
+
+.mfa-manual-setup {
+  border-top: 1px solid #dbe4f0;
+  padding-top: 17px;
+}
+
+.mfa-manual-setup summary {
+  width: fit-content;
+  border-radius: 7px;
+  color: #174ea6;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.mfa-manual-setup summary:focus-visible {
+  outline: 3px solid rgba(47, 107, 237, 0.28);
+  outline-offset: 4px;
+}
+
+.mfa-manual-setup__content {
+  display: grid;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.mfa-manual-setup__content p {
+  margin: 0;
+  font-size: 11px;
+}
+
+.mfa-secret-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.mfa-secret-row .mfa-secret {
+  flex: 1 1 auto;
+  min-width: 0;
+  align-content: center;
+  user-select: all;
+}
+
+.mfa-secret-row .button {
+  flex: 0 0 auto;
+}
+
+.mfa-copy-status {
+  min-height: 17px;
+  color: #166534 !important;
+  font-weight: 700;
+}
+
+.mfa-rotate-setup {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border-top: 1px solid #dbe4f0;
+  padding-top: 17px;
+}
+
+.mfa-rotate-setup > div:first-child {
+  min-width: 0;
+}
+
+.mfa-rotate-setup strong {
+  display: block;
+  color: #334155;
+  font-size: 12px;
+}
+
+.mfa-rotate-setup p {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.mfa-rotate-setup__trigger {
+  width: auto;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  padding-inline: 8px;
+  color: #174ea6;
+}
+
+.mfa-rotate-confirm {
+  display: grid;
+  flex: 0 0 min(100%, 390px);
+  gap: 9px;
+  border: 1px solid #f3d29c;
+  border-radius: 11px;
+  padding: 12px;
+  background: #fffbeb;
+}
+
+.mfa-rotate-confirm > p {
+  margin: 0;
+  color: #78480f;
+  font-weight: 750;
+}
+
+.mfa-rotate-confirm > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mfa-rotate-confirm .button {
+  min-height: 36px;
+  padding: 8px 11px;
+  font-size: 10px;
+}
+
+.mfa-rotate-confirm__confirm {
+  border-color: #dca94e;
+  background: #fff;
+  color: #85500d;
+}
+
+.auth-card--mfa > form {
+  display: grid;
+  gap: 13px;
+  padding: 0 36px 32px;
+}
+
+.mfa-expired-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.mfa-expired-error .button {
+  flex: 0 0 auto;
+  border-color: #f2a7ae;
+  background: #fff;
+  color: #a61022;
+}
+
+@media (max-width: 680px) {
+  .auth-card--mfa > div:first-child {
+    padding: 26px 20px 17px;
+  }
+
+  .auth-card--mfa .mfa-enrollment {
+    margin: 0 18px 22px;
+    padding: 19px;
+  }
+
+  .mfa-enrollment__grid {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 22px;
+  }
+
+  .mfa-qr__surface {
+    width: min(260px, 100%);
+  }
+
+  .mfa-secret-row,
+  .mfa-expired-error,
+  .mfa-rotate-setup {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mfa-secret-row .button,
+  .mfa-expired-error .button,
+  .mfa-rotate-setup__trigger,
+  .mfa-rotate-confirm,
+  .mfa-rotate-confirm .button {
+    width: 100%;
+  }
+
+  .mfa-rotate-confirm > div {
+    flex-direction: column;
+  }
+
+  .auth-card--mfa > form {
+    padding: 0 20px 27px;
+  }
+}
+
 .auth-service-status--email-unavailable {
   border-color: #fde68a;
   background: #fffbeb;
@@ -1787,4 +2129,16 @@ button:disabled {
     align-items: flex-start;
     font-size: 9px;
   }
+}
+.account-alert--success {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.account-alert a {
+  color: inherit;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }

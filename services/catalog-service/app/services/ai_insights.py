@@ -1,15 +1,25 @@
 from __future__ import annotations
 
 import csv
+import json
 from collections import Counter
 from decimal import Decimal, InvalidOperation
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from ..config import ROOT_DIR
+from ..config import get_settings
 
 
-DATA_DIR = ROOT_DIR / "Data"
+ML_STARTER_REQUIRED_FILES = (
+    "manifest.json",
+    "catalog_bootstrap.csv",
+    "product_monthly_trends_synthetic.csv",
+)
+LEGACY_REQUIRED_FILES = (
+    "mobile_sales_data.csv",
+    "supply_chain_data.csv",
+)
 
 STOCK_FILES = {
     "Apple": "AAPL.csv",
@@ -22,17 +32,29 @@ STOCK_FILES = {
 }
 
 
-def _read_csv(path: Path, limit: int | None = None) -> list[dict[str, str]]:
-    if not path.exists():
-        return []
+@lru_cache(maxsize=16)
+def _cached_csv_rows(path_value: str, modified_ns: int) -> tuple[dict[str, str], ...]:
+    del modified_ns  # Included in the cache key so replaced datasets are re-read.
+    path = Path(path_value)
     rows: list[dict[str, str]] = []
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle)
-        for index, row in enumerate(reader):
-            if limit is not None and index >= limit:
-                break
-            rows.append({str(key or "").strip(): str(value or "").strip() for key, value in row.items()})
-    return rows
+        for row in reader:
+            rows.append(
+                {
+                    str(key or "").strip(): str(value or "").strip()
+                    for key, value in row.items()
+                }
+            )
+    return tuple(rows)
+
+
+def _read_csv(path: Path, limit: int | None = None) -> list[dict[str, str]]:
+    if not path.exists():
+        return []
+    rows = _cached_csv_rows(str(path.resolve()), path.stat().st_mtime_ns)
+    selected = rows if limit is None else rows[:limit]
+    return list(selected)
 
 
 def _decimal(value: str | None) -> Decimal | None:
@@ -54,9 +76,9 @@ def _matches(row: dict[str, str], terms: list[str]) -> bool:
     return any(term in haystack for term in terms)
 
 
-def _mobile_sales_insight(query: str) -> dict[str, Any]:
+def _mobile_sales_insight(query: str, data_dir: Path) -> dict[str, Any]:
     terms = [part.lower() for part in query.split() if part.strip()]
-    rows = _read_csv(DATA_DIR / "mobile_sales_data.csv")
+    rows = _read_csv(data_dir / "mobile_sales_data.csv")
     matched = [row for row in rows if _matches(row, terms)]
     if not matched and terms:
         matched = rows
@@ -105,10 +127,10 @@ def _stock_rows(path: Path) -> list[dict[str, str]]:
     return [row for row in rows if _decimal(row.get("Close") or row.get("close")) is not None]
 
 
-def _market_signals() -> list[dict[str, str]]:
+def _market_signals(data_dir: Path) -> list[dict[str, str]]:
     signals: list[dict[str, str]] = []
     for name, filename in STOCK_FILES.items():
-        rows = _stock_rows(DATA_DIR / filename)
+        rows = _stock_rows(data_dir / filename)
         if len(rows) < 2:
             continue
         first = _decimal(rows[0].get("Close") or rows[0].get("close"))
@@ -128,8 +150,8 @@ def _market_signals() -> list[dict[str, str]]:
     return sorted(signals, key=lambda item: abs(Decimal(item["period_change_percent"])), reverse=True)[:5]
 
 
-def _campaign_insights() -> dict[str, Any]:
-    rows = _read_csv(DATA_DIR / "dataset_fashion_store_campaigns.csv")
+def _campaign_insights(data_dir: Path) -> dict[str, Any]:
+    rows = _read_csv(data_dir / "dataset_fashion_store_campaigns.csv")
     channel_counter: Counter[str] = Counter()
     discount_counter: Counter[str] = Counter()
     for row in rows:
@@ -146,9 +168,9 @@ def _campaign_insights() -> dict[str, Any]:
     }
 
 
-def _supply_chain_insights(query: str) -> dict[str, Any]:
+def _supply_chain_insights(query: str, data_dir: Path) -> dict[str, Any]:
     terms = [part.lower() for part in query.split() if part.strip()]
-    rows = _read_csv(DATA_DIR / "supply_chain_data.csv")
+    rows = _read_csv(data_dir / "supply_chain_data.csv")
     matched = [row for row in rows if _matches(row, terms)]
     if not matched and terms:
         matched = rows
@@ -188,8 +210,8 @@ def _supply_chain_insights(query: str) -> dict[str, Any]:
     }
 
 
-def _ml_trends() -> dict[str, Any]:
-    rows = _read_csv(DATA_DIR / "mobile_sales_data.csv")
+def _ml_trends(data_dir: Path) -> dict[str, Any]:
+    rows = _read_csv(data_dir / "mobile_sales_data.csv")
 
     monthly_qty: dict[str, int] = {}
     monthly_rev: dict[str, float] = {}
@@ -289,12 +311,214 @@ def _ml_trends() -> dict[str, Any]:
     }
 
 
-def build_ai_insights(query: str = "") -> dict[str, Any]:
-    sales = _mobile_sales_insight(query)
-    supply_chain = _supply_chain_insights(query)
-    market = _market_signals()
-    campaigns = _campaign_insights()
-    trends = _ml_trends()
+def _starter_dataset_insights(query: str, data_dir: Path) -> dict[str, Any]:
+    try:
+        manifest = json.loads((data_dir / "manifest.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return _unavailable_insights(
+            query,
+            data_dir,
+            reason=f"The ML starter manifest cannot be read: {type(exc).__name__}",
+        )
+
+    catalog_rows = _read_csv(data_dir / "catalog_bootstrap.csv")
+    trend_rows = _read_csv(data_dir / "product_monthly_trends_synthetic.csv")
+    terms = [part.casefold() for part in query.split() if part.strip()]
+    matched_catalog = [row for row in catalog_rows if _matches(row, terms)]
+    matched_product_ids = {
+        row.get("product_id", "") for row in matched_catalog if row.get("product_id")
+    }
+    matched_trends = [
+        row
+        for row in trend_rows
+        if not terms or row.get("product_id", "") in matched_product_ids
+    ]
+    latest_period = max(
+        (row.get("feature_period_start", "") for row in matched_trends),
+        default="",
+    )
+    latest_rows = [
+        row
+        for row in matched_trends
+        if row.get("feature_period_start", "") == latest_period
+    ]
+
+    category_by_product = {
+        row.get("product_id", ""): row.get("category_name")
+        or row.get("category_slug")
+        or "Unknown"
+        for row in catalog_rows
+    }
+    name_by_product = {
+        row.get("product_id", ""): row.get("product_name")
+        or row.get("product_slug")
+        or "Unknown"
+        for row in catalog_rows
+    }
+    category_forecast: Counter[str] = Counter()
+    origin_counter: Counter[str] = Counter()
+    forecast_rows: list[dict[str, Any]] = []
+    total_forecast_qty = 0
+    total_quotes = 0
+    total_orders = 0
+    trend_counter: Counter[str] = Counter()
+
+    for row in matched_catalog:
+        for country_code in row.get("origin_country_codes", "").split("|"):
+            if country_code:
+                origin_counter[country_code] += 1
+
+    for row in latest_rows:
+        product_id = row.get("product_id", "")
+        forecast_qty = int(_decimal(row.get("target_next_month_order_qty")) or 0)
+        total_forecast_qty += forecast_qty
+        total_quotes += int(_decimal(row.get("quote_requests")) or 0)
+        total_orders += int(_decimal(row.get("order_count")) or 0)
+        category_forecast[category_by_product.get(product_id, "Unknown")] += forecast_qty
+        trend_counter[row.get("target_next_month_trend") or "UNKNOWN"] += 1
+        forecast_rows.append(
+            {
+                "product_id": product_id,
+                "product": name_by_product.get(product_id, "Unknown"),
+                "forecast_quantity": forecast_qty,
+                "trend": row.get("target_next_month_trend") or "UNKNOWN",
+            }
+        )
+
+    forecast_rows.sort(
+        key=lambda item: (item["forecast_quantity"], item["product"]),
+        reverse=True,
+    )
+    price_values = [
+        value
+        for row in matched_catalog
+        if (value := _decimal(row.get("min_price_usd"))) is not None
+    ]
+    average_price = (
+        sum(price_values, start=Decimal("0")) / Decimal(len(price_values))
+        if price_values
+        else Decimal("0")
+    )
+    top_category = (
+        category_forecast.most_common(1)[0][0]
+        if category_forecast
+        else "No matching category"
+    )
+    top_origin = origin_counter.most_common(1)[0][0] if origin_counter else "Not available"
+    training_readiness = str(manifest.get("training_readiness") or "tutorial_only")
+    is_synthetic = bool(manifest.get("simulation", {}).get("is_real_history") is False)
+
+    recommendations = [
+        "Treat these values as tutorial-only synthetic signals, not observed demand or live market evidence."
+    ]
+    if latest_rows:
+        recommendations.append(
+            f"The synthetic next-month scenario is strongest for {top_category}; validate it with real quote and order outcomes before stocking."
+        )
+    if forecast_rows:
+        recommendations.append(
+            f"Review {forecast_rows[0]['product']} first in a controlled sourcing test; do not use the simulated forecast as an automated purchasing instruction."
+        )
+
+    return {
+        "available": True,
+        "status": "tutorial_data",
+        "query": query,
+        "dataset": {
+            "name": "ml-starter-v1",
+            "revision": manifest.get("dataset_revision"),
+            "schema_version": manifest.get("schema_version"),
+            "training_readiness": training_readiness,
+            "contains_observed_outcomes": bool(
+                manifest.get("contains_observed_outcomes", False)
+            ),
+            "is_synthetic": is_synthetic,
+            "latest_feature_period": latest_period or None,
+        },
+        "methodology": (
+            "Deterministic aggregation of the checked-in SourceAI ML starter dataset. "
+            "The demand rows are synthetic and suitable for tutorial and pipeline validation only."
+        ),
+        "sales": {
+            "matched_rows": len(matched_catalog),
+            "total_quantity_sold": total_forecast_qty,
+            "average_unit_price": format(average_price, ".2f"),
+            "top_brand": "Not provided by this dataset",
+            "top_region": top_origin,
+            "top_product_type": top_category,
+            "summary": (
+                f"{len(latest_rows)} synthetic latest-period rows match this query."
+                if latest_rows
+                else "No tutorial dataset rows match this query."
+            ),
+        },
+        "trends": {
+            "latest_feature_period": latest_period or None,
+            "matched_forecast_rows": len(latest_rows),
+            "synthetic_next_month_quantity": total_forecast_qty,
+            "quote_requests": total_quotes,
+            "orders": total_orders,
+            "trend_distribution": dict(sorted(trend_counter.items())),
+            "top_products": forecast_rows[:5],
+        },
+        "market_signals": [],
+        "campaigns": {
+            "campaign_count": 0,
+            "top_channel": "Not provided by this dataset",
+            "top_discount_type": "Not provided by this dataset",
+        },
+        "recommendations": recommendations,
+    }
+
+
+def _unavailable_insights(
+    query: str,
+    data_dir: Path,
+    *,
+    reason: str | None = None,
+) -> dict[str, Any]:
+    missing = [
+        filename for filename in ML_STARTER_REQUIRED_FILES if not (data_dir / filename).is_file()
+    ]
+    detail = reason or (
+        f"Required dataset files are missing: {', '.join(missing)}"
+        if missing
+        else "The configured dataset layout is not supported"
+    )
+    return {
+        "available": False,
+        "status": "unavailable",
+        "query": query,
+        "dataset": {
+            "name": "ml-starter-v1",
+            "training_readiness": "unavailable",
+            "contains_observed_outcomes": False,
+            "is_synthetic": None,
+        },
+        "methodology": "AI insights are unavailable because the configured source data cannot be validated.",
+        "reason": detail,
+        "missing_files": missing,
+        "market_signals": [],
+        "recommendations": [],
+    }
+
+
+def build_ai_insights(
+    query: str = "",
+    *,
+    data_dir: Path | None = None,
+) -> dict[str, Any]:
+    configured_data_dir = data_dir or get_settings().resolved_ai_insights_data_path()
+    if all((configured_data_dir / name).is_file() for name in ML_STARTER_REQUIRED_FILES):
+        return _starter_dataset_insights(query, configured_data_dir)
+    if not all((configured_data_dir / name).is_file() for name in LEGACY_REQUIRED_FILES):
+        return _unavailable_insights(query, configured_data_dir)
+
+    sales = _mobile_sales_insight(query, configured_data_dir)
+    supply_chain = _supply_chain_insights(query, configured_data_dir)
+    market = _market_signals(configured_data_dir)
+    campaigns = _campaign_insights(configured_data_dir)
+    trends = _ml_trends(configured_data_dir)
 
     recommendations: list[str] = []
     if supply_chain["matched_rows"]:
@@ -324,8 +548,16 @@ def build_ai_insights(query: str = "") -> dict[str, Any]:
         )
 
     return {
+        "available": True,
+        "status": "legacy_data",
         "query": query,
-        "methodology": "CSV-backed ML trend engine — moving average, brand momentum, regional velocity, spec popularity.",
+        "dataset": {
+            "name": "legacy-csv",
+            "training_readiness": "unverified",
+            "contains_observed_outcomes": None,
+            "is_synthetic": None,
+        },
+        "methodology": "CSV-backed trend engine — moving average, brand momentum, regional velocity, and spec popularity.",
         "supply_chain": supply_chain,
         "sales": sales,
         "market_signals": market,

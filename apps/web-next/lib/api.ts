@@ -68,6 +68,20 @@ export type Country = {
   name: string;
 };
 
+export type AiExplanation = {
+  /** Canonical summary in `language`; legacy snapshots may only have summary_bn. */
+  summary?: string;
+  summary_en?: string;
+  summary_bn?: string;
+  language?: "en" | "bn";
+  advantages: string[];
+  risks: string[];
+  missing_information: string[];
+  recommended_checks: string[];
+  confidence: number | null;
+  human_review_required: boolean;
+};
+
 export type QuoteResponse = {
   offers_top?: Array<{
     id: number;
@@ -97,15 +111,7 @@ export type QuoteResponse = {
     min_days: number;
     max_days: number;
   };
-  ai_explanation?: {
-    summary_bn: string;
-    advantages: string[];
-    risks: string[];
-    missing_information: string[];
-    recommended_checks: string[];
-    confidence: number | null;
-    human_review_required: boolean;
-  };
+  ai_explanation?: AiExplanation;
   ai_metadata?: {
     source: "ollama-via-n8n" | "deterministic-fallback" | string;
     model?: string | null;
@@ -236,15 +242,7 @@ export type CheapestCountryRecommendation = {
   methodology: RecommendationMethodology;
   recommendations: RecommendationItem[];
   data_gaps: string[];
-  ai_explanation?: {
-    summary_bn: string;
-    advantages: string[];
-    risks: string[];
-    missing_information: string[];
-    recommended_checks: string[];
-    confidence: number | null;
-    human_review_required: boolean;
-  };
+  ai_explanation?: AiExplanation;
   ai_metadata?: {
     source: "ollama-via-n8n" | "deterministic-fallback" | string;
     model?: string | null;
@@ -628,6 +626,9 @@ export async function getAuthServiceStatus(timeoutMs = 5000): Promise<AuthServic
 export function startMfaEnrollment(mfaToken: string) {
   return postJson<{ secret: string; otpauth_uri: string; message?: string }>("/api/auth/mfa/enroll/start/", { mfa_token: mfaToken });
 }
+export function restartMfaEnrollment(mfaToken: string) {
+  return postJson<{ secret: string; otpauth_uri: string; message?: string }>("/api/auth/mfa/enroll/restart/", { mfa_token: mfaToken });
+}
 export function confirmMfaEnrollment(mfaToken: string, code: string) {
   return postJson<AuthSuccess & { recovery_codes: string[]; message?: string }>("/api/auth/mfa/enroll/confirm/", { mfa_token: mfaToken, code });
 }
@@ -656,7 +657,7 @@ export async function logoutSession() {
 }
 
 const catalogSnapshotFallbackEnabled =
-  process.env.NEXT_PUBLIC_CATALOG_SNAPSHOT_FALLBACK !== "0";
+  process.env.NEXT_PUBLIC_CATALOG_SNAPSHOT_FALLBACK === "1";
 
 export async function getProducts(query?: string) {
   const path = query ? `/api/products/?q=${encodeURIComponent(query)}` : "/api/products/";
@@ -667,15 +668,10 @@ export async function getProducts(query?: string) {
   } catch (error) {
     liveError = error;
   }
-  if (!catalogSnapshotFallbackEnabled) {
-    if (liveProducts) return liveProducts;
-    throw liveError;
-  }
+  if (liveProducts) return liveProducts;
+  if (!catalogSnapshotFallbackEnabled) throw liveError;
   const { getSnapshotProducts } = await import("./public-catalog");
-  const snapshotProducts = getSnapshotProducts(query);
-  return liveProducts && liveProducts.length >= snapshotProducts.length
-    ? liveProducts
-    : snapshotProducts;
+  return getSnapshotProducts(query);
 }
 
 export type ProductPage = { items: Product[]; total: number; page: number; page_size: number; pages: number; catalog_source?: "snapshot" };
@@ -689,13 +685,10 @@ export async function browseProducts(input: { q?: string; category?: string; pag
   } catch (error) {
     liveError = error;
   }
-  if (!catalogSnapshotFallbackEnabled) {
-    if (livePage) return livePage;
-    throw liveError;
-  }
+  if (livePage) return livePage;
+  if (!catalogSnapshotFallbackEnabled) throw liveError;
   const { browseSnapshotProducts } = await import("./public-catalog");
-  const snapshotPage = browseSnapshotProducts(input);
-  return livePage && livePage.total >= snapshotPage.total ? livePage : snapshotPage;
+  return browseSnapshotProducts(input);
 }
 
 export function getLiveCategories() {
@@ -710,15 +703,10 @@ export async function getCategories() {
   } catch (error) {
     liveError = error;
   }
-  if (!catalogSnapshotFallbackEnabled) {
-    if (liveCategories) return liveCategories;
-    throw liveError;
-  }
+  if (liveCategories) return liveCategories;
+  if (!catalogSnapshotFallbackEnabled) throw liveError;
   const { getSnapshotCategories } = await import("./public-catalog");
-  const snapshotCategories = getSnapshotCategories();
-  return liveCategories && liveCategories.length >= snapshotCategories.length
-    ? liveCategories
-    : snapshotCategories;
+  return getSnapshotCategories();
 }
 
 export function getLiveCountries() {
@@ -733,15 +721,10 @@ export async function getCountries() {
   } catch (error) {
     liveError = error;
   }
-  if (!catalogSnapshotFallbackEnabled) {
-    if (liveCountries) return liveCountries;
-    throw liveError;
-  }
+  if (liveCountries) return liveCountries;
+  if (!catalogSnapshotFallbackEnabled) throw liveError;
   const { getSnapshotCountries } = await import("./public-catalog");
-  const snapshotCountries = getSnapshotCountries();
-  return liveCountries && liveCountries.length >= snapshotCountries.length
-    ? liveCountries
-    : snapshotCountries;
+  return getSnapshotCountries();
 }
 
 export function getAiInsights(q = "") {

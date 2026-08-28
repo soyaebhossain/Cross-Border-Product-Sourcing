@@ -12,9 +12,11 @@ from app.api.routes.customer import get_current_customer
 from app.auth import ALLOWED_ROLES
 from app.customer_schemas import (
     AddressCreateIn,
+    AddressUpdateIn,
     AdminDisputeDecisionIn,
     AdminSupportStatusIn,
     CustomerProfileUpdateIn,
+    DisputeCancelIn,
     DisputeCreateIn,
     PaymentRetryIn,
     SupportMessageCreateIn,
@@ -24,6 +26,7 @@ from app.models import (
     AccountUser,
     AdminAuditEvent,
     CustomerAddress,
+    CustomerNotification,
     CustomerInvoice,
     ManualPaymentProof,
     NotificationOutbox,
@@ -41,11 +44,14 @@ from app.services.customer_account import (
     get_customer_address_or_404,
     get_customer_invoice,
     serialize_customer_profile,
+    update_customer_address,
     update_customer_profile,
 )
+from app.services.financial_operations import financial_snapshot
 from app.services.customer_payments import retry_manual_payment
 from app.services.customer_support import (
     add_admin_support_message,
+    cancel_customer_dispute,
     create_customer_dispute,
     create_support_ticket,
     update_admin_dispute,
@@ -53,7 +59,9 @@ from app.services.customer_support import (
 )
 from app.services.notifications import (
     dispatch_outbox_batch,
+    get_or_create_notification_preferences,
     queue_customer_notification,
+    update_notification_preferences,
 )
 from app.services.orders import decide_manual_payment_record
 from app.db import Base
@@ -190,6 +198,25 @@ def test_customer_profile_address_defaults_and_ownership(session: Session) -> No
         CUSTOMER,
     )
     assert home.is_default_shipping and home.is_default_billing
+    with pytest.raises(ValueError, match="cannot be blank"):
+        AddressCreateIn(
+            label="   ",
+            recipient_name="Buyer",
+            line1="123 Main Road",
+            city="Dhaka",
+            country_code="BD",
+            phone="+8801700000000",
+        )
+    with pytest.raises(ValueError, match="cannot be blank"):
+        AddressUpdateIn(line1="   ")
+    with pytest.raises(HTTPException) as only_default:
+        update_customer_address(
+            session,
+            home.id,
+            AddressUpdateIn(is_default_shipping=False),
+            CUSTOMER,
+        )
+    assert only_default.value.status_code == 409
     with pytest.raises(HTTPException) as forbidden:
         get_customer_address_or_404(session, home.id, OTHER_CUSTOMER)
     assert forbidden.value.status_code == 403
@@ -328,6 +355,61 @@ def test_notifications_queue_real_delivery_and_fail_closed_without_provider(
     assert "buyer@example.test" not in (outbox.error_detail or "")
 
 
+def test_notification_channels_require_a_real_destination(session: Session) -> None:
+    phone_only = AccountUser(
+        id=20,
+        username="phone-only",
+        phone="+8801711000000",
+        password_hash="not-used",
+        role="customer",
+        is_active=True,
+    )
+    no_destination = AccountUser(
+        id=21,
+        username="in-app-only",
+        password_hash="not-used",
+        role="customer",
+        is_active=True,
+    )
+    session.add_all((phone_only, no_destination))
+    session.commit()
+
+    preference = get_or_create_notification_preferences(session, phone_only.id)
+    assert preference.order_email is False
+    assert preference.support_email is False
+    update_notification_preferences(
+        session,
+        phone_only.id,
+        {"order_sms": True},
+    )
+    with pytest.raises(HTTPException, match="verified account email"):
+        update_notification_preferences(
+            session,
+            phone_only.id,
+            {"order_email": True},
+        )
+    with pytest.raises(HTTPException, match="phone number"):
+        update_notification_preferences(
+            session,
+            no_destination.id,
+            {"support_whatsapp": True},
+        )
+
+    notification = queue_customer_notification(
+        session,
+        user_id=no_destination.id,
+        category="order",
+        title="In-app update",
+        body="This remains visible in the account inbox.",
+    )
+    session.commit()
+    assert session.scalar(
+        select(NotificationOutbox.id).where(
+            NotificationOutbox.notification_id == notification.id
+        )
+    ) is None
+
+
 def test_support_dispute_ownership_and_privileged_audit(
     session: Session,
 ) -> None:
@@ -365,6 +447,19 @@ def test_support_dispute_ownership_and_privileged_audit(
         ADMIN,
     )
     assert ticket.status == "RESOLVED"
+    resolved_at = ticket.resolved_at
+    ticket = update_admin_support_status(
+        session,
+        ticket.id,
+        AdminSupportStatusIn(
+            status="CLOSED",
+            note="Closing after the confirmed resolution.",
+            request_id="req-support-close",
+        ),
+        ADMIN,
+    )
+    assert ticket.resolved_at == resolved_at
+    assert ticket.closed_at is not None
 
     dispute = create_customer_dispute(
         session,
@@ -398,6 +493,50 @@ def test_support_dispute_ownership_and_privileged_audit(
         "support.status_changed",
         "dispute.status_changed",
     }
+
+
+def test_cancelled_invoice_has_no_outstanding_balance(session: Session) -> None:
+    order = session.get(Order, 10)
+    order.status = "CANCELLED"
+    session.commit()
+
+    snapshot = financial_snapshot(session, order)
+
+    assert snapshot["outstanding_bdt"] == "0.00"
+
+
+def test_customer_dispute_cancellation_creates_traceable_notification(
+    session: Session,
+) -> None:
+    dispute = create_customer_dispute(
+        session,
+        DisputeCreateIn(
+            order_id=10,
+            dispute_type="PAYMENT",
+            description="The transaction is no longer disputed.",
+            requested_resolution="Cancel this dispute.",
+        ),
+        CUSTOMER,
+    )
+
+    cancelled = cancel_customer_dispute(
+        session,
+        dispute.id,
+        DisputeCancelIn(note="Customer confirmed the issue is resolved."),
+        CUSTOMER,
+    )
+
+    notification = session.scalar(
+        select(CustomerNotification).where(
+            CustomerNotification.user_id == CUSTOMER["sub"],
+            CustomerNotification.category == "dispute",
+            CustomerNotification.data["dispute_id"].as_integer() == dispute.id,
+        ).order_by(CustomerNotification.id.desc())
+    )
+    assert cancelled.status == "CANCELLED"
+    assert notification is not None
+    assert notification.data["status"] == "CANCELLED"
+    assert notification.title.endswith("cancelled")
 
 
 def test_payment_proof_urls_are_https_only() -> None:

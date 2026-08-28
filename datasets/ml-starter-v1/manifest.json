@@ -13,13 +13,13 @@
       "columns": 32,
       "purpose": "Static catalog features; bootstrap only",
       "rows": 610,
-      "sha256": "ecd0ee2b78abd1d2cfa7dfd11c8657d61502264deb06d5a2066a90aa2b09b94f"
+      "sha256": "0f8ae6a5f36e37ef302fedf6a7a413714b0c1c32940fe5d73eaf91a9fbb7544b"
     },
     "category_text_classification.csv": {
       "columns": 10,
       "purpose": "Catalog taxonomy tutorial",
       "rows": 610,
-      "sha256": "ab3570eeaf95f1a126373601133fa47f302b71dedc5a143ca97358811a3f9d12"
+      "sha256": "a10c2d23cc2d174692b6550217c87299ee6f123cda70deaaef6904ff599478ed"
     },
     "data_dictionary.csv": {
       "columns": 8,
@@ -37,13 +37,13 @@
       "columns": 7,
       "purpose": "Product-origin relationship table",
       "rows": 1930,
-      "sha256": "6d71804cd1cad169e07b8417327b33150ab8d0aed98d5c385aad7c29f6daa69f"
+      "sha256": "4844dbc5c12f88b87c9205148b30796aa275c2b9abcb14e478e5143fe30f5a7d"
     },
     "product_monthly_trends_synthetic.csv": {
       "columns": 38,
       "purpose": "Synthetic next-month forecasting tutorial",
       "rows": 23790,
-      "sha256": "325bb53ae7ef7ecc0a8ac6b097c8b246af51974d1f7402e4c0eacd1687ff917c"
+      "sha256": "8777b00568ba053a069ad73674ab307ed5679feb601b835d10ff50973478dcab"
     },
     "real_sourcing_outcomes_template.csv": {
       "columns": 34,
@@ -64,7 +64,7 @@
   "sources": [
     {
       "path": "apps/web-next/data/public-catalog.snapshot.json",
-      "sha256": "9a51689d2798f4a51856efb09925fbb7ba24870eedee8d0025269500b995ab6a",
+      "sha256": "922089e4eaf0426053619c954f2ec03c4ee95c8bc7eb330003e2d3fcc5983dc4",
       "source_revision": "20260730_04"
     },
     {

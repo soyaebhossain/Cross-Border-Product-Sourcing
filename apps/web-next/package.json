@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "next": "15.5.22",
+    "qrcode.react": "^4.2.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },

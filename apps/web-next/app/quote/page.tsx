@@ -4,11 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 import { getCountries, getProducts, quoteProductWithAi, saveQuote, type Country, type Product, type QuoteResponse } from "../../lib/api";
+import { localizedAiItems, localizedAiSummary } from "../../lib/ai-explanation-locale";
 import { formatBdt } from "../../lib/format";
 import { useLocale } from "../../lib/locale-context";
 
 export default function QuotePage() {
-  const { locale } = useLocale();
+  const { locale, intlLocale } = useLocale();
+  const bn = locale === "bn";
   const [products, setProducts] = useState<Product[]>([]);
   const [countries, setCountries] = useState<Country[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
@@ -23,7 +25,10 @@ export default function QuotePage() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const requestedVariant = Number(params.get("variant")) || null;
-    const requestedQty = Number(params.get("qty")) || 1;
+    const rawRequestedQty = Number(params.get("qty"));
+    const requestedQty = Number.isFinite(rawRequestedQty)
+      ? Math.min(100_000, Math.max(1, Math.round(rawRequestedQty)))
+      : 1;
     const requestedCountry = params.get("country");
     const requestedMode = params.get("mode");
     setForm((prev) => ({ ...prev, qty: requestedQty, country: requestedCountry || prev.country, mode: requestedMode || prev.mode }));
@@ -49,6 +54,13 @@ export default function QuotePage() {
       setSelectedVariantId((prev) => prev || selectedProduct.variants[0].id);
     }
   }, [selectedProduct]);
+
+  useEffect(() => {
+    // A generated explanation belongs to the language used in its request.
+    // Clear it on a locale switch so the page never presents stale mixed-language output.
+    setResponse(null);
+    setSavedQuoteId(null);
+  }, [locale]);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -91,6 +103,25 @@ export default function QuotePage() {
   }, [response]);
   const aiExplanation = response?.ai_explanation;
   const aiMetadata = response?.ai_metadata;
+  const aiSummary = aiExplanation
+    ? localizedAiSummary(
+        aiExplanation,
+        locale,
+        bn ? "সোর্সিং সুপারিশের সারাংশ এখন পাওয়া যাচ্ছে না।" : "The sourcing recommendation summary is not available yet.",
+      )
+    : "";
+  const aiAdvantages = aiExplanation
+    ? localizedAiItems(aiExplanation.advantages, locale, bn ? "কোনো সুবিধার তথ্য দেওয়া হয়নি।" : "No advantages were supplied.", aiExplanation.language)
+    : [];
+  const aiRisks = aiExplanation
+    ? localizedAiItems(aiExplanation.risks, locale, bn ? "অতিরিক্ত ঝুঁকি শনাক্ত হয়নি।" : "No additional risk was identified.", aiExplanation.language)
+    : [];
+  const aiMissingInformation = aiExplanation
+    ? localizedAiItems(aiExplanation.missing_information, locale, bn ? "অনুপস্থিত তথ্যের বিবরণ দেওয়া হয়নি।" : "No missing-information details were supplied.", aiExplanation.language)
+    : [];
+  const aiRecommendedChecks = aiExplanation
+    ? localizedAiItems(aiExplanation.recommended_checks, locale, bn ? "কোনো যাচাইয়ের তথ্য দেওয়া হয়নি।" : "No checks were supplied.", aiExplanation.language)
+    : [];
 
   return (
     <main className="shell shell--narrow">
@@ -147,8 +178,12 @@ export default function QuotePage() {
               <input
                 type="number"
                 min={1}
+                max={100000}
                 value={form.qty}
-                onChange={(event) => setForm((prev) => ({ ...prev, qty: Number(event.target.value) || 1 }))}
+                onChange={(event) => setForm((prev) => ({
+                  ...prev,
+                  qty: Math.min(100_000, Math.max(1, Math.round(Number(event.target.value) || 1))),
+                }))}
                 className="input-field"
               />
             </div>
@@ -212,35 +247,35 @@ export default function QuotePage() {
             <div className="quote-summary">
               <div>
                 <strong>Total</strong>
-                <span>{formatBdt(summary.total_bdt)}</span>
+                <span>{formatBdt(summary.total_bdt, intlLocale)}</span>
               </div>
               <div>
                 <strong>Product cost</strong>
-                <span>{formatBdt(summary.product_cost_bdt || summary.origin_price_bdt)}</span>
+                <span>{formatBdt(summary.product_cost_bdt || summary.origin_price_bdt, intlLocale)}</span>
               </div>
               <div>
                 <strong>Shipping</strong>
-                <span>{formatBdt(summary.shipping_bdt)}</span>
+                <span>{formatBdt(summary.shipping_bdt, intlLocale)}</span>
               </div>
               <div>
                 <strong>Customs duty</strong>
-                <span>{formatBdt(summary.customs_duty_bdt || summary.duty_vat_bdt)}</span>
+                <span>{formatBdt(summary.customs_duty_bdt || summary.duty_vat_bdt, intlLocale)}</span>
               </div>
               <div>
                 <strong>VAT / tax</strong>
-                <span>{formatBdt(summary.vat_tax_bdt || 0)}</span>
+                <span>{formatBdt(summary.vat_tax_bdt || 0, intlLocale)}</span>
               </div>
               <div>
                 <strong>Handling</strong>
-                <span>{formatBdt(summary.handling_charge_bdt || summary.service_fee_bdt)}</span>
+                <span>{formatBdt(summary.handling_charge_bdt || summary.service_fee_bdt, intlLocale)}</span>
               </div>
               <div>
                 <strong>Advance</strong>
-                <span>{formatBdt(summary.advance_bdt)}</span>
+                <span>{formatBdt(summary.advance_bdt, intlLocale)}</span>
               </div>
               <div>
                 <strong>Remaining</strong>
-                <span>{formatBdt(summary.remaining_bdt)}</span>
+                <span>{formatBdt(summary.remaining_bdt, intlLocale)}</span>
               </div>
             </div>
             <div className="form-actions">
@@ -250,24 +285,30 @@ export default function QuotePage() {
               <article className="form-card" aria-labelledby="ai-explanation-title">
                 <div className="section__header">
                   <div>
-                    <p className="eyebrow">AI-assisted explanation</p>
-                    <h2 id="ai-explanation-title">সোর্সিং সিদ্ধান্তের ব্যাখ্যা</h2>
+                    <p className="eyebrow">{bn ? "AI-সহায়িত ব্যাখ্যা" : "AI-assisted explanation"}</p>
+                    <h2 id="ai-explanation-title">{bn ? "সোর্সিং সিদ্ধান্তের ব্যাখ্যা" : "Sourcing decision explanation"}</h2>
                   </div>
                   <span className={`admin-status admin-status--${aiExplanation.human_review_required ? "pending" : "approved"}`}>
-                    {aiExplanation.human_review_required ? "Human review required" : "No mandatory review"}
+                    {aiExplanation.human_review_required
+                      ? (bn ? "মানব পর্যালোচনা প্রয়োজন" : "Human review required")
+                      : (bn ? "বাধ্যতামূলক পর্যালোচনা নেই" : "No mandatory review")}
                   </span>
                 </div>
-                <p>{aiExplanation.summary_bn}</p>
+                <p>{aiSummary}</p>
                 <div className="form-grid">
-                  <div><strong>Advantages</strong><ul>{aiExplanation.advantages.map((item) => <li key={item}>{item}</li>)}</ul></div>
-                  <div><strong>Risks</strong><ul>{aiExplanation.risks.length ? aiExplanation.risks.map((item) => <li key={item}>{item}</li>) : <li>No additional risk identified.</li>}</ul></div>
-                  <div><strong>Missing information</strong><ul>{aiExplanation.missing_information.map((item) => <li key={item}>{item}</li>)}</ul></div>
-                  <div><strong>Recommended checks</strong><ul>{aiExplanation.recommended_checks.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                  <div><strong>{bn ? "সুবিধা" : "Advantages"}</strong><ul>{aiAdvantages.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                  <div><strong>{bn ? "ঝুঁকি" : "Risks"}</strong><ul>{aiRisks.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                  <div><strong>{bn ? "অনুপস্থিত তথ্য" : "Missing information"}</strong><ul>{aiMissingInformation.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                  <div><strong>{bn ? "যা যাচাই করবেন" : "Recommended checks"}</strong><ul>{aiRecommendedChecks.map((item) => <li key={item}>{item}</li>)}</ul></div>
                 </div>
                 <small>
-                  {aiMetadata?.automation_available ? `Generated with ${aiMetadata.model || "local AI"}.` : "AI service unavailable; deterministic fallback shown."}
-                  {aiExplanation.confidence !== null ? ` Self-reported confidence: ${Math.round(aiExplanation.confidence * 100)}%.` : ""}
-                  {" "}All monetary values remain server-calculated.
+                  {aiMetadata?.automation_available
+                    ? (bn ? `${aiMetadata.model || "local AI"} দিয়ে তৈরি।` : `Generated with ${aiMetadata.model || "local AI"}.`)
+                    : (bn ? "AI সেবা পাওয়া যায়নি; নির্ধারিত fallback দেখানো হয়েছে।" : "AI service unavailable; deterministic fallback shown.")}
+                  {aiExplanation.confidence !== null
+                    ? (bn ? ` স্ব-প্রতিবেদিত আস্থা: ${Math.round(aiExplanation.confidence * 100)}%।` : ` Self-reported confidence: ${Math.round(aiExplanation.confidence * 100)}%.`)
+                    : ""}
+                  {bn ? " সব আর্থিক মান সার্ভারে হিসাব করা হয়।" : " All monetary values remain server-calculated."}
                 </small>
               </article>
             ) : null}

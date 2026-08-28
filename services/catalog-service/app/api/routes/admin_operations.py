@@ -241,6 +241,14 @@ def _commit_unique(session: Session, detail: str) -> None:
         raise HTTPException(status_code=409, detail=detail) from exc
 
 
+def _flush_unique(session: Session, detail: str) -> None:
+    try:
+        session.flush()
+    except IntegrityError as exc:
+        session.rollback()
+        raise HTTPException(status_code=409, detail=detail) from exc
+
+
 def _archive(
     session: Session,
     entity: Any,
@@ -503,7 +511,7 @@ def create_category(
     require_admin(user)
     category = Category(name=payload.name.strip(), slug=payload.slug, is_active=True)
     session.add(category)
-    session.flush()
+    _flush_unique(session, "Category slug already exists")
     record_admin_audit(
         session,
         user,
@@ -613,7 +621,7 @@ def create_product(
         raise HTTPException(status_code=409, detail="Cannot add a product to an archived category")
     product = Product(**payload.model_dump(), is_active=True)
     session.add(product)
-    session.flush()
+    _flush_unique(session, "Product slug already exists")
     record_admin_audit(
         session,
         user,
@@ -728,7 +736,7 @@ def create_variant(
         raise HTTPException(status_code=409, detail="Cannot add a variant to an archived product")
     variant = ProductVariant(**payload.model_dump(), is_active=True)
     session.add(variant)
-    session.flush()
+    _flush_unique(session, "Variant SKU already exists")
     record_admin_audit(
         session,
         user,
@@ -738,7 +746,7 @@ def create_variant(
         after=payload.model_dump(mode="json"),
         note="Product variant created",
     )
-    _commit_unique(session, "Variant could not be created")
+    _commit_unique(session, "Variant SKU already exists")
     session.refresh(variant)
     invalidate_admin_analytics()
     return _variant_json(variant)
@@ -979,6 +987,54 @@ def _validate_offer_links(
     return variant, country, supplier
 
 
+def _normalized_currency(value: str) -> str:
+    return value.strip().upper()
+
+
+def _require_active_currency_rate(session: Session, currency: str) -> None:
+    normalized = _normalized_currency(currency)
+    if normalized == "BDT":
+        return
+    rate_exists = session.scalar(
+        select(CurrencyRate.id).where(
+            func.upper(CurrencyRate.currency) == normalized,
+            CurrencyRate.is_active.is_(True),
+        )
+    )
+    if not rate_exists:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Activate a BDT exchange rate for {normalized} before publishing this offer",
+        )
+
+
+def _require_currency_unused_by_active_offers(
+    session: Session,
+    currency: str,
+) -> None:
+    normalized = _normalized_currency(currency)
+    if normalized == "BDT":
+        return
+    offer_count = int(
+        session.scalar(
+            select(func.count(SellerOffer.id)).where(
+                SellerOffer.is_active.is_(True),
+                func.upper(SellerOffer.currency) == normalized,
+            )
+        )
+        or 0
+    )
+    if offer_count:
+        noun = "offer" if offer_count == 1 else "offers"
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Cannot archive or rename {normalized}: {offer_count} active supplier "
+                f"{noun} still use this exchange rate. Archive or migrate those offers first."
+            ),
+        )
+
+
 @router.post("/api/admin/offers/", status_code=status.HTTP_201_CREATED)
 def create_offer(
     payload: OfferCreateIn,
@@ -992,8 +1048,9 @@ def create_offer(
         country_id=payload.country_id,
         seller_id=payload.seller_id,
     )
+    _require_active_currency_rate(session, payload.currency)
     values = payload.model_dump()
-    values["currency"] = payload.currency.upper()
+    values["currency"] = _normalized_currency(payload.currency)
     offer = SellerOffer(**values, is_active=True)
     session.add(offer)
     session.flush()
@@ -1067,7 +1124,8 @@ def update_offer(
         seller_id=seller_id,
     )
     if "currency" in values and values["currency"]:
-        values["currency"] = values["currency"].upper()
+        values["currency"] = _normalized_currency(values["currency"])
+    _require_active_currency_rate(session, str(values.get("currency", offer.currency)))
     for field, value in values.items():
         setattr(offer, field, value.strip() if isinstance(value, str) else value)
     offer.updated_at = utc_now()
@@ -1103,6 +1161,7 @@ def archive_offer(
             country_id=offer.country_id,
             seller_id=offer.seller_id,
         )
+        _require_active_currency_rate(session, offer.currency)
     _archive(session, offer, payload, user, entity_type="seller_offer")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -1366,6 +1425,25 @@ def update_order_settlement(
     order = get_order_or_404(session, order_id, user)
     if payload.delivered_at is not None and order.status != "DELIVERED":
         raise HTTPException(status_code=409, detail="Only a delivered order can receive delivered_at")
+    created_at = order.created_at
+    if created_at is not None and created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+    for field_name, timestamp in (
+        ("promised_delivery_at", payload.promised_delivery_at),
+        ("delivered_at", payload.delivered_at),
+    ):
+        if timestamp is None or created_at is None:
+            continue
+        normalized = (
+            timestamp.replace(tzinfo=timezone.utc)
+            if timestamp.tzinfo is None
+            else timestamp.astimezone(timezone.utc)
+        )
+        if normalized < created_at:
+            raise HTTPException(
+                status_code=422,
+                detail=f"{field_name} cannot be earlier than order creation",
+            )
     before = {
         "actual_cost_bdt": order.actual_cost_bdt,
         "promised_delivery_at": order.promised_delivery_at,
@@ -1592,12 +1670,16 @@ def put_currency(
     user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     require_admin(user)
+    existing = _not_found(session.get(CurrencyRate, record_id), "Currency rate")
+    normalized_currency = _normalized_currency(payload.currency)
+    if _normalized_currency(existing.currency) != normalized_currency:
+        _require_currency_unused_by_active_offers(session, existing.currency)
     item = _upsert_setting(
         session,
         user,
         model=CurrencyRate,
         record_id=record_id,
-        values={"currency": payload.currency.upper(), "rate_to_bdt": payload.rate_to_bdt},
+        values={"currency": normalized_currency, "rate_to_bdt": payload.rate_to_bdt},
         entity_type="currency_rate",
         note=payload.note,
         request_id=payload.request_id,
@@ -1617,7 +1699,10 @@ def create_currency(
         user,
         model=CurrencyRate,
         record_id=None,
-        values={"currency": payload.currency.upper(), "rate_to_bdt": payload.rate_to_bdt},
+        values={
+            "currency": _normalized_currency(payload.currency),
+            "rate_to_bdt": payload.rate_to_bdt,
+        },
         entity_type="currency_rate",
         note=payload.note,
         request_id=payload.request_id,
@@ -1826,5 +1911,7 @@ def archive_setting(
     require_admin(user)
     model, entity_type = _setting_type(setting_type)
     item = _not_found(session.get(model, record_id), "Setting")
+    if isinstance(item, CurrencyRate) and payload.archived:
+        _require_currency_unused_by_active_offers(session, item.currency)
     _archive(session, item, payload, user, entity_type=entity_type)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

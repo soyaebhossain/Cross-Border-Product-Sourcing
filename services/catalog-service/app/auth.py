@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from .config import get_settings
 from .db import get_session
+from .identity import normalize_email_address, normalize_identifier_key, normalize_username
 from .models import AccountUser, AdminAuditEvent, AuthChallenge, RefreshSession, SocialIdentity
 
 
@@ -26,6 +27,10 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login/", auto_error=Fal
 ALLOWED_ROLES = {"customer", "operator", "admin"}
 PRIVILEGED_ROLES = {"operator", "admin"}
 RECOVERY_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+DUMMY_PASSWORD_HASH = (
+    "pbkdf2_sha256$1200000$sourceai-fixed-dummy-salt$"
+    "snMLG5ym8RarDIp4A1yeado8JFAlYRfKDflV/gb3+To="
+)
 
 
 class AccountLockedError(Exception):
@@ -132,14 +137,19 @@ def validate_password_strength(password: str, identifiers: tuple[str | None, ...
 
 def _login_identifier_conditions(*identifiers: str | None) -> list[Any]:
     normalized = {
-        identifier.strip().casefold()
+        key
         for identifier in identifiers
-        if identifier is not None and identifier.strip()
+        if (key := normalize_identifier_key(identifier)) is not None
     }
     conditions: list[Any] = []
     for value in normalized:
         conditions.extend(
             (
+                AccountUser.username_normalized == value,
+                AccountUser.email_normalized == value,
+                AccountUser.phone_normalized == value,
+                # Compatibility for test fixtures and legacy rows awaiting the
+                # normalized-identity backfill migration.
                 func.lower(AccountUser.username) == value,
                 func.lower(AccountUser.email) == value,
                 func.lower(AccountUser.phone) == value,
@@ -193,18 +203,19 @@ def authenticate_user(session: Session, identifier: str, password: str) -> dict[
     except AmbiguousLoginIdentifierError:
         # Fail closed for legacy cross-field collisions without revealing which
         # accounts matched the submitted identifier.
-        hashlib.pbkdf2_hmac("sha256", password.encode(), b"sourceai-dummy", 100_000)
+        check_password(password, DUMMY_PASSWORD_HASH)
         return None
     if user is None or not user.is_active:
         # Bound work for nonexistent/disabled accounts without revealing which
         # identifier exists. The per-IP and per-account request limits still
         # provide the primary CPU-exhaustion protection.
-        hashlib.pbkdf2_hmac("sha256", password.encode(), b"sourceai-dummy", 100_000)
+        check_password(password, DUMMY_PASSWORD_HASH)
         return None
 
     now = _now()
     if user.locked_until and _as_utc(user.locked_until) > now:
-        check_password(password, user.password_hash)
+        if not check_password(password, user.password_hash):
+            return None
         retry_after = int((_as_utc(user.locked_until) - now).total_seconds())
         raise AccountLockedError(retry_after)
     if user.locked_until:
@@ -217,8 +228,6 @@ def authenticate_user(session: Session, identifier: str, password: str) -> dict[
         if user.failed_login_attempts >= settings.login_failure_limit:
             user.locked_until = now + timedelta(seconds=settings.login_lockout_seconds)
         session.commit()
-        if user.locked_until:
-            raise AccountLockedError(settings.login_lockout_seconds)
         return None
 
     user.failed_login_attempts = 0
@@ -245,7 +254,7 @@ def create_user(
     normalized_role = role if role in ALLOWED_ROLES else "customer"
     identifier = next(
         (
-            candidate.strip()
+            normalize_username(candidate)
             for candidate in (username, email, phone)
             if candidate is not None and candidate.strip()
         ),
@@ -257,10 +266,15 @@ def create_user(
     if login_identifier_exists(session, identifier, email, phone):
         raise HTTPException(status_code=400, detail="Account already exists")
 
+    normalized_email = normalize_email_address(email) if email else None
+    normalized_phone = phone.strip() if phone else None
     user = AccountUser(
         username=identifier,
-        email=email.strip().casefold() if email else None,
-        phone=phone.strip() if phone else None,
+        username_normalized=normalize_identifier_key(identifier),
+        email=normalized_email,
+        email_normalized=normalize_identifier_key(normalized_email),
+        phone=normalized_phone,
+        phone_normalized=normalize_identifier_key(normalized_phone),
         password_hash=make_password(password),
         role=normalized_role,
         is_staff=normalized_role in PRIVILEGED_ROLES,
@@ -295,8 +309,8 @@ def get_or_create_social_user(
             raise HTTPException(status_code=403, detail="Privileged accounts must use password sign-in")
         return _user_to_dict(user)
 
-    normalized_email = email.strip().casefold()
-    if session.scalar(select(AccountUser).where(func.lower(AccountUser.email) == normalized_email)):
+    normalized_email = normalize_email_address(email)
+    if login_identifier_exists(session, normalized_email):
         raise HTTPException(
             status_code=409,
             detail="An existing account uses this email. Sign in first before linking Google.",
@@ -664,8 +678,18 @@ def _load_mfa_challenge(
         challenge_id = str(payload["jti"])
     except (KeyError, TypeError, ValueError) as exc:
         raise HTTPException(status_code=401, detail="Invalid MFA challenge") from exc
-    challenge = session.get(AuthChallenge, challenge_id)
-    user = _active_local_user(session, user_id)
+    # Serialize confirmation/restart attempts so a challenge remains truly
+    # one-use when multiple requests arrive at the same time.
+    challenge = session.scalar(
+        select(AuthChallenge)
+        .where(AuthChallenge.id == challenge_id)
+        .with_for_update()
+    )
+    user = session.scalar(
+        select(AccountUser)
+        .where(AccountUser.id == user_id, AccountUser.is_active.is_(True))
+        .with_for_update()
+    )
     now = _now()
     if (
         challenge is None
@@ -677,6 +701,16 @@ def _load_mfa_challenge(
         or int(payload.get("ver") or 0) != user.auth_version
     ):
         raise HTTPException(status_code=401, detail="MFA challenge expired or already used")
+    if user.mfa_locked_until and _as_utc(user.mfa_locked_until) > now:
+        retry_after = max(1, int((_as_utc(user.mfa_locked_until) - now).total_seconds()))
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail="Authenticator verification is temporarily locked. Try again later.",
+            headers={"Retry-After": str(retry_after)},
+        )
+    if user.mfa_locked_until:
+        user.mfa_locked_until = None
+        user.mfa_failed_attempts = 0
     return challenge, user
 
 
@@ -709,12 +743,31 @@ def _totp(secret: str, counter: int) -> str:
     return f"{value:06d}"
 
 
-def verify_totp(secret: str, code: str, *, timestamp: float | None = None, window: int = 1) -> bool:
+def matching_totp_counter(
+    secret: str,
+    code: str,
+    *,
+    timestamp: float | None = None,
+    window: int = 1,
+) -> int | None:
     normalized = "".join(character for character in code if character.isdigit())
     if len(normalized) != 6:
-        return False
+        return None
     counter = int((timestamp if timestamp is not None else time.time()) // 30)
-    return any(hmac.compare_digest(_totp(secret, counter + offset), normalized) for offset in range(-window, window + 1))
+    for offset in range(-window, window + 1):
+        candidate = counter + offset
+        if hmac.compare_digest(_totp(secret, candidate), normalized):
+            return candidate
+    return None
+
+
+def verify_totp(secret: str, code: str, *, timestamp: float | None = None, window: int = 1) -> bool:
+    return matching_totp_counter(
+        secret,
+        code,
+        timestamp=timestamp,
+        window=window,
+    ) is not None
 
 
 def _recovery_hash(code: str) -> str:
@@ -751,12 +804,39 @@ def begin_mfa_enrollment(session: Session, challenge_token: str) -> dict[str, st
     return {"secret": secret, "otpauth_uri": uri}
 
 
+def restart_mfa_enrollment(
+    session: Session,
+    challenge_token: str,
+) -> tuple[dict[str, str], dict[str, Any]]:
+    """Rotate an unconfirmed TOTP credential behind an active password challenge."""
+
+    challenge, user = _load_mfa_challenge(session, challenge_token, purpose="enroll")
+    if user.mfa_enabled:
+        raise HTTPException(status_code=409, detail="MFA is already enabled")
+
+    secret = _new_totp_secret()
+    user.mfa_secret_encrypted = _fernet().encrypt(secret.encode()).decode()
+    user.mfa_recovery_hashes = []
+    challenge.failed_attempts = 0
+    session.commit()
+
+    label = quote(f"{get_settings().mfa_issuer}:{user.username}", safe="")
+    issuer = quote(get_settings().mfa_issuer, safe="")
+    uri = f"otpauth://totp/{label}?secret={secret}&issuer={issuer}&algorithm=SHA1&digits=6&period=30"
+    return {"secret": secret, "otpauth_uri": uri}, _user_to_dict(user)
+
+
 def _record_mfa_failure(session: Session, challenge: AuthChallenge, user: AccountUser) -> None:
     settings = get_settings()
     challenge.failed_attempts += 1
-    if challenge.failed_attempts >= settings.mfa_challenge_attempt_limit:
+    user.mfa_failed_attempts += 1
+    if (
+        challenge.failed_attempts >= settings.mfa_challenge_attempt_limit
+        or user.mfa_failed_attempts >= settings.mfa_challenge_attempt_limit
+    ):
         now = _now()
         challenge.consumed_at = now
+        user.mfa_locked_until = now + timedelta(seconds=settings.login_lockout_seconds)
         user.failed_login_attempts = settings.login_failure_limit
         user.locked_until = now + timedelta(seconds=settings.login_lockout_seconds)
         user.last_failed_login_at = now
@@ -770,13 +850,19 @@ def confirm_mfa_enrollment(
 ) -> tuple[dict[str, Any], list[str], bool]:
     challenge, user = _load_mfa_challenge(session, challenge_token, purpose="enroll")
     secret = _decrypt_totp_secret(user.mfa_secret_encrypted)
-    if not verify_totp(secret, code):
+    matched_counter = matching_totp_counter(secret, code)
+    if matched_counter is None or (
+        user.last_totp_counter is not None
+        and matched_counter <= user.last_totp_counter
+    ):
         _record_mfa_failure(session, challenge, user)
         raise HTTPException(status_code=401, detail="Invalid authentication code")
     recovery_codes = _new_recovery_codes()
     user.mfa_recovery_hashes = [_recovery_hash(item) for item in recovery_codes]
     user.mfa_enabled = True
     user.mfa_enrolled_at = _now()
+    user.mfa_failed_attempts = 0
+    user.mfa_locked_until = None
     user.auth_version += 1
     challenge.consumed_at = _now()
     session.commit()
@@ -796,7 +882,14 @@ def verify_mfa_login(
         raise HTTPException(status_code=409, detail="MFA is not enabled")
     secret = _decrypt_totp_secret(user.mfa_secret_encrypted)
     used_recovery = False
-    valid = bool(code and verify_totp(secret, code))
+    matched_counter = matching_totp_counter(secret, code) if code else None
+    valid = bool(
+        matched_counter is not None
+        and (
+            user.last_totp_counter is None
+            or matched_counter > user.last_totp_counter
+        )
+    )
     if not valid and recovery_code:
         candidate = _recovery_hash(recovery_code)
         stored_hashes = list(user.mfa_recovery_hashes or [])
@@ -809,6 +902,10 @@ def verify_mfa_login(
     if not valid:
         _record_mfa_failure(session, challenge, user)
         raise HTTPException(status_code=401, detail="Invalid authentication code")
+    user.mfa_failed_attempts = 0
+    user.mfa_locked_until = None
+    if not used_recovery:
+        user.last_totp_counter = matched_counter
     challenge.consumed_at = _now()
     session.commit()
     session.refresh(user)

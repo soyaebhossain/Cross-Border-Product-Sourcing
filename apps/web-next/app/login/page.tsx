@@ -5,12 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppIcon, GoogleIcon } from "../../components/app-icon";
+import { MfaEnrollmentPanel } from "../../components/mfa-enrollment-panel";
 import {
   ApiError,
   confirmMfaEnrollment,
   getAuthServiceStatus,
   isApiServiceUnavailable,
   loginWithCredentials,
+  restartMfaEnrollment,
   startGoogleLogin,
   startMfaEnrollment,
   verifyMfaLogin,
@@ -42,6 +44,8 @@ export default function LoginPage() {
   const [mfa, setMfa] = useState<MfaRequired | null>(null);
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [mfaCode, setMfaCode] = useState("");
+  const [challengeExpired, setChallengeExpired] = useState(false);
+  const [rotatingEnrollment, setRotatingEnrollment] = useState(false);
   const [recoveryMode, setRecoveryMode] = useState(false);
   const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
   const [codesStored, setCodesStored] = useState(false);
@@ -130,6 +134,8 @@ export default function LoginPage() {
     setMfa(null);
     setEnrollment(null);
     setMfaCode("");
+    setChallengeExpired(false);
+    setRotatingEnrollment(false);
     setRecoveryMode(false);
     setRecoveryCodes([]);
     setCodesStored(false);
@@ -182,12 +188,48 @@ export default function LoginPage() {
         const result = await verifyMfaLogin(mfa.mfa_token, recoveryMode ? { recovery_code: value } : { code: value.replace(/\s/g, "") });
         redirectAfterAuth(result.user.role);
       }
-    } catch {
-      setError(recoveryMode
-        ? (bn ? "Recovery code সঠিক নয়, ব্যবহৃত হয়েছে, অথবা challenge-এর মেয়াদ শেষ।" : "The recovery code is invalid, already used, or the challenge expired.")
-        : (bn ? "Authenticator code সঠিক নয় অথবা challenge-এর মেয়াদ শেষ।" : "The authenticator code is invalid or the challenge expired."));
+    } catch (reason) {
+      const expired = reason instanceof ApiError && /expired|already used/i.test(reason.message);
+      setChallengeExpired(expired);
+      if (expired) {
+        setError(bn
+          ? "নিরাপত্তার জন্য এই sign-in challenge-এর মেয়াদ শেষ হয়েছে। নতুন করে sign in করুন।"
+          : "This security challenge has expired. Start sign-in again.");
+      } else if (isApiServiceUnavailable(reason)) {
+        setError(bn
+          ? "Authenticator service-এ এখন সংযোগ করা যাচ্ছে না। কিছুক্ষণ পর আবার চেষ্টা করুন।"
+          : "The authenticator service cannot be reached right now. Please try again shortly.");
+      } else {
+        setError(recoveryMode
+          ? (bn ? "Recovery code সঠিক নয় অথবা এটি আগেই ব্যবহার করা হয়েছে।" : "That recovery code is invalid or has already been used.")
+          : (bn ? "Code-টি মেলেনি। App-এর বর্তমান code দিন এবং device time automatic আছে কি না দেখুন।" : "That code did not match. Enter the current code from the app and make sure your device time is automatic."));
+      }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const generateNewEnrollment = async () => {
+    if (!mfa?.mfa_enrollment_required) return;
+    setRotatingEnrollment(true);
+    setError("");
+    setErrorReference("");
+    try {
+      const nextEnrollment = await restartMfaEnrollment(mfa.mfa_token);
+      setEnrollment(nextEnrollment);
+      setMfaCode("");
+      setChallengeExpired(false);
+    } catch (reason) {
+      setErrorReference(reason instanceof ApiError ? reason.requestId || "" : "");
+      const expired = reason instanceof ApiError && /expired|already used/i.test(reason.message);
+      setChallengeExpired(expired);
+      setError(expired
+        ? (bn ? "নিরাপত্তার জন্য এই sign-in challenge-এর মেয়াদ শেষ হয়েছে। নতুন করে sign in করুন।" : "This security challenge has expired. Start sign-in again.")
+        : isApiServiceUnavailable(reason)
+          ? (bn ? "নতুন QR code তৈরি করা যাচ্ছে না। সংযোগ ঠিক হলে আবার চেষ্টা করুন।" : "A new QR code could not be generated. Check your connection and try again.")
+          : (bn ? "নতুন QR code তৈরি করা যায়নি। আবার চেষ্টা করুন।" : "A new QR code could not be generated. Please try again."));
+    } finally {
+      setRotatingEnrollment(false);
     }
   };
 
@@ -229,27 +271,19 @@ export default function LoginPage() {
   if (mfa) {
     const enrollmentRequired = mfa.mfa_enrollment_required;
     return <main className="shell shell--narrow">
-      <section className="auth-card auth-card--single">
+      <section className="auth-card auth-card--single auth-card--mfa">
         <div>
           <p className="eyebrow">{enrollmentRequired ? (bn ? "প্রথমবারের নিরাপত্তা সেটআপ" : "First-time security setup") : (bn ? "দ্বিতীয় নিরাপত্তা ধাপ" : "Second security step")}</p>
           <h1>{enrollmentRequired ? (bn ? "Authenticator app সংযুক্ত করুন" : "Connect an authenticator app") : (bn ? "নিরাপত্তা code দিন" : "Enter your security code")}</h1>
-          <p>{bn ? `এই challenge প্রায় ${Math.max(1, Math.floor(mfa.expires_in / 60))} মিনিটের মধ্যে শেষ হবে।` : `This challenge expires in about ${Math.max(1, Math.floor(mfa.expires_in / 60))} minutes.`}</p>
+          <p className="mfa-challenge-expiry" role="status">{bn ? `নিরাপত্তার জন্য এই setup session প্রায় ${Math.max(1, Math.floor(mfa.expires_in / 60))} মিনিট পর শেষ হবে।` : `For security, this setup session expires in about ${Math.max(1, Math.floor(mfa.expires_in / 60))} minutes.`}</p>
         </div>
-        {enrollmentRequired && enrollment ? <div className="mfa-enrollment">
-          <ol>
-            <li>{bn ? "Google Authenticator, Microsoft Authenticator বা compatible TOTP app খুলুন।" : "Open Google Authenticator, Microsoft Authenticator or another compatible TOTP app."}</li>
-            <li>{bn ? "নিচের secret key ম্যানুয়ালি যোগ করুন অথবা authenticator link খুলুন।" : "Add the secret key manually or open the authenticator link."}</li>
-            <li>{bn ? "App-এর ৬ সংখ্যার code দিয়ে setup নিশ্চিত করুন।" : "Confirm setup with the current six-digit code from the app."}</li>
-          </ol>
-          <label><span>{bn ? "Secret key" : "Secret key"}</span><output className="mfa-secret">{enrollment.secret}</output></label>
-          <a className="button button--ghost" href={enrollment.otpauth_uri}>{bn ? "Authenticator app-এ খুলুন" : "Open in authenticator app"}</a>
-        </div> : null}
+        {enrollmentRequired && enrollment ? <MfaEnrollmentPanel secret={enrollment.secret} otpauthUri={enrollment.otpauth_uri} bn={bn} generating={rotatingEnrollment} onGenerateNewQr={generateNewEnrollment} /> : null}
         <form onSubmit={submitMfa}>
           {!enrollmentRequired ? <div className="login-role-switch" role="group" aria-label={bn ? "Verification পদ্ধতি" : "Verification method"}><button type="button" className={!recoveryMode ? "login-role-switch__active" : ""} aria-pressed={!recoveryMode} onClick={() => { setRecoveryMode(false); setMfaCode(""); setError(""); }}>{bn ? "Authenticator code" : "Authenticator code"}</button><button type="button" className={recoveryMode ? "login-role-switch__active" : ""} aria-pressed={recoveryMode} onClick={() => { setRecoveryMode(true); setMfaCode(""); setError(""); }}>{bn ? "Recovery code" : "Recovery code"}</button></div> : null}
-          <label>{recoveryMode ? (bn ? "একবার ব্যবহারযোগ্য recovery code" : "One-time recovery code") : (bn ? "৬ সংখ্যার authenticator code" : "Six-digit authenticator code")}<input autoFocus autoComplete="one-time-code" inputMode={recoveryMode ? "text" : "numeric"} pattern={recoveryMode ? undefined : "[0-9]{6}"} minLength={6} maxLength={recoveryMode ? 30 : 6} value={mfaCode} onChange={event => setMfaCode(event.target.value)} required /></label>
-          {error ? <div className="form-error" role="alert">{error}</div> : null}
-          <button className="market-button" disabled={loading || mfaCode.trim().length < 6}>{loading ? (bn ? "যাচাই হচ্ছে…" : "Verifying…") : enrollmentRequired ? (bn ? "MFA চালু ও নিশ্চিত করুন" : "Enable and confirm MFA") : (bn ? "যাচাই করে প্রবেশ করুন" : "Verify and sign in")}</button>
-          <button className="auth-text-button" type="button" onClick={resetChallenge} disabled={loading}>{bn ? "Login-এ ফিরে যান" : "Back to sign in"}</button>
+          <label>{recoveryMode ? (bn ? "একবার ব্যবহারযোগ্য recovery code" : "One-time recovery code") : (bn ? "৬ সংখ্যার authenticator code" : "Six-digit authenticator code")}<input autoFocus={!enrollmentRequired} autoComplete="one-time-code" inputMode={recoveryMode ? "text" : "numeric"} pattern={recoveryMode ? undefined : "[0-9]{6}"} minLength={6} maxLength={recoveryMode ? 30 : 6} value={mfaCode} aria-invalid={Boolean(error)} aria-describedby={error ? "mfa-verification-error" : undefined} disabled={challengeExpired} onChange={event => { setMfaCode(recoveryMode ? event.target.value : event.target.value.replace(/\D/g, "").slice(0, 6)); if (!challengeExpired) setError(""); }} required /></label>
+          {error ? <div className={`form-error${challengeExpired ? " mfa-expired-error" : ""}`} id="mfa-verification-error" role="alert"><span>{error}</span>{challengeExpired ? <button className="button button--ghost" type="button" onClick={resetChallenge}>{bn ? "আবার sign in করুন" : "Start sign-in again"}</button> : null}</div> : null}
+          <button className="market-button" disabled={loading || challengeExpired || (recoveryMode ? mfaCode.trim().length < 6 : mfaCode.length !== 6)}>{loading ? (bn ? "যাচাই হচ্ছে…" : "Verifying…") : enrollmentRequired ? (bn ? "MFA চালু ও নিশ্চিত করুন" : "Enable and confirm MFA") : (bn ? "যাচাই করে প্রবেশ করুন" : "Verify and sign in")}</button>
+          {!challengeExpired ? <button className="auth-text-button" type="button" onClick={resetChallenge} disabled={loading}>{bn ? "Login-এ ফিরে যান" : "Back to sign in"}</button> : null}
         </form>
       </section>
     </main>;

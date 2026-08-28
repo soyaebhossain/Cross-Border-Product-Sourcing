@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
@@ -12,7 +12,14 @@ from ...config import Settings, get_settings
 from ...db import get_session
 from ...serializers import serialize_category, serialize_country, serialize_product
 from ...services.ai_insights import build_ai_insights
-from ...services.catalog import browse_products, get_product_by_slug_or_404, list_categories, list_countries, list_products
+from ...services.catalog import (
+    browse_products,
+    build_market_summaries,
+    get_product_by_slug_or_404,
+    list_categories,
+    list_countries,
+    list_products,
+)
 
 
 router = APIRouter()
@@ -30,6 +37,11 @@ def health() -> dict[str, str]:
     return {"status": "ok", "service": "catalog-service"}
 
 
+@router.head("/api/health", include_in_schema=False)
+def health_head() -> Response:
+    return Response(status_code=status.HTTP_200_OK)
+
+
 def _runtime_settings(request: Request) -> Settings:
     return getattr(request.app.state, "catalog_settings", None) or get_settings()
 
@@ -40,6 +52,7 @@ def readiness(
     runtime_settings: Settings = Depends(_runtime_settings),
 ) -> dict[str, str | bool] | JSONResponse:
     password_reset_email_configured = runtime_settings.password_reset_email_configured
+    signed_proxy_identity_configured = runtime_settings.signed_proxy_identity_configured
     try:
         for statement in READINESS_QUERIES:
             session.execute(text(statement))
@@ -51,6 +64,7 @@ def readiness(
                 "service": "catalog-service",
                 "database": "unavailable",
                 "password_reset_email_configured": password_reset_email_configured,
+                "signed_proxy_identity_configured": signed_proxy_identity_configured,
             },
         )
     return {
@@ -58,7 +72,18 @@ def readiness(
         "service": "catalog-service",
         "database": "ready",
         "password_reset_email_configured": password_reset_email_configured,
+        "signed_proxy_identity_configured": signed_proxy_identity_configured,
     }
+
+
+@router.head("/api/ready", include_in_schema=False)
+def readiness_head(
+    session: Session = Depends(get_session),
+    runtime_settings: Settings = Depends(_runtime_settings),
+) -> Response:
+    result = readiness(session=session, runtime_settings=runtime_settings)
+    status_code = result.status_code if isinstance(result, JSONResponse) else status.HTTP_200_OK
+    return Response(status_code=status_code)
 
 
 @router.get("/api/categories/")
@@ -86,7 +111,10 @@ def products(
 
 @router.get("/api/products/{slug}/")
 def product_by_slug(slug: str, session: Session = Depends(get_session)) -> dict[str, Any]:
-    return serialize_product(get_product_by_slug_or_404(session, slug))
+    product = get_product_by_slug_or_404(session, slug)
+    data = serialize_product(product)
+    data["market"] = build_market_summaries(session, [product])[product.id]
+    return data
 
 
 @router.get("/api/catalog/browse/")

@@ -10,16 +10,33 @@ from sqlalchemy.orm import Session
 
 from app.admin_schemas import (
     ArchiveIn,
+    CategoryCreateIn,
+    CurrencyRateIn,
+    OfferCreateIn,
+    OrderSettlementIn,
     PaymentReversalIn,
     RefundCreateIn,
     RefundReverseIn,
+    ProductCreateIn,
+    VariantCreateIn,
 )
 from app.api.routes.admin_analytics import (
     analytics_overview,
     profitability_analytics,
     supplier_analytics,
 )
-from app.api.routes.admin_operations import archive_product, decide_ai_review
+from app.api.routes.admin_operations import (
+    archive_setting,
+    archive_product,
+    create_category,
+    create_product,
+    create_variant,
+    decide_ai_review,
+    put_currency,
+    update_order_settlement,
+)
+from app.api.routes.catalog import product_by_slug
+from app.api.routes.research import analytics as research_analytics
 from app.db import Base
 from app.models import (
     AccountUser,
@@ -28,7 +45,9 @@ from app.models import (
     Category,
     Country,
     CurrencyRate,
+    CustomerAddress,
     ETARule,
+    DutyRule,
     ManualPaymentProof,
     Order,
     OrderItem,
@@ -42,7 +61,7 @@ from app.models import (
 )
 from app.schemas import AIReviewDecisionIn, CreateOrderIn, SaveQuoteIn, UpdateOrderStatusIn
 from app.security import request_id_context
-from app.services.catalog import list_products
+from app.services.catalog import build_market_summaries, list_products
 from app.services.financial_operations import (
     create_refund,
     financial_snapshot,
@@ -112,6 +131,17 @@ def session() -> Session:
             [
                 admin,
                 customer,
+                CustomerAddress(
+                    user_id=2,
+                    label="Primary",
+                    recipient_name="Buyer",
+                    line1="1 Test Road",
+                    city="Dhaka",
+                    country_code="BD",
+                    phone="+8801700000000",
+                    is_default_shipping=True,
+                    is_default_billing=True,
+                ),
                 category,
                 product,
                 variant,
@@ -137,6 +167,11 @@ def session() -> Session:
                     delivery_type="DOOR",
                     min_days=5,
                     max_days=7,
+                ),
+                DutyRule(
+                    country=country,
+                    percent=Decimal("5.00"),
+                    fixed_bdt=Decimal("0.00"),
                 ),
             ]
         )
@@ -256,6 +291,24 @@ def test_refund_reversal_and_payment_reversal_recompute_financials(session: Sess
     assert {event.request_id for event in events} == {"req-refund-flow"}
 
 
+def test_settlement_rejects_delivery_before_order_creation(session: Session) -> None:
+    order = _raw_order(session, delivered=True)
+    created_at = order.created_at
+    if created_at.tzinfo is None:
+        created_at = created_at.replace(tzinfo=timezone.utc)
+
+    with pytest.raises(HTTPException, match="cannot be earlier"):
+        update_order_settlement(
+            order.id,
+            OrderSettlementIn(
+                delivered_at=created_at - timedelta(minutes=1),
+                note="Correct an invalid historical timestamp",
+            ),
+            session,
+            ADMIN,
+        )
+
+
 def test_saved_quote_price_is_server_owned_and_quote_orders_are_unique(session: Session) -> None:
     variant = session.scalar(select(ProductVariant))
     quote = save_quote_record(
@@ -296,6 +349,46 @@ def test_saved_quote_price_is_server_owned_and_quote_orders_are_unique(session: 
     )
     with pytest.raises(HTTPException, match="already linked"):
         create_manual_order_record(session, duplicate, CUSTOMER)
+
+
+def test_research_conversion_excludes_cancelled_quote_orders(session: Session) -> None:
+    variant = session.scalar(select(ProductVariant))
+    quote = save_quote_record(
+        session,
+        SaveQuoteIn(
+            variant_id=variant.id,
+            country="CN",
+            mode="LOCAL",
+            qty=1,
+            delivery_type="DOOR",
+            response={},
+        ),
+        CUSTOMER,
+    )
+    order, _ = create_manual_order_record(
+        session,
+        CreateOrderIn(
+            variant_id=variant.id,
+            country="CN",
+            mode="LOCAL",
+            qty=1,
+            delivery_type="DOOR",
+            saved_quote_id=quote.id,
+            trx_id="RESEARCH-CANCELLED-1",
+            channel="bKash",
+        ),
+        CUSTOMER,
+    )
+    update_order_status_record(
+        session,
+        order.id,
+        UpdateOrderStatusIn(status="CANCELLED", note="Customer cancelled before verification"),
+        ADMIN,
+    )
+
+    result = research_analytics(session=session, _current_user=ADMIN)
+
+    assert result["cards"]["quote_to_order_conversion_rate"] == 0
 
 
 def test_saved_ai_explanation_is_persisted_and_human_review_is_audited(session: Session) -> None:
@@ -364,6 +457,112 @@ def test_soft_archive_hides_product_and_variant_from_public_sourcing(session: Se
     with pytest.raises(HTTPException) as raised:
         get_variant_or_404(session, variant.id)
     assert raised.value.status_code == 404
+
+
+def test_catalog_market_uses_eta_rules_and_product_detail_matches_cards(session: Session) -> None:
+    product = session.scalar(select(Product))
+
+    market = build_market_summaries(session, [product])[product.id]
+    detail = product_by_slug(product.slug, session)
+
+    assert market["min_delivery_days"] == 5
+    assert market["min_price"] == 10.0
+    assert market["currency"] == "USD"
+    assert detail["market"] == market
+
+
+def test_catalog_search_treats_sql_wildcards_as_literal_text(session: Session) -> None:
+    assert list_products(session, q="%") == []
+    assert list_products(session, q="_") == []
+    assert [item.slug for item in list_products(session, q="Monitor")] == ["monitor"]
+
+
+def test_admin_duplicate_slugs_and_normalized_skus_return_conflict(session: Session) -> None:
+    category = session.scalar(select(Category))
+    product = session.scalar(select(Product))
+
+    with pytest.raises(HTTPException) as category_error:
+        create_category(
+            CategoryCreateIn(name="Duplicate", slug=category.slug),
+            session,
+            ADMIN,
+        )
+    assert category_error.value.status_code == 409
+
+    with pytest.raises(HTTPException) as product_error:
+        create_product(
+            ProductCreateIn(
+                name="Duplicate monitor",
+                slug=product.slug,
+                category_id=category.id,
+            ),
+            session,
+            ADMIN,
+        )
+    assert product_error.value.status_code == 409
+
+    with pytest.raises(HTTPException) as sku_error:
+        create_variant(
+            VariantCreateIn(product_id=product.id, sku=" mon-1 "),
+            session,
+            ADMIN,
+        )
+    assert sku_error.value.status_code == 409
+
+
+def test_offer_price_cannot_exceed_database_precision() -> None:
+    with pytest.raises(ValueError):
+        OfferCreateIn(
+            variant_id=1,
+            country_id=1,
+            seller_id=1,
+            price_origin=Decimal("10000000000.00"),
+        )
+
+
+def test_active_offer_currency_rate_cannot_be_archived_or_renamed(
+    session: Session,
+) -> None:
+    rate = session.scalar(select(CurrencyRate).where(CurrencyRate.currency == "USD"))
+    offer = session.scalar(select(SellerOffer))
+
+    with pytest.raises(HTTPException) as archive_error:
+        archive_setting(
+            "currencies",
+            rate.id,
+            ArchiveIn(note="Retire the old exchange-rate configuration"),
+            session,
+            ADMIN,
+        )
+    assert archive_error.value.status_code == 409
+    assert "active supplier offer" in archive_error.value.detail
+    assert rate.is_active is True
+
+    with pytest.raises(HTTPException) as rename_error:
+        put_currency(
+            rate.id,
+            CurrencyRateIn(
+                currency="EUR",
+                rate_to_bdt=Decimal("125.0000"),
+                note="Replace the configured quote currency",
+            ),
+            session,
+            ADMIN,
+        )
+    assert rename_error.value.status_code == 409
+    assert rate.currency == "USD"
+
+    offer.is_active = False
+    session.commit()
+    response = archive_setting(
+        "currencies",
+        rate.id,
+        ArchiveIn(note="All USD offers have been archived"),
+        session,
+        ADMIN,
+    )
+    assert response.status_code == 204
+    assert rate.is_active is False
 
 
 def test_state_transition_requires_note_and_records_actor_request_id(session: Session) -> None:

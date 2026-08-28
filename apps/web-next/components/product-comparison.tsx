@@ -10,7 +10,7 @@ import { PriceDisplay, RiskBadge } from "./sourcing-ui";
 export function ProductComparison({ products }: { products: Product[] }) {
   const { addProduct } = useSourcingBasket();
   const { locale } = useLocale();
-  if (!products.length) return <section className="basket-empty-state"><h1>{locale === "bn" ? "তুলনার জন্য কোনো পণ্য নেই" : "No products selected for comparison"}</h1><p>{locale === "bn" ? "ক্যাটালগ থেকে ২–৪টি পণ্য বেছে নিন।" : "Choose 2–4 products from the catalog to compare sourcing signals."}</p><Link className="button button--primary" href="/products">{sourcingText(locale, "continueSourcing")}</Link></section>;
+  if (!products.length) return <section className="basket-empty-state"><h2>{locale === "bn" ? "তুলনার জন্য কোনো পণ্য নেই" : "No products selected for comparison"}</h2><p>{locale === "bn" ? "ক্যাটালগ থেকে ২–৪টি পণ্য বেছে নিন।" : "Choose 2–4 products from the catalog to compare sourcing signals."}</p><Link className="button button--primary" href="/products">{sourcingText(locale, "continueSourcing")}</Link></section>;
 
   const rows: Array<{ label: string; value: (product: Product) => React.ReactNode }> = [
     { label: locale === "bn" ? "আনুমানিক মূল্য" : "Estimated price", value: (product) => <PriceDisplay amount={product.market?.min_price} currency={product.market?.currency} compact /> },

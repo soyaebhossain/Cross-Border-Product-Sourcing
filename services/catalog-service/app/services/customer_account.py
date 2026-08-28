@@ -231,6 +231,25 @@ def update_customer_address(
     address = get_customer_address_or_404(session, address_id, current_user)
     _lock_customer_account(session, address.user_id)
     values = payload.model_dump(exclude_unset=True)
+    for flag in ("is_default_shipping", "is_default_billing"):
+        if values.get(flag) is not False or not getattr(address, flag):
+            continue
+        replacement = session.scalar(
+            select(CustomerAddress)
+            .where(
+                CustomerAddress.user_id == address.user_id,
+                CustomerAddress.id != address.id,
+                CustomerAddress.archived_at.is_(None),
+            )
+            .order_by(CustomerAddress.id.desc())
+        )
+        if replacement is None:
+            label = "shipping" if flag == "is_default_shipping" else "billing"
+            raise HTTPException(
+                status_code=409,
+                detail=f"The only active address must remain the default {label} address",
+            )
+        setattr(replacement, flag, True)
     _clear_other_defaults(
         session,
         user_id=address.user_id,

@@ -23,7 +23,9 @@ workflow in the quote workflow settings, then activate them deliberately.
 
 1. Copy `.env.example` to `.env` and replace `N8N_ENCRYPTION_KEY` and
    `N8N_AUTOMATION_TOKEN`. The webhook token must match
-   `CATALOG_AUTOMATION_WEBHOOK_TOKEN`.
+   `CATALOG_AUTOMATION_WEBHOOK_TOKEN`. Keep the example's `http://n8n:5678`
+   webhook URL for Docker Compose; use `http://localhost:5678` only when the
+   FastAPI process runs directly on the host.
 2. Start the normal application plus the automation profile:
 
    ```powershell

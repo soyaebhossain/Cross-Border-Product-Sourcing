@@ -28,6 +28,7 @@ from ...auth import (
     get_or_create_social_user,
     get_current_user_detail,
     refresh_access_token,
+    restart_mfa_enrollment,
     revoke_refresh_token,
     verify_mfa_login,
 )
@@ -364,8 +365,7 @@ async def register(
 
 
 @router.post("/api/auth/mfa/enroll/start/")
-def mfa_enroll_start(
-    payload: MFAChallengeIn,
+async def mfa_enroll_start(
     request: Request,
     session: Session = Depends(get_session),
 ) -> dict[str, Any]:
@@ -374,6 +374,7 @@ def mfa_enroll_start(
         limit=settings.login_rate_limit,
         window_seconds=settings.login_rate_window_seconds,
     )
+    payload = await _read_json_payload(request, MFAChallengeIn)
     enrollment = begin_mfa_enrollment(session, payload.mfa_token)
     return {
         **enrollment,
@@ -381,9 +382,33 @@ def mfa_enroll_start(
     }
 
 
+@router.post("/api/auth/mfa/enroll/restart/")
+async def mfa_enroll_restart(
+    request: Request,
+    session: Session = Depends(get_session),
+) -> dict[str, Any]:
+    auth_rate_limiter.enforce(
+        client_rate_key(request, "mfa-enroll-restart"),
+        limit=settings.login_rate_limit,
+        window_seconds=settings.login_rate_window_seconds,
+    )
+    payload = await _read_json_payload(request, MFAChallengeIn)
+    enrollment, user = restart_mfa_enrollment(session, payload.mfa_token)
+    _audit_mfa(
+        session,
+        user=user,
+        action="auth.mfa.enrollment_restarted",
+        request=request,
+        note="Pending authenticator credential rotated before enrollment confirmation.",
+    )
+    return {
+        **enrollment,
+        "message": "A new authenticator credential was generated. Scan this QR/URI and discard the previous one.",
+    }
+
+
 @router.post("/api/auth/mfa/enroll/confirm/")
-def mfa_enroll_confirm(
-    payload: MFAEnrollmentConfirmIn,
+async def mfa_enroll_confirm(
     request: Request,
     response: Response,
     session: Session = Depends(get_session),
@@ -393,6 +418,7 @@ def mfa_enroll_confirm(
         limit=settings.login_rate_limit,
         window_seconds=settings.login_rate_window_seconds,
     )
+    payload = await _read_json_payload(request, MFAEnrollmentConfirmIn)
     user, recovery_codes, persistent = confirm_mfa_enrollment(
         session,
         payload.mfa_token,
@@ -415,8 +441,7 @@ def mfa_enroll_confirm(
 
 
 @router.post("/api/auth/mfa/verify/")
-def mfa_verify(
-    payload: MFAVerifyIn,
+async def mfa_verify(
     request: Request,
     response: Response,
     session: Session = Depends(get_session),
@@ -426,6 +451,7 @@ def mfa_verify(
         limit=settings.login_rate_limit,
         window_seconds=settings.login_rate_window_seconds,
     )
+    payload = await _read_json_payload(request, MFAVerifyIn)
     user, persistent, used_recovery = verify_mfa_login(
         session,
         payload.mfa_token,

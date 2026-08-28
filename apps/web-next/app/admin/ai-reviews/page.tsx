@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { getAdminAIReviews, type AdminAIReview } from "../../../lib/admin-api";
+import { localizedAiSummary } from "../../../lib/ai-explanation-locale";
 import { formatDateTime } from "../../../lib/format";
 import { useLocale } from "../../../lib/locale-context";
 
@@ -26,6 +27,6 @@ export default function AdminAIReviewsPage() {
     {error ? <div className="admin-alert admin-alert--error" role="alert">{error}</div> : null}
     {loading ? <div className="admin-auth-check"><span className="admin-spinner" />Loading reviews…</div> : null}
     {!loading && !items.length ? <div className="admin-empty">No AI explanations match this status.</div> : null}
-    <div className="admin-card-grid">{items.map(item => <article className="admin-card" key={item.id}><div className="admin-card__header"><div><h2>{item.product_name}</h2><p>Quote #{item.saved_quote_id} · {item.country} · {item.mode} · Qty {item.qty}</p></div><span className={`admin-status admin-status--${item.review_status.toLowerCase()}`}>{item.review_status}</span></div><p>{item.explanation.summary_bn}</p><dl className="account-definition-list"><div><dt>Provider</dt><dd>{item.provider}</dd></div><div><dt>Confidence</dt><dd>{item.confidence == null ? "Not calibrated" : `${Math.round(Number(item.confidence) * 100)}%`}</dd></div><div><dt>Created</dt><dd>{formatDateTime(item.created_at, intlLocale)}</dd></div><div><dt>Mandatory review</dt><dd>{item.human_review_required ? "Yes" : "No"}</dd></div></dl><Link className="admin-button admin-button--primary" href={`/admin/quotes/${item.saved_quote_id}`}>Review quote</Link></article>)}</div>
+    <div className="admin-card-grid">{items.map(item => <article className="admin-card" key={item.id}><div className="admin-card__header"><div><h2>{item.product_name}</h2><p>Quote #{item.saved_quote_id} · {item.country} · {item.mode} · Qty {item.qty}</p></div><span className={`admin-status admin-status--${item.review_status.toLowerCase()}`}>{item.review_status}</span></div><p>{localizedAiSummary(item.explanation, locale, bn ? "AI ব্যাখ্যার সারাংশ পাওয়া যাচ্ছে না।" : "The AI explanation summary is not available.")}</p><dl className="account-definition-list"><div><dt>Provider</dt><dd>{item.provider}</dd></div><div><dt>Confidence</dt><dd>{item.confidence == null ? "Not calibrated" : `${Math.round(Number(item.confidence) * 100)}%`}</dd></div><div><dt>Created</dt><dd>{formatDateTime(item.created_at, intlLocale)}</dd></div><div><dt>Mandatory review</dt><dd>{item.human_review_required ? "Yes" : "No"}</dd></div></dl><Link className="admin-button admin-button--primary" href={`/admin/quotes/${item.saved_quote_id}`}>Review quote</Link></article>)}</div>
   </div>;
 }

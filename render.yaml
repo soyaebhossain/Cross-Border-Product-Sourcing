@@ -6,7 +6,7 @@ services:
     region: singapore
     numInstances: 1
     dockerfilePath: ./services/catalog-service/Dockerfile
-    dockerContext: ./services/catalog-service
+    dockerContext: .
     healthCheckPath: /api/ready
     autoDeployTrigger: checksPass
     envVars:
@@ -26,10 +26,14 @@ services:
         value: https://cross-border-product-sourcing.vercel.app
       - key: CATALOG_CORS_ORIGINS
         value: https://cross-border-product-sourcing.vercel.app
+      - key: CATALOG_PROXY_SHARED_SECRET
+        sync: false
       - key: CATALOG_SECURE_COOKIES
         value: "true"
       - key: CATALOG_MEDIA_PATH
         value: /app/media
+      - key: CATALOG_AI_INSIGHTS_DATA_PATH
+        value: /app/datasets/ml-starter-v1
       - key: CATALOG_REQUEST_LOG_LEVEL
         value: INFO
       - key: CATALOG_ERROR_MONITORING_ENVIRONMENT

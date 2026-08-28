@@ -298,8 +298,16 @@ def update_admin_support_status(
     before = {"status": ticket.status}
     ticket.status = payload.status
     now = utc_now()
-    ticket.resolved_at = now if payload.status == "RESOLVED" else None
-    ticket.closed_at = now if payload.status == "CLOSED" else None
+    if payload.status == "RESOLVED":
+        ticket.resolved_at = ticket.resolved_at or now
+        ticket.closed_at = None
+    elif payload.status == "CLOSED":
+        # Closing a resolved ticket must preserve when it was resolved.
+        ticket.closed_at = now
+    else:
+        # A reopened ticket is no longer resolved; CLOSED itself is terminal.
+        ticket.resolved_at = None
+        ticket.closed_at = None
     ticket.updated_at = now
     ticket.messages.append(
         SupportMessage(
@@ -461,6 +469,16 @@ def cancel_customer_dispute(
     dispute.resolution_note = payload.note.strip()
     dispute.request_id = request_id_context.get()
     dispute.updated_at = utc_now()
+    queue_customer_notification(
+        session,
+        user_id=dispute.user_id,
+        category="dispute",
+        title=f"Dispute {dispute.public_id} cancelled",
+        body=payload.note.strip(),
+        order_id=dispute.order_id,
+        data={"dispute_id": dispute.id, "status": dispute.status},
+        template_key="dispute_cancelled",
+    )
     session.commit()
     session.refresh(dispute)
     return dispute

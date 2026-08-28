@@ -9,18 +9,20 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt ./
+COPY services/catalog-service/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY alembic.ini ./
-COPY migrations ./migrations
-COPY docker-entrypoint.sh ./
+COPY services/catalog-service/alembic.ini ./
+COPY services/catalog-service/migrations ./migrations
+COPY services/catalog-service/docker-entrypoint.sh ./
 RUN sed -i 's/\r$//' ./docker-entrypoint.sh \
     && chmod +x ./docker-entrypoint.sh
 
-COPY app ./app
-COPY media ./media
-COPY scripts ./scripts
+COPY services/catalog-service/app ./app
+COPY apps/web-next/data/public-catalog.snapshot.json ./app/seed_data/public-catalog.snapshot.json
+COPY services/catalog-service/media ./media
+COPY services/catalog-service/scripts ./scripts
+COPY datasets/ml-starter-v1 ./datasets/ml-starter-v1
 
 RUN useradd --create-home --uid 10001 sourceai \
     && chown -R sourceai:sourceai /app

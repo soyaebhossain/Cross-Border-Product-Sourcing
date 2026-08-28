@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { decideAdminAIReview, getAdminQuoteDetail, type AdminQuoteDetail } from "../../../../lib/admin-api";
+import { localizedAiItems, localizedAiSummary } from "../../../../lib/ai-explanation-locale";
 import { formatCurrency, formatDateTime } from "../../../../lib/format";
 import { useLocale } from "../../../../lib/locale-context";
 
@@ -40,6 +41,22 @@ export default function AdminQuoteDetailPage() {
   if (loading) return <div className="admin-auth-check"><span className="admin-spinner" />{bn ? "কোট লোড হচ্ছে…" : "Loading quote…"}</div>;
   if (!quote) return <div className="admin-page"><div className="admin-alert admin-alert--error" role="alert">{error || "Quote not found."}</div></div>;
   const breakdown = quote.snapshot?.breakdown;
+  const aiExplanation = quote.ai_review?.explanation;
+  const aiSummary = aiExplanation
+    ? localizedAiSummary(aiExplanation, locale, bn ? "AI ব্যাখ্যার সারাংশ পাওয়া যাচ্ছে না।" : "The AI explanation summary is not available.")
+    : "";
+  const aiAdvantages = aiExplanation
+    ? localizedAiItems(aiExplanation.advantages, locale, bn ? "কোনো সুবিধার তথ্য দেওয়া হয়নি।" : "No advantages were supplied.", aiExplanation.language)
+    : [];
+  const aiRisks = aiExplanation
+    ? localizedAiItems(aiExplanation.risks, locale, bn ? "অতিরিক্ত ঝুঁকির তথ্য দেওয়া হয়নি।" : "No additional risks were supplied.", aiExplanation.language)
+    : [];
+  const aiMissingInformation = aiExplanation
+    ? localizedAiItems(aiExplanation.missing_information, locale, bn ? "অনুপস্থিত তথ্যের বিবরণ দেওয়া হয়নি।" : "No missing-information details were supplied.", aiExplanation.language)
+    : [];
+  const aiRecommendedChecks = aiExplanation
+    ? localizedAiItems(aiExplanation.recommended_checks, locale, bn ? "কোনো যাচাইয়ের তথ্য দেওয়া হয়নি।" : "No checks were supplied.", aiExplanation.language)
+    : [];
 
   return <div className="admin-page">
     <header className="admin-page-header"><div><Link className="account-back-link" href="/admin/quotes">← {bn ? "কোট তালিকা" : "Quote list"}</Link><p className="admin-eyebrow">Locked quote snapshot</p><h1>{bn ? "সেভড কোট" : "Saved quote"} #{quote.id}</h1><p>{formatDateTime(quote.created_at, intlLocale)} · {quote.country} · {quote.mode}</p></div><button className="admin-button admin-button--secondary" type="button" onClick={() => window.print()}>{bn ? "প্রিন্ট / PDF" : "Print / PDF"}</button></header>
@@ -51,9 +68,9 @@ export default function AdminQuoteDetailPage() {
     </dl></article></section>
     <section className="admin-card"><div className="admin-card__header"><div><h2>Linked orders</h2><p>Duplicate-order integrity</p></div></div>{quote.order_ids.length ? <div className="admin-inline-actions">{quote.order_ids.map(id => <Link className="admin-button admin-button--secondary" href={`/admin/orders/${id}`} key={id}>Order #{id}</Link>)}</div> : <div className="admin-empty">No order has been created from this quote.</div>}</section>
     {quote.ai_review ? <section className="admin-card"><div className="admin-card__header"><div><h2>AI sourcing explanation</h2><p>{quote.ai_review.provider} · {quote.ai_review.model || "deterministic fallback"} · {quote.ai_review.prompt_version}</p></div><span className={`admin-status admin-status--${quote.ai_review.review_status.toLowerCase()}`}>{quote.ai_review.review_status}</span></div>
-      <p>{quote.ai_review.explanation.summary_bn}</p>
+      <p>{aiSummary}</p>
       <dl className="account-definition-list"><div><dt>Human review required</dt><dd>{quote.ai_review.human_review_required ? "Yes" : "No"}</dd></div><div><dt>Confidence</dt><dd>{quote.ai_review.confidence == null ? "Not calibrated" : `${Math.round(Number(quote.ai_review.confidence) * 100)}%`}</dd></div><div><dt>Reviewed by</dt><dd>{quote.ai_review.reviewed_by_user_id ? `User #${quote.ai_review.reviewed_by_user_id}` : "—"}</dd></div><div><dt>Review note</dt><dd>{quote.ai_review.review_note || "—"}</dd></div></dl>
-      <div className="admin-detail-grid"><div><strong>Advantages</strong><ul>{quote.ai_review.explanation.advantages.map(item => <li key={item}>{item}</li>)}</ul></div><div><strong>Risks</strong><ul>{quote.ai_review.explanation.risks.map(item => <li key={item}>{item}</li>)}</ul></div><div><strong>Missing information</strong><ul>{quote.ai_review.explanation.missing_information.map(item => <li key={item}>{item}</li>)}</ul></div><div><strong>Recommended checks</strong><ul>{quote.ai_review.explanation.recommended_checks.map(item => <li key={item}>{item}</li>)}</ul></div></div>
+      <div className="admin-detail-grid"><div><strong>Advantages</strong><ul>{aiAdvantages.map(item => <li key={item}>{item}</li>)}</ul></div><div><strong>Risks</strong><ul>{aiRisks.map(item => <li key={item}>{item}</li>)}</ul></div><div><strong>Missing information</strong><ul>{aiMissingInformation.map(item => <li key={item}>{item}</li>)}</ul></div><div><strong>Recommended checks</strong><ul>{aiRecommendedChecks.map(item => <li key={item}>{item}</li>)}</ul></div></div>
       {quote.ai_review.review_status === "PENDING" ? <div className="admin-modal__form"><label><span>Mandatory review note</span><textarea rows={4} minLength={3} maxLength={2000} value={reviewNote} onChange={event => setReviewNote(event.target.value)} /></label><div className="admin-inline-actions"><button className="admin-button admin-button--primary" type="button" disabled={reviewSaving || reviewNote.trim().length < 3} onClick={() => void decideReview("APPROVED")}>Approve explanation</button><button className="admin-button admin-button--danger" type="button" disabled={reviewSaving || reviewNote.trim().length < 3} onClick={() => void decideReview("REJECTED")}>Reject explanation</button></div></div> : null}
     </section> : null}
   </div>;

@@ -4,12 +4,13 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useEffect, useState } from "react";
 import { getCheapestCountryRecommendationWithAi, type CheapestCountryRecommendation } from "../lib/api";
+import { localizedAiItems, localizedAiSummary } from "../lib/ai-explanation-locale";
 import { formatBdt } from "../lib/format";
 import { useLocale } from "../lib/locale-context";
 import { localizedRecommendationText } from "../lib/sourcing-copy";
 
 export function SourcingWorkspace({ variantId }: { variantId: number }) {
-  const { locale } = useLocale();
+  const { locale, intlLocale } = useLocale();
   const bn = locale === "bn";
   const [qty, setQty] = useState(10);
   const [weights, setWeights] = useState<Record<string, number>>({ price: 35, quality: 20, delivery: 15, reliability: 15, risk: 15 });
@@ -48,6 +49,23 @@ export function SourcingWorkspace({ variantId }: { variantId: number }) {
   }, [variantId, qty, weights, refreshKey, locale]);
 
   const selected = data?.recommendations[selectedIndex];
+  const aiExplanation = data?.ai_explanation;
+  const aiSummary = aiExplanation
+    ? localizedAiSummary(
+        aiExplanation,
+        locale,
+        bn ? "দেশভিত্তিক সুপারিশের সারাংশ এখন পাওয়া যাচ্ছে না।" : "The country recommendation summary is not available yet.",
+      )
+    : "";
+  const aiAdvantages = aiExplanation
+    ? localizedAiItems(aiExplanation.advantages, locale, bn ? "কোনো সুবিধার তথ্য দেওয়া হয়নি।" : "No advantages were supplied.", aiExplanation.language)
+    : [];
+  const aiRisks = aiExplanation
+    ? localizedAiItems(aiExplanation.risks, locale, bn ? "অতিরিক্ত ঝুঁকি শনাক্ত হয়নি।" : "No additional risk was identified.", aiExplanation.language)
+    : [];
+  const aiRecommendedChecks = aiExplanation
+    ? localizedAiItems(aiExplanation.recommended_checks, locale, bn ? "কোনো যাচাইয়ের তথ্য দেওয়া হয়নি।" : "No checks were supplied.", aiExplanation.language)
+    : [];
   const quoteHref = (selected
     ? `/quote?variant=${variantId}&qty=${qty}&country=${encodeURIComponent(selected.country.code)}&mode=${encodeURIComponent(selected.mode)}`
     : `/quote?variant=${variantId}&qty=${qty}`) as Route;
@@ -104,7 +122,7 @@ export function SourcingWorkspace({ variantId }: { variantId: number }) {
             >
               <div className="supplier-rank">#{item.rank}</div>
               <div><strong>{item.selected_offer.seller_name}</strong><span>{item.country.name} · {item.mode}</span></div>
-              <div><small>{bn ? "ল্যান্ডেড কস্ট" : "Landed cost"}</small><strong>{formatBdt(item.estimated_total_bdt)}</strong></div>
+              <div><small>{bn ? "ল্যান্ডেড কস্ট" : "Landed cost"}</small><strong>{formatBdt(item.estimated_total_bdt, intlLocale)}</strong></div>
               <div><small>{bn ? "ডেলিভারি" : "Delivery"}</small><strong>{item.eta.min_days}–{item.eta.max_days} {bn ? "দিন" : "days"}</strong></div>
               <div><small>{bn ? "স্কোর" : "Score"}</small><strong>{Number(item.score).toFixed(1)}/100</strong></div>
               <span className={`risk-badge risk-badge--${item.risk_level.toLowerCase()}`}>{riskLabel(item.risk_level)}</span>
@@ -126,11 +144,11 @@ export function SourcingWorkspace({ variantId }: { variantId: number }) {
               {data.ai_metadata?.automation_available ? `Ollama · ${data.ai_metadata.model || "local model"}` : (bn ? "নির্ধারিত fallback" : "Deterministic fallback")}
             </span>
           </div>
-          <p className="workspace-ai__summary">{data.ai_explanation.summary_bn}</p>
+          <p className="workspace-ai__summary">{aiSummary}</p>
           <div className="workspace-ai__grid">
-            <div><strong>{bn ? "সুবিধা" : "Advantages"}</strong><ul>{data.ai_explanation.advantages.map((item) => <li key={item}>{item}</li>)}</ul></div>
-            <div><strong>{bn ? "ঝুঁকি" : "Risks"}</strong><ul>{data.ai_explanation.risks.length ? data.ai_explanation.risks.map((item) => <li key={item}>{item}</li>) : <li>{bn ? "অতিরিক্ত ঝুঁকি শনাক্ত হয়নি।" : "No additional risk was identified."}</li>}</ul></div>
-            <div><strong>{bn ? "যা যাচাই করবেন" : "Recommended checks"}</strong><ul>{data.ai_explanation.recommended_checks.map((item) => <li key={item}>{item}</li>)}</ul></div>
+            <div><strong>{bn ? "সুবিধা" : "Advantages"}</strong><ul>{aiAdvantages.map((item) => <li key={item}>{item}</li>)}</ul></div>
+            <div><strong>{bn ? "ঝুঁকি" : "Risks"}</strong><ul>{aiRisks.map((item) => <li key={item}>{item}</li>)}</ul></div>
+            <div><strong>{bn ? "যা যাচাই করবেন" : "Recommended checks"}</strong><ul>{aiRecommendedChecks.map((item) => <li key={item}>{item}</li>)}</ul></div>
           </div>
           <small>{bn ? "র‍্যাঙ্কিং ও সব আর্থিক হিসাব server-এর deterministic sourcing engine করে; AI শুধু ব্যাখ্যা দেয়।" : "The server's deterministic sourcing engine calculates rankings and all monetary values; AI only explains the result."}{data.ai_explanation.human_review_required ? (bn ? " মানুষের পর্যালোচনা প্রয়োজন।" : " Human review is required.") : ""}</small>
         </article>

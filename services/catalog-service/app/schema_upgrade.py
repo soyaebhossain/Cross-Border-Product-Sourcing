@@ -8,6 +8,8 @@ not add columns. Every statement here is additive or a data backfill; no table,
 column, or row is removed.
 """
 
+import unicodedata
+from collections import Counter
 from collections.abc import Iterable
 
 from sqlalchemy import Engine, inspect, text
@@ -40,6 +42,104 @@ def _execute_best_effort(connection, statement: str) -> None:
         # application layer still enforces the invariant and the migration can
         # be completed after an operator resolves the legacy rows.
         pass
+
+
+def _identity_key(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = unicodedata.normalize("NFKC", value).strip().casefold()
+    return normalized or None
+
+
+def _backfill_sqlite_identity_keys(connection) -> None:
+    if not inspect(connection).has_table("accounts_users"):
+        return
+    required = {
+        "username_normalized",
+        "email_normalized",
+        "phone_normalized",
+    }
+    if not required.issubset(_existing_columns(connection, "accounts_users")):
+        return
+    rows = list(
+        connection.execute(
+            text("SELECT id, username, email, phone FROM accounts_users")
+        ).mappings()
+    )
+    normalized = [
+        {
+            "id": int(row["id"]),
+            "username": _identity_key(row["username"]),
+            "email": _identity_key(row["email"]),
+            "phone": _identity_key(row["phone"]),
+        }
+        for row in rows
+    ]
+    duplicate_values: dict[str, set[str]] = {}
+    for field in ("username", "email", "phone"):
+        counts = Counter(row[field] for row in normalized if row[field] is not None)
+        duplicate_values[field] = {
+            value for value, count in counts.items() if count > 1
+        }
+    for row in normalized:
+        connection.execute(
+            text(
+                """
+                UPDATE accounts_users
+                SET username_normalized = :username,
+                    email_normalized = :email,
+                    phone_normalized = :phone
+                WHERE id = :id
+                """
+            ),
+            {
+                "id": row["id"],
+                "username": (
+                    None
+                    if row["username"] in duplicate_values["username"]
+                    else row["username"]
+                ),
+                "email": (
+                    None
+                    if row["email"] in duplicate_values["email"]
+                    else row["email"]
+                ),
+                "phone": (
+                    None
+                    if row["phone"] in duplicate_values["phone"]
+                    else row["phone"]
+                ),
+            },
+        )
+
+
+def _normalize_sqlite_skus(connection) -> None:
+    table_name = "catalog_product_variants"
+    if not inspect(connection).has_table(table_name):
+        return
+    rows = list(
+        connection.execute(text(f"SELECT id, sku FROM {table_name}")).mappings()
+    )
+    normalized = [
+        {
+            "id": int(row["id"]),
+            "sku": (
+                unicodedata.normalize("NFKC", str(row["sku"])).strip().upper()
+                if row["sku"] is not None
+                else None
+            ),
+        }
+        for row in rows
+    ]
+    counts = Counter(row["sku"] for row in normalized if row["sku"])
+    duplicates = {value for value, count in counts.items() if count > 1}
+    for row in normalized:
+        if row["sku"] in duplicates:
+            continue
+        connection.execute(
+            text(f"UPDATE {table_name} SET sku = :sku WHERE id = :id"),
+            row,
+        )
 
 
 def upgrade_sqlite_schema(engine: Engine) -> None:
@@ -125,8 +225,16 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
                 ("mfa_secret_encrypted", "TEXT"),
                 ("mfa_recovery_hashes", "JSON NOT NULL DEFAULT '[]'"),
                 ("mfa_enrolled_at", "DATETIME"),
+                ("username_normalized", "VARCHAR(150)"),
+                ("email_normalized", "VARCHAR(254)"),
+                ("phone_normalized", "VARCHAR(40)"),
+                ("mfa_failed_attempts", "INTEGER NOT NULL DEFAULT 0"),
+                ("mfa_locked_until", "DATETIME"),
+                ("last_totp_counter", "BIGINT"),
             ),
         )
+        _backfill_sqlite_identity_keys(connection)
+        _normalize_sqlite_skus(connection)
 
         if inspect(connection).has_table("orders_saved_quotes"):
             _execute_best_effort(
@@ -248,6 +356,10 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
 
         for statement in (
             "CREATE INDEX IF NOT EXISTS ix_accounts_users_locked_until ON accounts_users (locked_until)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_accounts_users_username_normalized ON accounts_users (username_normalized)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_accounts_users_email_normalized ON accounts_users (email_normalized)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_accounts_users_phone_normalized ON accounts_users (phone_normalized)",
+            "CREATE INDEX IF NOT EXISTS ix_accounts_users_mfa_locked_until ON accounts_users (mfa_locked_until)",
             "CREATE INDEX IF NOT EXISTS ix_auth_challenges_user_id ON accounts_auth_challenges (user_id)",
             "CREATE INDEX IF NOT EXISTS ix_auth_challenges_expires_at ON accounts_auth_challenges (expires_at)",
             "CREATE INDEX IF NOT EXISTS ix_refresh_sessions_user_id ON accounts_refresh_sessions (user_id)",
@@ -265,6 +377,7 @@ def upgrade_sqlite_schema(engine: Engine) -> None:
             "CREATE INDEX IF NOT EXISTS ix_categories_is_active ON catalog_categories (is_active)",
             "CREATE INDEX IF NOT EXISTS ix_products_is_active ON catalog_products (is_active)",
             "CREATE INDEX IF NOT EXISTS ix_variants_is_active ON catalog_product_variants (is_active)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_catalog_product_variants_sku ON catalog_product_variants (sku)",
             "CREATE INDEX IF NOT EXISTS ix_sellers_is_active ON sourcing_sellers (is_active)",
             "CREATE INDEX IF NOT EXISTS ix_offers_is_active ON sourcing_seller_offers (is_active)",
             "CREATE INDEX IF NOT EXISTS ix_manual_payments_decision ON orders_manual_payments (decision)",

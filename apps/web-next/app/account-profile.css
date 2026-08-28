@@ -1,0 +1,272 @@
+/*
+ * Profile and address-book layout.
+ *
+ * This file is intentionally loaded after the legacy stylesheets so the
+ * customer profile form has one predictable, responsive field model.
+ */
+
+.account-page .account-panel {
+  padding: clamp(20px, 2.2vw, 28px);
+}
+
+.account-page .account-panel__header {
+  margin-bottom: 22px;
+}
+
+.account-page .account-panel__header h2 {
+  font-size: 18px;
+  line-height: 1.3;
+}
+
+.account-page .account-panel__header p {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.account-profile-form {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 18px 16px;
+}
+
+.account-profile-form > label {
+  display: grid;
+  grid-column: span 6;
+  min-width: 0;
+  align-content: start;
+  gap: 7px;
+  color: #334155;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.account-profile-form > label:nth-of-type(5) {
+  grid-column: span 5;
+}
+
+.account-profile-form > label:nth-of-type(6) {
+  grid-column: span 3;
+}
+
+.account-profile-form > label:nth-of-type(7) {
+  grid-column: span 4;
+}
+
+.account-profile-form input,
+.account-profile-form select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  margin: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 12px;
+  color: #17243a;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.account-profile-form select {
+  padding-right: 36px;
+}
+
+.account-profile-form input:hover,
+.account-profile-form select:hover {
+  border-color: #94a3b8;
+}
+
+.account-profile-form input:focus-visible,
+.account-profile-form select:focus-visible {
+  border-color: #2563eb;
+  outline: 0;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+
+.account-profile-form__wide {
+  grid-column: 1 / -1;
+}
+
+.account-profile-form .account-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.account-profile-form .account-form-actions .button {
+  min-width: 132px;
+}
+
+.account-address-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.account-address-card {
+  display: grid;
+  min-width: 0;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #dfe6ef;
+  border-radius: 12px;
+  background: #fbfcfe;
+}
+
+.account-address-card > div:first-child {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.account-address-card > div:first-child strong {
+  color: #10203a;
+  font-size: 13px;
+}
+
+.account-address-card > div:first-child span {
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #e8f1ff;
+  padding: 4px 8px;
+  color: #1854bd;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.account-address-card > div:first-child span:empty {
+  display: none;
+}
+
+.account-address-card p {
+  margin: 0;
+  color: #526177;
+  font-size: 11px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.account-address-card > div:last-child {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.account-address-empty {
+  display: flex;
+  min-height: 116px;
+  align-items: center;
+  gap: 15px;
+  padding: 20px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  background: #fbfcfe;
+}
+
+.account-address-empty__icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 12px;
+  background: #eaf2ff;
+  color: #1d5fe9;
+}
+
+.account-address-empty__copy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.account-address-empty__copy strong {
+  margin: 0;
+  color: #10203a;
+  font-size: 13px;
+}
+
+.account-address-empty__copy span {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+@media (max-width: 1100px) {
+  .account-profile-form > label:nth-of-type(5),
+  .account-profile-form > label:nth-of-type(6),
+  .account-profile-form > label:nth-of-type(7) {
+    grid-column: span 6;
+  }
+
+  .account-profile-form > label:nth-of-type(7) {
+    grid-column: 1 / -1;
+  }
+
+  .account-address-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .account-page .account-panel {
+    padding: 18px;
+  }
+
+  .account-profile-form {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .account-profile-form > label,
+  .account-profile-form > label:nth-of-type(5),
+  .account-profile-form > label:nth-of-type(6),
+  .account-profile-form > label:nth-of-type(7),
+  .account-profile-form__wide {
+    grid-column: 1;
+  }
+
+  .account-profile-form .account-form-actions {
+    align-items: stretch;
+  }
+
+  .account-profile-form .account-form-actions .button {
+    width: 100%;
+  }
+
+  .account-address-empty {
+    align-items: flex-start;
+    min-height: 0;
+  }
+
+  .account-address-card > div:first-child {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .account-address-card > div:last-child {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .account-address-card > div:last-child .button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-profile-form input,
+  .account-profile-form select {
+    transition: none;
+  }
+}

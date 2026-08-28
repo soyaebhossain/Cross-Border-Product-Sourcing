@@ -45,7 +45,11 @@ def financial_snapshot(session: Session, order: Order) -> dict[str, Any]:
     gross_collected = _money(order.advance_bdt if approved else 0)
     refunds = posted_refunds_for_order(session, order.id)
     net_collected = max(Decimal("0.00"), gross_collected - refunds)
-    outstanding = max(Decimal("0.00"), _money(order.total_bdt) - net_collected)
+    outstanding = (
+        Decimal("0.00")
+        if order.status == "CANCELLED"
+        else max(Decimal("0.00"), _money(order.total_bdt) - net_collected)
+    )
     return {
         "gross_collected_bdt": format(gross_collected, ".2f"),
         "refunds_bdt": format(refunds, ".2f"),

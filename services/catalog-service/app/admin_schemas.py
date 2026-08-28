@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class AuditNoteIn(BaseModel):
@@ -71,6 +71,12 @@ class VariantCreateIn(BaseModel):
     width_cm: Decimal = Field(default=Decimal("0"), ge=0)
     height_cm: Decimal = Field(default=Decimal("0"), ge=0)
 
+    @field_validator("sku")
+    @classmethod
+    def normalize_sku(cls, value: str | None) -> str | None:
+        normalized = value.strip().upper() if value is not None else ""
+        return normalized or None
+
 
 class VariantUpdateIn(BaseModel):
     sku: str | None = Field(default=None, max_length=80)
@@ -81,6 +87,12 @@ class VariantUpdateIn(BaseModel):
     height_cm: Decimal | None = Field(default=None, ge=0)
     note: str = Field(min_length=3, max_length=1000)
     request_id: str | None = Field(default=None, max_length=100)
+
+    @field_validator("sku")
+    @classmethod
+    def normalize_sku(cls, value: str | None) -> str | None:
+        normalized = value.strip().upper() if value is not None else ""
+        return normalized or None
 
 
 class SupplierCreateIn(BaseModel):
@@ -104,7 +116,7 @@ class OfferCreateIn(BaseModel):
     country_id: int = Field(ge=1)
     seller_id: int = Field(ge=1)
     mode: Literal["LOCAL", "BULK"] = "LOCAL"
-    price_origin: Decimal = Field(gt=0)
+    price_origin: Decimal = Field(gt=0, le=Decimal("9999999999.99"))
     currency: str = Field(default="USD", min_length=3, max_length=10, pattern=r"^[A-Za-z]+$")
     stock: int = Field(default=0, ge=0)
     moq: int = Field(default=1, ge=1)
@@ -116,7 +128,11 @@ class OfferUpdateIn(BaseModel):
     country_id: int | None = Field(default=None, ge=1)
     seller_id: int | None = Field(default=None, ge=1)
     mode: Literal["LOCAL", "BULK"] | None = None
-    price_origin: Decimal | None = Field(default=None, gt=0)
+    price_origin: Decimal | None = Field(
+        default=None,
+        gt=0,
+        le=Decimal("9999999999.99"),
+    )
     currency: str | None = Field(
         default=None,
         min_length=3,

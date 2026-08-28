@@ -13,7 +13,7 @@ from sqlalchemy import create_engine, inspect, text
 
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
-HEAD_REVISION = "20260806_05"
+HEAD_REVISION = "20260827_07"
 EXPECTED_TABLES = {
     "accounts_auth_challenges",
     "accounts_refresh_sessions",
@@ -78,6 +78,83 @@ def _upgrade_to_head(database_url: str, revision: str = "head") -> None:
 
 
 class AlembicMigrationTests(unittest.TestCase):
+    def test_latest_migration_configures_duty_and_repairs_known_catalog_rows(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database_path = Path(directory) / "catalog-quality.sqlite3"
+            database_url = _sqlite_url(database_path)
+            _upgrade_to_head(database_url, "20260826_06")
+
+            engine = create_engine(database_url)
+            with engine.begin() as connection:
+                connection.execute(
+                    text("INSERT INTO sourcing_countries (id, code, name) VALUES (91, 'CN', 'China')")
+                )
+                connection.execute(
+                    text(
+                        "INSERT INTO catalog_categories (id, name, slug) "
+                        "VALUES (91, 'Phones', 'phones')"
+                    )
+                )
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO catalog_products (id, name, slug, model, category_id)
+                        VALUES (91, 'Buttom Phones', 'Phone', 'Nokia 1100', 91)
+                        """
+                    )
+                )
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO catalog_product_variants (
+                            id, product_id, sku, variant_name, weight_kg,
+                            length_cm, width_cm, height_cm
+                        )
+                        VALUES (
+                            91, 91, 'PHONE', '1100 model', 120.000,
+                            200.00, 40.00, 20.00
+                        )
+                        """
+                    )
+                )
+            engine.dispose()
+
+            _upgrade_to_head(database_url)
+
+            engine = create_engine(database_url)
+            with engine.connect() as connection:
+                duty = connection.execute(
+                    text(
+                        """
+                        SELECT percent, fixed_bdt
+                        FROM pricing_duty_rules
+                        WHERE country_id = 91 AND category_id IS NULL AND is_active = 1
+                        """
+                    )
+                ).one()
+                product = connection.execute(
+                    text(
+                        "SELECT name, slug, model FROM catalog_products WHERE id = 91"
+                    )
+                ).one()
+                variant = connection.execute(
+                    text(
+                        """
+                        SELECT sku, variant_name, weight_kg, length_cm, width_cm, height_cm
+                        FROM catalog_product_variants WHERE id = 91
+                        """
+                    )
+                ).one()
+            engine.dispose()
+
+            self.assertEqual(tuple(duty), (5, 0))
+            self.assertEqual(
+                tuple(product),
+                ("Nokia 1100 Feature Phone", "nokia-1100-feature-phone", "NOKIA-1100"),
+            )
+            self.assertEqual(tuple(variant[:2]), ("NOKIA-1100-STD", "Standard"))
+            self.assertEqual(tuple(float(value) for value in variant[2:]), (0.12, 10.6, 4.6, 2.0))
+
     def test_revision_four_normalizes_legacy_seller_account_role(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "seller-role.sqlite3"

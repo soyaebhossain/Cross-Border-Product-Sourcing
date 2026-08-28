@@ -17,6 +17,7 @@ if str(SERVICE_ROOT) not in sys.path:
 
 from app.auth import login_identifier_exists, make_password, validate_password_strength  # noqa: E402
 from app.db import engine  # noqa: E402
+from app.identity import normalize_email_address, normalize_identifier_key, normalize_username  # noqa: E402
 from app.models import AccountUser, AdminAuditEvent  # noqa: E402
 
 
@@ -27,8 +28,8 @@ def provision_admin(
     email: str,
     password: str,
 ) -> AccountUser:
-    normalized_username = username.strip()
-    normalized_email = email.strip().casefold()
+    normalized_username = normalize_username(username)
+    normalized_email = normalize_email_address(email)
     if not 3 <= len(normalized_username) <= 150:
         raise ValueError("Username must be between 3 and 150 characters")
     if "@" not in normalized_email or len(normalized_email) > 254:
@@ -38,8 +39,11 @@ def provision_admin(
     validate_password_strength(password, (normalized_username, normalized_email))
     admin = AccountUser(
         username=normalized_username,
+        username_normalized=normalize_identifier_key(normalized_username),
         email=normalized_email,
+        email_normalized=normalize_identifier_key(normalized_email),
         phone=None,
+        phone_normalized=None,
         password_hash=make_password(password),
         role="admin",
         is_active=True,

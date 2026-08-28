@@ -21,12 +21,12 @@ export function TrustBadge({ children, explanation }: { children: React.ReactNod
   return <span className="trust-badge-ui" title={explanation} tabIndex={0} aria-label={`${children}. ${explanation}`}><span aria-hidden>✓</span>{children}</span>;
 }
 
-export function QuantitySelector({ value, min = 1, onChange, label }: { value: number; min?: number; onChange: (value: number) => void; label: string }) {
+export function QuantitySelector({ value, min = 1, max = 100_000, onChange, label }: { value: number; min?: number; max?: number; onChange: (value: number) => void; label: string }) {
   const { locale } = useLocale();
-  const update = (next: number) => onChange(Math.max(min, Number.isFinite(next) ? Math.round(next) : min));
+  const update = (next: number) => onChange(Math.min(max, Math.max(min, Number.isFinite(next) ? Math.round(next) : min)));
   return <div className="quantity-selector" aria-label={label}>
     <button type="button" onClick={() => update(value - 1)} disabled={value <= min} aria-label={`${label}: ${locale === "bn" ? "কমান" : "decrease"}`}>−</button>
-    <input type="number" min={min} value={value} onChange={(event) => update(Number(event.target.value))} aria-label={label} />
-    <button type="button" onClick={() => update(value + 1)} aria-label={`${label}: ${locale === "bn" ? "বাড়ান" : "increase"}`}>+</button>
+    <input type="number" min={min} max={max} value={value} onChange={(event) => update(Number(event.target.value))} aria-label={label} />
+    <button type="button" onClick={() => update(value + 1)} disabled={value >= max} aria-label={`${label}: ${locale === "bn" ? "বাড়ান" : "increase"}`}>+</button>
   </div>;
 }

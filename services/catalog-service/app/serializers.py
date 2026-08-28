@@ -95,6 +95,35 @@ def serialize_product(product: Product) -> dict[str, Any]:
 
 
 def serialize_saved_quote(saved_quote: SavedQuote) -> dict[str, Any]:
+    response = dict(saved_quote.response or {})
+    if saved_quote.ai_explanation is not None:
+        stored_explanation = saved_quote.ai_explanation
+        explanation = dict(stored_explanation.explanation or {})
+        stored_context = stored_explanation.deterministic_snapshot or {}
+        stored_language = stored_context.get("response_language")
+        if stored_language in {"en", "bn"}:
+            # Keep this import local: services.__init__ imports orders, whose
+            # sourcing module depends on decimal_str from this module.
+            from .services.automation import fallback_explanation, validated_explanation
+
+            explanation = validated_explanation(
+                explanation,
+                fallback_explanation(stored_context),
+                language=stored_language,
+            )
+        explanation.setdefault(
+            "confidence",
+            float(stored_explanation.confidence) if stored_explanation.confidence is not None else None,
+        )
+        explanation.setdefault("human_review_required", stored_explanation.human_review_required)
+        response["ai_explanation"] = explanation
+        response["ai_metadata"] = {
+            "source": stored_explanation.provider,
+            "model": stored_explanation.model,
+            "prompt_version": stored_explanation.prompt_version,
+            "automation_available": stored_explanation.provider == "ollama-via-n8n",
+            "monetary_calculations_are_deterministic": True,
+        }
     return {
         "id": saved_quote.id,
         "variant_id": saved_quote.variant_id,
@@ -104,7 +133,7 @@ def serialize_saved_quote(saved_quote: SavedQuote) -> dict[str, Any]:
         "mode": saved_quote.mode,
         "delivery_type": saved_quote.delivery_type,
         "qty": saved_quote.qty,
-        "response": saved_quote.response,
+        "response": response,
         "status": saved_quote.status or (saved_quote.response or {}).get("status", "requested"),
         "expires_at": saved_quote.expires_at or (saved_quote.response or {}).get("expires_at"),
         "created_at": saved_quote.created_at,

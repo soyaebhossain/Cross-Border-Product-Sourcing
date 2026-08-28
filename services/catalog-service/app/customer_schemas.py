@@ -53,10 +53,22 @@ class AddressCreateIn(BaseModel):
     is_default_shipping: bool = False
     is_default_billing: bool = False
 
-    @field_validator("country_code")
+    @field_validator("label", "recipient_name", "line1", "city", "phone", mode="before")
     @classmethod
-    def normalize_country(cls, value: str) -> str:
-        return value.upper()
+    def reject_blank_required_text(cls, value: object) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("Required address fields cannot be blank")
+        return value.strip()
+
+    @field_validator("company_name", "line2", "region", "postal_code", mode="before")
+    @classmethod
+    def normalize_optional_text(cls, value: object) -> object:
+        return value.strip() or None if isinstance(value, str) else value
+
+    @field_validator("country_code", mode="before")
+    @classmethod
+    def normalize_country(cls, value: object) -> object:
+        return value.strip().upper() if isinstance(value, str) else value
 
 
 class AddressUpdateIn(BaseModel):
@@ -78,10 +90,22 @@ class AddressUpdateIn(BaseModel):
     is_default_shipping: bool | None = None
     is_default_billing: bool | None = None
 
-    @field_validator("country_code")
+    @field_validator("label", "recipient_name", "line1", "city", "phone", mode="before")
     @classmethod
-    def normalize_country(cls, value: str | None) -> str | None:
-        return value.upper() if value else value
+    def reject_blank_required_text(cls, value: object) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("Required address fields cannot be blank")
+        return value.strip()
+
+    @field_validator("company_name", "line2", "region", "postal_code", mode="before")
+    @classmethod
+    def normalize_optional_text(cls, value: object) -> object:
+        return value.strip() or None if isinstance(value, str) else value
+
+    @field_validator("country_code", mode="before")
+    @classmethod
+    def normalize_country(cls, value: object) -> object:
+        return value.strip().upper() if isinstance(value, str) else value
 
     @model_validator(mode="after")
     def require_change(self) -> "AddressUpdateIn":

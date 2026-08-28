@@ -15,6 +15,7 @@ from uuid import uuid4
 from types import SimpleNamespace
 
 import resend
+from fastapi import HTTPException
 from resend.exceptions import NoContentError, ResendError
 from sqlalchemy import or_, select, update
 from sqlalchemy.orm import Session
@@ -332,7 +333,13 @@ def get_or_create_notification_preferences(
         select(NotificationPreference).where(NotificationPreference.user_id == user_id)
     )
     if preference is None:
-        preference = NotificationPreference(user_id=user_id)
+        user = session.get(AccountUser, user_id)
+        email_available = bool(user and (user.email or "").strip())
+        preference = NotificationPreference(
+            user_id=user_id,
+            order_email=email_available,
+            support_email=email_available,
+        )
         session.add(preference)
         session.flush()
     return preference
@@ -357,6 +364,32 @@ def update_notification_preferences(
     changes: dict[str, bool | None],
 ) -> NotificationPreference:
     preference = get_or_create_notification_preferences(session, user_id)
+    user = session.get(AccountUser, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+    email_requested = any(
+        changes.get(field) is True
+        for field in ("order_email", "support_email", "marketing_email")
+    )
+    phone_requested = any(
+        changes.get(field) is True
+        for field in (
+            "order_sms",
+            "order_whatsapp",
+            "support_sms",
+            "support_whatsapp",
+        )
+    )
+    if email_requested and not (user.email or "").strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Add a verified account email before enabling email notifications",
+        )
+    if phone_requested and not (user.phone or "").strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Add an account phone number before enabling SMS or WhatsApp notifications",
+        )
     for field, value in changes.items():
         if value is not None:
             setattr(preference, field, value)
@@ -407,7 +440,10 @@ def queue_customer_notification(
     for channel, destination in destinations.items():
         if not _channel_enabled(preference, category, channel):
             continue
-        destination_available = bool(destination)
+        if not destination:
+            # The in-app notification remains available. Do not create a
+            # permanently failed external delivery with an empty recipient.
+            continue
         session.add(
             NotificationOutbox(
                 notification_id=notification.id,
@@ -421,9 +457,9 @@ def queue_customer_notification(
                     "order_id": order_id,
                     **(data or {}),
                 },
-                status="QUEUED" if destination_available else "FAILED",
-                error_code=None if destination_available else "destination_missing",
-                error_detail=None if destination_available else f"{channel.title()} destination is unavailable",
+                status="QUEUED",
+                error_code=None,
+                error_detail=None,
             )
         )
     return notification

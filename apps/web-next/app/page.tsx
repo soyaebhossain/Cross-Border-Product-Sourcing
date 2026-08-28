@@ -22,9 +22,20 @@ export default async function HomePage() {
       representedCategories.add(product.category.slug);
       if (selected.length === 8) return selected;
     }
+    // Keep the remaining slots photo-backed whenever possible. The first pass
+    // maximizes category diversity; this pass reuses categories before falling
+    // back to an illustrative card only when the result set has fewer than
+    // eight products with assigned media.
+    for (const product of catalog.items) {
+      if (!product.image || selectedIds.has(product.id)) continue;
+      selected.push(product);
+      selectedIds.add(product.id);
+      if (selected.length === 8) return selected;
+    }
     for (const product of catalog.items) {
       if (selectedIds.has(product.id)) continue;
       selected.push(product);
+      selectedIds.add(product.id);
       if (selected.length === 8) break;
     }
     return selected;

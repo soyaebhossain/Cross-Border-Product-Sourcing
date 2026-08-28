@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint, func, text
+from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -14,8 +14,11 @@ class AccountUser(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(150), unique=True, nullable=False)
+    username_normalized: Mapped[str | None] = mapped_column(String(150), unique=True, index=True)
     email: Mapped[str | None] = mapped_column(String(254), unique=True)
+    email_normalized: Mapped[str | None] = mapped_column(String(254), unique=True, index=True)
     phone: Mapped[str | None] = mapped_column(String(40), unique=True)
+    phone_normalized: Mapped[str | None] = mapped_column(String(40), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(200), nullable=False)
     role: Mapped[str] = mapped_column(String(20), default="customer")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -30,6 +33,14 @@ class AccountUser(Base):
     mfa_secret_encrypted: Mapped[str | None] = mapped_column(Text())
     mfa_recovery_hashes: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     mfa_enrolled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    mfa_failed_attempts: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default="0",
+        nullable=False,
+    )
+    mfa_locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    last_totp_counter: Mapped[int | None] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -118,7 +129,7 @@ class ProductVariant(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     product_id: Mapped[int] = mapped_column(ForeignKey("catalog_products.id"), nullable=False)
-    sku: Mapped[str | None] = mapped_column(String(80))
+    sku: Mapped[str | None] = mapped_column(String(80), unique=True, index=True)
     variant_name: Mapped[str | None] = mapped_column(String(120))
     weight_kg: Mapped[Decimal] = mapped_column(Numeric(8, 3), default=Decimal("0.000"))
     length_cm: Mapped[Decimal] = mapped_column(Numeric(8, 2), default=Decimal("0.00"))

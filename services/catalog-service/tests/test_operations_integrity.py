@@ -18,10 +18,12 @@ from app.models import (
     Base,
     Category,
     Country,
+    CustomerAddress,
     ManualPaymentProof,
     Order,
     OrderItem,
     OrderStatusHistory,
+    PaymentProofAttempt,
     Product,
     ProductVariant,
     SavedQuote,
@@ -89,6 +91,19 @@ class OperationsIntegrityTests(unittest.TestCase):
             moq=1,
         )
         self.session.add_all([self.product, self.user, self.country, self.seller, self.offer])
+        self.session.add(
+            CustomerAddress(
+                user_id=CUSTOMER["sub"],
+                label="Primary",
+                recipient_name="Customer",
+                line1="1 Test Road",
+                city="Dhaka",
+                country_code="BD",
+                phone="+8801700000000",
+                is_default_shipping=True,
+                is_default_billing=True,
+            )
+        )
         self.session.commit()
 
     def tearDown(self) -> None:
@@ -209,6 +224,39 @@ class OperationsIntegrityTests(unittest.TestCase):
         self.assertEqual(raised.exception.status_code, 409)
         self.session.refresh(quote)
         self.assertEqual(quote.status, "expired")
+
+    def test_historical_payment_transaction_cannot_be_reused(self) -> None:
+        first_quote = self._quote()
+        first_order, _ = create_manual_order_record(
+            self.session,
+            self._payload(first_quote, trx_id="HISTORIC-100"),
+            CUSTOMER,
+        )
+        first_order.manual_payment.channel = "Nagad"
+        first_order.manual_payment.trx_id = "CURRENT-200"
+        first_order.manual_payment.trx_normalized = "current200"
+        self.session.commit()
+        self.assertIsNotNone(
+            self.session.scalar(
+                select(PaymentProofAttempt.id).where(
+                    PaymentProofAttempt.trx_normalized == "historic100"
+                )
+            )
+        )
+
+        second_quote = self._quote()
+        with self.assertRaises(HTTPException) as raised:
+            create_manual_order_record(
+                self.session,
+                self._payload(
+                    second_quote,
+                    trx_id="historic 100",
+                    idempotency_key="checkout-attempt-historical",
+                ),
+                CUSTOMER,
+            )
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("already been submitted", raised.exception.detail)
 
     def test_payment_decision_and_status_transitions_are_audited(self) -> None:
         order = self._raw_order()

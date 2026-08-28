@@ -1,0 +1,74 @@
+/* Saved quote cards carry more detail than compact catalog cards. */
+.account-page .saved-quotes-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr));
+  align-items: start;
+  gap: 18px;
+}
+
+.account-page .saved-quote-card {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
+.account-page .saved-quote-card > * {
+  min-width: 0;
+}
+
+.account-page .saved-quote-card h2,
+.account-page .saved-quote-card p,
+.account-page .saved-quote-card dd,
+.account-page .saved-quote-card li {
+  overflow-wrap: anywhere;
+}
+
+.account-page .saved-quote-card .workspace-ai {
+  min-width: 0;
+  margin-top: 2px;
+}
+
+.account-page .saved-quote-card .workspace-ai__header {
+  flex-wrap: wrap;
+}
+
+.account-page .saved-quote-card .workspace-ai__header > div {
+  min-width: 0;
+  flex: 1 1 230px;
+}
+
+.account-page .saved-quote-card .workspace-ai__status {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+.account-page .saved-quote-card .workspace-ai__grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr));
+}
+
+.account-page .saved-quote-card .workspace-ai__grid > div {
+  min-width: 0;
+}
+
+.account-page .saved-quote-card .form-actions {
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 680px) {
+  .account-page .saved-quote-card {
+    padding: 16px;
+  }
+
+  .account-page .saved-quote-card .workspace-ai {
+    padding: 15px;
+  }
+
+  .account-page .saved-quote-card .form-actions > * {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
+  }
+}

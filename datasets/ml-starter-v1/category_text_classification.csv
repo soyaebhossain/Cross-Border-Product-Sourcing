@@ -2,9 +2,9 @@ example_id,split,product_id,product_name,model,target_category_slug,target_categ
 category-1,validation,1,iPhone 14,A2649,phones,Phones,seed_derived,catalog_taxonomy,1
 category-2,train,2,NVIDIA RTX 4070,4070-12G,pc-components,PC Components,seed_derived,catalog_taxonomy,1
 category-3,train,3,"Xiaomi Power Bank 20,000mAh",PB200ZM,electronics,Electronics,seed_derived,catalog_taxonomy,1
-category-4,train,4,Buttom Phones,Nokia 1100,phones,Phones,seed_derived,catalog_taxonomy,1
-category-5,train,5,Light,Nokia 1100,electronics,Electronics,seed_derived,catalog_taxonomy,1
-category-6,train,6,Fan,Nova air,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-4,train,4,Nokia 1100 Feature Phone,NOKIA-1100,phones,Phones,seed_derived,catalog_taxonomy,1
+category-5,train,5,Rechargeable LED Work Light,LED-WORK-1122,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-6,validation,6,Nova Air Pedestal Fan,NOVA-AIR-55W,electronics,Electronics,seed_derived,catalog_taxonomy,1
 category-7,train,7,Haircare SKU0,SKU0,haircare,Haircare,seed_derived,catalog_taxonomy,1
 category-8,train,8,Skincare SKU1,SKU1,skincare,Skincare,seed_derived,catalog_taxonomy,1
 category-9,train,9,Haircare SKU2,SKU2,haircare,Haircare,seed_derived,catalog_taxonomy,1
@@ -140,7 +140,7 @@ category-138,test,138,Baseus 65W GaN Charger,CCGP140201,electronics,Electronics,
 category-139,train,139,"Xiaomi Smart TV A2 43""",L43M8-A2EU,electronics,Electronics,seed_derived,catalog_taxonomy,1
 category-140,test,140,"Philips 27"" 4K Monitor",27E1N5500,electronics,Electronics,seed_derived,catalog_taxonomy,1
 category-141,train,141,Logitech MX Master 3S Mouse,910-006556,electronics,Electronics,seed_derived,catalog_taxonomy,1
-category-142,validation,142,Keychron K2 Pro Keyboard,K2P-B2,electronics,Electronics,seed_derived,catalog_taxonomy,1
+category-142,train,142,Keychron K2 Pro Keyboard,K2P-B2,electronics,Electronics,seed_derived,catalog_taxonomy,1
 category-143,train,143,JBL Earbuds Live Pro 2,JBLLIVEPRO2TWS,electronics,Electronics,seed_derived,catalog_taxonomy,1
 category-144,train,144,Xiaomi Smart Band 8 Pro,BHR7208GL,electronics,Electronics,seed_derived,catalog_taxonomy,1
 category-145,train,145,TP-Link Deco XE75 Mesh WiFi,DECO XE75,electronics,Electronics,seed_derived,catalog_taxonomy,1

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import time
+from datetime import timedelta
 
 import jwt
 import pytest
@@ -13,7 +14,8 @@ from sqlalchemy.pool import StaticPool
 
 from app.config import Settings
 from app.db import Base, get_session
-from app.models import AccountUser, AuthChallenge, RefreshSession
+from app.models import AccountUser, AdminAuditEvent, AuthChallenge, RefreshSession
+from app.schemas import RegisterIn
 
 
 auth = importlib.import_module("app.auth")
@@ -171,16 +173,19 @@ def test_failed_passwords_persist_and_lock_the_account(
     created = _user(session)
     assert auth.authenticate_user(session, created["username"], "wrong-password") is None
     assert auth.authenticate_user(session, created["username"], "wrong-password") is None
-    with pytest.raises(auth.AccountLockedError) as locked:
-        auth.authenticate_user(session, created["username"], "wrong-password")
-    assert locked.value.retry_after == settings.login_lockout_seconds
+    # The threshold-crossing response remains the same generic authentication
+    # failure as the earlier attempts. Revealing the lock only after a correct
+    # password prevents the lock state from becoming an account oracle.
+    assert auth.authenticate_user(session, created["username"], "wrong-password") is None
 
     stored = session.get(AccountUser, created["id"])
     assert stored is not None
     assert stored.failed_login_attempts == settings.login_failure_limit
     assert stored.locked_until is not None
-    with pytest.raises(auth.AccountLockedError):
+    assert auth.authenticate_user(session, created["username"], "wrong-password") is None
+    with pytest.raises(auth.AccountLockedError) as locked:
         auth.authenticate_user(session, created["username"], "G7!vB2#qL9@xSecure")
+    assert 0 < locked.value.retry_after <= settings.login_lockout_seconds
 
 
 @pytest.mark.parametrize(
@@ -242,6 +247,45 @@ def test_legacy_ambiguous_login_identifier_fails_closed(
     assert second.failed_login_attempts == 0
 
 
+def test_registration_rejects_header_injection_email() -> None:
+    with pytest.raises(ValueError, match="line breaks"):
+        RegisterIn(
+            username="safe-user",
+            email="buyer@example.com\r\nBcc: attacker@example.com",
+            password="G7!vB2#qL9@xSecure",
+        )
+
+
+def test_unicode_casefold_identity_is_unique_and_login_stable(
+    session: Session,
+) -> None:
+    created = auth.create_user(
+        session,
+        username="StraßeBuyer",
+        email="unicode-buyer@example.test",
+        phone=None,
+        password="G7!vB2#qL9@xSecure",
+        role="customer",
+    )
+
+    authenticated = auth.authenticate_user(
+        session,
+        "STRASSEBUYER",
+        "G7!vB2#qL9@xSecure",
+    )
+    assert authenticated is not None
+    assert authenticated["id"] == created["id"]
+    with pytest.raises(HTTPException, match="Account already exists"):
+        auth.create_user(
+            session,
+            username="STRASSEBUYER",
+            email="other-unicode@example.test",
+            phone=None,
+            password="V8!nM4@qZ7#cSecure",
+            role="customer",
+        )
+
+
 def test_admin_mfa_enrollment_totp_and_one_time_recovery(
     session: Session,
 ) -> None:
@@ -290,6 +334,20 @@ def test_admin_mfa_enrollment_totp_and_one_time_recovery(
     assert remember is False
     assert used_recovery is False
 
+    replay_token = auth.create_mfa_challenge(
+        session,
+        verified_user,
+        purpose="login",
+        persistent=False,
+    )
+    with pytest.raises(HTTPException, match="Invalid authentication code"):
+        auth.verify_mfa_login(
+            session,
+            replay_token,
+            code=_current_totp(enrollment["secret"]),
+            recovery_code=None,
+        )
+
     recovery_token = auth.create_mfa_challenge(
         session,
         verified_user,
@@ -304,6 +362,102 @@ def test_admin_mfa_enrollment_totp_and_one_time_recovery(
     )
     assert used_recovery is True
     assert len(session.get(AccountUser, created["id"]).mfa_recovery_hashes) == 9
+
+
+def test_pending_mfa_enrollment_retry_reuses_the_same_provisioning_uri(
+    session: Session,
+) -> None:
+    """A harmless enroll/start retry must not silently change the app credential."""
+
+    created = _user(session)
+    enroll_token = auth.create_mfa_challenge(
+        session,
+        created,
+        purpose="enroll",
+        persistent=True,
+    )
+
+    first = auth.begin_mfa_enrollment(session, enroll_token)
+    retried = auth.begin_mfa_enrollment(session, enroll_token)
+
+    assert retried == first
+    assert retried["otpauth_uri"].startswith("otpauth://totp/")
+
+
+def test_restart_mfa_enrollment_rotates_pending_secret_and_resets_challenge_attempts(
+    session: Session,
+    settings: Settings,
+) -> None:
+    created = _user(session)
+    enroll_token = auth.create_mfa_challenge(
+        session,
+        created,
+        purpose="enroll",
+        persistent=True,
+    )
+    first = auth.begin_mfa_enrollment(session, enroll_token)
+    challenge_id = jwt.decode(
+        enroll_token,
+        settings.jwt_secret,
+        algorithms=["HS256"],
+    )["jti"]
+    challenge = session.get(AuthChallenge, challenge_id)
+    assert challenge is not None
+    challenge.failed_attempts = 2
+    session.commit()
+
+    restarted, user = auth.restart_mfa_enrollment(session, enroll_token)
+
+    assert user["id"] == created["id"]
+    assert restarted["secret"] != first["secret"]
+    assert restarted["otpauth_uri"] != first["otpauth_uri"]
+    assert challenge.failed_attempts == 0
+    stored = session.get(AccountUser, created["id"])
+    assert stored is not None
+    assert stored.mfa_enabled is False
+    assert stored.mfa_secret_encrypted != restarted["secret"]
+    assert auth._decrypt_totp_secret(stored.mfa_secret_encrypted) == restarted["secret"]
+
+
+def test_expired_mfa_enrollment_challenge_cannot_be_restarted(
+    session: Session,
+    settings: Settings,
+) -> None:
+    """An expired token cannot mint or recover a credential without a new password login."""
+
+    created = _user(session)
+    enroll_token = auth.create_mfa_challenge(
+        session,
+        created,
+        purpose="enroll",
+        persistent=True,
+    )
+    challenge_id = jwt.decode(
+        enroll_token,
+        settings.jwt_secret,
+        algorithms=["HS256"],
+    )["jti"]
+    challenge = session.get(AuthChallenge, challenge_id)
+    assert challenge is not None
+    challenge.expires_at = auth._now() - timedelta(seconds=1)
+    session.commit()
+
+    with pytest.raises(HTTPException, match="expired or already used"):
+        auth.begin_mfa_enrollment(session, enroll_token)
+    with pytest.raises(HTTPException, match="expired or already used"):
+        auth.restart_mfa_enrollment(session, enroll_token)
+
+
+def test_totp_validation_allows_only_one_adjacent_time_step(settings: Settings) -> None:
+    secret = "JBSWY3DPEHPK3PXP"
+    counter = 60_000_000
+    timestamp = (counter * 30) + 15
+
+    assert auth.verify_totp(secret, auth._totp(secret, counter), timestamp=timestamp)
+    assert auth.verify_totp(secret, auth._totp(secret, counter - 1), timestamp=timestamp)
+    assert auth.verify_totp(secret, auth._totp(secret, counter + 1), timestamp=timestamp)
+    assert not auth.verify_totp(secret, auth._totp(secret, counter - 2), timestamp=timestamp)
+    assert not auth.verify_totp(secret, auth._totp(secret, counter + 2), timestamp=timestamp)
 
 
 def test_refresh_tokens_rotate_and_replay_revokes_the_family(
@@ -357,6 +511,39 @@ def test_mfa_challenge_attempt_limit_locks_account(
     user = session.get(AccountUser, created["id"])
     assert challenge is not None and challenge.consumed_at is not None
     assert user is not None and user.locked_until is not None
+    assert user.mfa_locked_until is not None
+
+
+def test_mfa_failures_accumulate_across_rotated_challenges(
+    session: Session,
+    settings: Settings,
+) -> None:
+    created = _user(session)
+    user = session.get(AccountUser, created["id"])
+    assert user is not None
+    secret = auth._new_totp_secret()
+    user.mfa_enabled = True
+    user.mfa_secret_encrypted = auth._fernet().encrypt(secret.encode()).decode()
+    session.commit()
+
+    for _ in range(settings.mfa_challenge_attempt_limit):
+        challenge_token = auth.create_mfa_challenge(
+            session,
+            auth._user_to_dict(user),
+            purpose="login",
+            persistent=False,
+        )
+        with pytest.raises(HTTPException):
+            auth.verify_mfa_login(
+                session,
+                challenge_token,
+                code="000000",
+                recovery_code=None,
+            )
+
+    session.refresh(user)
+    assert user.mfa_failed_attempts == settings.mfa_challenge_attempt_limit
+    assert user.mfa_locked_until is not None
 
 
 def test_access_token_version_invalidates_after_security_change(
@@ -413,11 +600,29 @@ def test_privileged_login_issues_no_session_before_mfa_confirmation(
             json={"mfa_token": challenge_token},
         )
         assert enrollment.status_code == 200
+        restarted = client.post(
+            "/api/auth/mfa/enroll/restart/",
+            json={"mfa_token": challenge_token},
+        )
+        assert restarted.status_code == 200
+        assert restarted.json()["secret"] != enrollment.json()["secret"]
+        assert restarted.json()["otpauth_uri"].startswith("otpauth://totp/")
+        audit = session.scalar(
+            select(AdminAuditEvent).where(
+                AdminAuditEvent.action == "auth.mfa.enrollment_restarted"
+            )
+        )
+        assert audit is not None
+        assert audit.actor_user_id == created["id"]
+        assert audit.before_data is None
+        assert audit.after_data is None
+        assert enrollment.json()["secret"] not in (audit.note or "")
+        assert restarted.json()["secret"] not in (audit.note or "")
         confirmation = client.post(
             "/api/auth/mfa/enroll/confirm/",
             json={
                 "mfa_token": challenge_token,
-                "code": _current_totp(enrollment.json()["secret"]),
+                "code": _current_totp(restarted.json()["secret"]),
             },
         )
         assert confirmation.status_code == 200

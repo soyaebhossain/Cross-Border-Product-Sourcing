@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { createOrder, getSavedQuote, type SavedQuote } from "../../../../../lib/api";
+import {
+  listCustomerAddresses,
+  type CustomerAddress,
+} from "../../../../../lib/customer-api";
 import { formatBdt, formatDateTime } from "../../../../../lib/format";
 import { useLocale } from "../../../../../lib/locale-context";
 
@@ -10,6 +15,7 @@ export default function CreateOrderFromQuotePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [quote, setQuote] = useState<SavedQuote | null>(null);
+  const [addresses, setAddresses] = useState<CustomerAddress[]>([]);
   const [channel, setChannel] = useState("bKash");
   const [trxId, setTrxId] = useState("");
   const [screenshotUrl, setScreenshotUrl] = useState("");
@@ -26,8 +32,11 @@ export default function CreateOrderFromQuotePage() {
     const generatedKey = `quote-${params.id}-${crypto.randomUUID()}`;
     idempotencyKey.current = existingKey || generatedKey;
     if (!existingKey) window.sessionStorage.setItem(storageKey, generatedKey);
-    getSavedQuote(params.id)
-      .then(setQuote)
+    Promise.all([getSavedQuote(params.id), listCustomerAddresses()])
+      .then(([savedQuote, customerAddresses]) => {
+        setQuote(savedQuote);
+        setAddresses(customerAddresses);
+      })
       .catch(() => setError(bn ? "সেভড কোট লোড করা যায়নি। সাইন ইন করে আবার চেষ্টা করুন।" : "This saved quote could not be loaded. Please sign in and try again."))
       .finally(() => setLoading(false));
   }, [params.id, bn]);
@@ -36,6 +45,12 @@ export default function CreateOrderFromQuotePage() {
     event.preventDefault();
     if (!quote || !trxId.trim()) {
       setError(bn ? "অর্ডার করতে payment transaction ID দিন।" : "Enter your payment transaction ID to place the order.");
+      return;
+    }
+    const defaultShipping = addresses.find((item) => item.is_default_shipping);
+    const defaultBilling = addresses.find((item) => item.is_default_billing);
+    if (!defaultShipping || !defaultBilling) {
+      setError(bn ? "অর্ডারের আগে ডিফল্ট শিপিং ও বিলিং ঠিকানা যোগ করুন।" : "Add default shipping and billing addresses before placing the order.");
       return;
     }
     if ((quote.expires_at && new Date(quote.expires_at).getTime() < Date.now()) || quote.order_ids?.length) {
@@ -58,8 +73,8 @@ export default function CreateOrderFromQuotePage() {
         screenshot_url: screenshotUrl.trim() || undefined,
       });
       router.push(`/account/orders/${result.order_id}`);
-    } catch {
-      setError(bn ? "অর্ডার তৈরি করা যায়নি। Transaction ID, quote expiry এবং sign-in যাচাই করুন।" : "Order could not be created. Check the transaction ID, quote expiry and sign-in.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : (bn ? "অর্ডার তৈরি করা যায়নি। Transaction ID, quote expiry এবং sign-in যাচাই করুন।" : "Order could not be created. Check the transaction ID, quote expiry and sign-in."));
     } finally {
       setSubmitting(false);
     }
@@ -71,6 +86,9 @@ export default function CreateOrderFromQuotePage() {
   const breakdown = quote.response?.breakdown;
   const expired = Boolean(quote.expires_at && new Date(quote.expires_at).getTime() < Date.now());
   const ordered = Boolean(quote.order_ids?.length);
+  const defaultShipping = addresses.find((item) => item.is_default_shipping);
+  const defaultBilling = addresses.find((item) => item.is_default_billing);
+  const addressReady = Boolean(defaultShipping && defaultBilling);
   return (
       <section className="account-page">
         <div className="section__header">
@@ -84,6 +102,17 @@ export default function CreateOrderFromQuotePage() {
           <div><strong>{bn ? "মোট locked মূল্য" : "Locked total"}</strong><span>{formatBdt(breakdown?.total_bdt, intlLocale)}</span></div>
           <div><strong>{bn ? "প্রয়োজনীয় অগ্রিম" : "Advance required"}</strong><span>{formatBdt(breakdown?.advance_bdt, intlLocale)}</span></div>
           <div><strong>{bn ? "বাকি" : "Remaining"}</strong><span>{formatBdt(breakdown?.remaining_bdt, intlLocale)}</span></div>
+        </div>
+        <div className={`account-alert ${addressReady ? "account-alert--success" : "account-alert--danger"}`} role={addressReady ? "status" : "alert"}>
+          <strong>{addressReady ? (bn ? "ডেলিভারি ঠিকানা প্রস্তুত" : "Delivery addresses ready") : (bn ? "ডেলিভারি ঠিকানা প্রয়োজন" : "Delivery addresses required")}</strong>
+          {addressReady ? (
+            <span>
+              {bn ? "শিপিং" : "Shipping"}: {defaultShipping?.label} · {defaultShipping?.line1}, {defaultShipping?.city}
+              {defaultBilling?.id !== defaultShipping?.id ? ` · ${bn ? "বিলিং" : "Billing"}: ${defaultBilling?.label}` : ` · ${bn ? "শিপিং ও বিলিং উভয়ের জন্য" : "also used for billing"}`}
+            </span>
+          ) : (
+            <span>{bn ? "পেমেন্ট রেফারেন্স দেওয়ার আগে প্রোফাইলে একটি ডিফল্ট শিপিং ও বিলিং ঠিকানা সেট করুন।" : "Set default shipping and billing addresses in your profile before submitting payment."} <Link href="/account/profile">{bn ? "ঠিকানা যোগ করুন →" : "Add addresses →"}</Link></span>
+          )}
         </div>
         <form className="form-card" onSubmit={submit}>
           <p className="form-note">{bn ? "কোটের অগ্রিম পরিশোধ করে payment reference দিন। Admin যাচাই না করা পর্যন্ত অর্ডার pending থাকবে।" : "Pay the quoted advance, then submit the payment reference. The order remains pending until an admin verifies it."}</p>
@@ -108,7 +137,7 @@ export default function CreateOrderFromQuotePage() {
             </div>
           </div>
           <div className="form-actions">
-            <button className="button button--primary" type="submit" disabled={submitting || expired || ordered}>{submitting ? (bn ? "অর্ডার হচ্ছে…" : "Placing order…") : (bn ? "নিশ্চিত করে অর্ডার করুন" : "Confirm and place order")}</button>
+            <button className="button button--primary" type="submit" disabled={submitting || expired || ordered || !addressReady}>{submitting ? (bn ? "অর্ডার হচ্ছে…" : "Placing order…") : (bn ? "নিশ্চিত করে অর্ডার করুন" : "Confirm and place order")}</button>
             {error ? <div className="form-error" role="alert">{error}</div> : null}
           </div>
         </form>

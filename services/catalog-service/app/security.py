@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import contextvars
 import hashlib
+import hmac
+import ipaddress
 import json
 import logging
 import math
@@ -18,7 +20,7 @@ from fastapi import HTTPException, Request, status
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import JSONResponse, Response
 
-from .config import Settings
+from .config import Settings, get_settings
 
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
@@ -237,8 +239,41 @@ class SlidingWindowRateLimiter:
 auth_rate_limiter = SlidingWindowRateLimiter()
 
 
+def _signed_proxy_client_ip(request: Request) -> str | None:
+    settings = get_settings()
+    if not settings.signed_proxy_identity_configured:
+        return None
+    client_ip = (request.headers.get("x-sourceai-client-ip") or "").strip()
+    timestamp_raw = (
+        request.headers.get("x-sourceai-proxy-timestamp") or ""
+    ).strip()
+    provided_signature = (
+        request.headers.get("x-sourceai-proxy-signature") or ""
+    ).strip().lower()
+    try:
+        normalized_ip = str(ipaddress.ip_address(client_ip))
+        timestamp = int(timestamp_raw)
+    except (ValueError, TypeError):
+        return None
+    if abs(int(time.time()) - timestamp) > 60:
+        return None
+    secret = settings.proxy_shared_secret
+    if secret is None:
+        return None
+    expected_signature = hmac.new(
+        secret.get_secret_value().encode(),
+        f"{normalized_ip}\n{timestamp}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(expected_signature, provided_signature):
+        return None
+    return normalized_ip
+
+
 def client_rate_key(request: Request, scope: str, discriminator: str | None = None) -> str:
-    client_host = request.client.host if request.client else "unknown"
+    client_host = _signed_proxy_client_ip(request) or (
+        request.client.host if request.client else "unknown"
+    )
     key = f"{scope}:{client_host}"
     if discriminator:
         digest = hashlib.sha256(discriminator.strip().lower().encode()).hexdigest()[:24]

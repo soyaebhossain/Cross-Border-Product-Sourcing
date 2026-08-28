@@ -104,7 +104,7 @@ def analytics(
         len({
             order.saved_quote_id
             for order in orders
-            if order.saved_quote_id is not None
+            if order.saved_quote_id is not None and order.status != "CANCELLED"
         }),
         len(quotes),
     )

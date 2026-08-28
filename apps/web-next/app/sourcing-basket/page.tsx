@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { ProductImage } from "../../components/product-image";
 import { QuantitySelector, RiskBadge } from "../../components/sourcing-ui";
-import { quoteProductWithAi, saveQuote } from "../../lib/api";
+import { ApiError, quoteProductWithAi, saveQuote } from "../../lib/api";
 import { useLocale } from "../../lib/locale-context";
 import { useSourcingBasket } from "../../lib/sourcing-basket";
 import { localizedCatalogLabel, sourcingText } from "../../lib/sourcing-copy";
@@ -17,25 +17,53 @@ export default function SourcingBasketPage() {
   const { items, itemCount, estimatedProductTotal, removeItem, updateItem } = useSourcingBasket();
   const { locale } = useLocale();
   const [requesting, setRequesting] = useState(false);
-  const [result, setResult] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [result, setResult] = useState<{ type: "success" | "error"; message: string; signIn?: boolean } | null>(null);
 
   const requestQuotes = async () => {
     if (!items.length) return;
     setRequesting(true);
     setResult(null);
     let saved = 0;
-    try {
-      for (const item of items) {
-        const response = await quoteProductWithAi({ variant_id: item.variantId, country: item.countryCode, mode: "LOCAL", qty: item.quantity, delivery_type: "DOOR", language: locale });
+    for (const item of items) {
+      let response;
+      try {
+        response = await quoteProductWithAi({ variant_id: item.variantId, country: item.countryCode, mode: "LOCAL", qty: item.quantity, delivery_type: "DOOR", language: locale });
+      } catch (reason) {
+        const detail = reason instanceof ApiError && reason.status < 500 ? reason.message : null;
+        setResult({
+          type: "error",
+          message: detail || (locale === "bn" ? "এই মুহূর্তে কোট হিসাব করা যাচ্ছে না। কিছুক্ষণ পর আবার চেষ্টা করুন।" : "The quote could not be calculated right now. Please try again shortly."),
+        });
+        setRequesting(false);
+        return;
+      }
+
+      try {
         await saveQuote({ variant_id: item.variantId, country: item.countryCode, mode: "LOCAL", qty: item.quantity, delivery_type: "DOOR", response });
         saved += 1;
+      } catch (reason) {
+        if (reason instanceof ApiError && reason.status === 401) {
+          setResult({
+            type: "error",
+            message: locale === "bn"
+              ? "কোট হিসাব হয়েছে, কিন্তু সংরক্ষণ করতে সাইন ইন প্রয়োজন। আপনার basket এই browser-এ সংরক্ষিত আছে।"
+              : "Your quote was calculated, but you need to sign in to save it. Your basket remains saved in this browser.",
+            signIn: true,
+          });
+        } else {
+          setResult({
+            type: "error",
+            message: saved
+              ? (locale === "bn" ? `${saved}টি কোট সংরক্ষিত হয়েছে; পরের কোটটি সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।` : `${saved} quote${saved === 1 ? "" : "s"} saved; the next quote could not be saved. Please try again.`)
+              : (locale === "bn" ? "কোট হিসাব হয়েছে, কিন্তু এখন সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।" : "The quote was calculated but could not be saved. Please try again."),
+          });
+        }
+        setRequesting(false);
+        return;
       }
-      setResult({ type: "success", message: locale === "bn" ? `${saved}টি কোট সফলভাবে তৈরি ও সংরক্ষণ হয়েছে।` : `${saved} quote${saved === 1 ? "" : "s"} created and saved successfully.` });
-    } catch {
-      setResult({ type: "error", message: saved ? (locale === "bn" ? `${saved}টি কোট সংরক্ষণ হয়েছে; বাকি কোটগুলো সম্পন্ন হয়নি। আবার চেষ্টা করুন।` : `${saved} quote${saved === 1 ? "" : "s"} saved; the remaining requests could not be completed. Please try again.`) : (locale === "bn" ? "কোট service এখন পাওয়া যাচ্ছে না অথবা কোট সংরক্ষণ করতে sign in প্রয়োজন। আপনার বাস্কেট সংরক্ষিত আছে।" : "The quote service is unavailable or sign-in is required to save quotes. Your basket is still saved.") });
-    } finally {
-      setRequesting(false);
     }
+    setResult({ type: "success", message: locale === "bn" ? `${saved}টি কোট সফলভাবে তৈরি ও সংরক্ষণ হয়েছে।` : `${saved} quote${saved === 1 ? "" : "s"} created and saved successfully.` });
+    setRequesting(false);
   };
 
   if (!items.length) return <main className="sourcing-basket-page"><section className="basket-empty-state"><h1>{sourcingText(locale, "basketEmpty")}</h1><p>{sourcingText(locale, "basketEmptyHelp")}</p><Link className="button button--primary" href="/products">{sourcingText(locale, "continueSourcing")}</Link></section></main>;
@@ -62,7 +90,7 @@ export default function SourcingBasketPage() {
           </article>;
         })}
       </section>
-      <aside className="basket-summary"><h2>{locale === "bn" ? "অনুরোধের সারাংশ" : "Request summary"}</h2><div className="basket-summary__row"><span>{locale === "bn" ? "পণ্যের সংখ্যা" : "Basket items"}</span><strong>{new Intl.NumberFormat(locale === "bn" ? "bn-BD" : "en-US").format(itemCount)}</strong></div><div className="basket-summary__row basket-summary__row--total"><span>{sourcingText(locale, "estimatedProductCost")}</span><strong>{money(estimatedProductTotal, "USD", locale)}</strong></div><p className="pricing-disclaimer">{sourcingText(locale, "shippingDisclaimer")}</p><p className="pricing-disclaimer">{sourcingText(locale, "finalQuoteDisclaimer")}</p><button type="button" className="button button--primary" onClick={requestQuotes} disabled={requesting}>{requesting ? (locale === "bn" ? "কোট তৈরি হচ্ছে…" : "Creating quotes…") : sourcingText(locale, itemCount === 1 ? "requestQuote" : "requestQuotes")}</button>{result ? <div className={`basket-summary__message${result.type === "error" ? " basket-summary__message--error" : ""}`} role="status">{result.message}{result.type === "success" ? <><br /><Link href="/account/saved-quotes">{locale === "bn" ? "সংরক্ষিত কোট দেখুন" : "View saved quotes"}</Link></> : null}</div> : null}</aside>
+      <aside className="basket-summary"><h2>{locale === "bn" ? "অনুরোধের সারাংশ" : "Request summary"}</h2><div className="basket-summary__row"><span>{locale === "bn" ? "পণ্যের সংখ্যা" : "Basket items"}</span><strong>{new Intl.NumberFormat(locale === "bn" ? "bn-BD" : "en-US").format(itemCount)}</strong></div><div className="basket-summary__row basket-summary__row--total"><span>{sourcingText(locale, "estimatedProductCost")}</span><strong>{money(estimatedProductTotal, "USD", locale)}</strong></div><p className="pricing-disclaimer">{sourcingText(locale, "shippingDisclaimer")}</p><p className="pricing-disclaimer">{sourcingText(locale, "finalQuoteDisclaimer")}</p><button type="button" className="button button--primary" onClick={requestQuotes} disabled={requesting}>{requesting ? (locale === "bn" ? "কোট তৈরি হচ্ছে…" : "Creating quotes…") : sourcingText(locale, itemCount === 1 ? "requestQuote" : "requestQuotes")}</button>{result ? <div className={`basket-summary__message${result.type === "error" ? " basket-summary__message--error" : ""}`} role="status">{result.message}{result.signIn ? <><br /><Link href="/login">{locale === "bn" ? "সাইন ইন করুন" : "Sign in to save the quote"}</Link></> : null}{result.type === "success" ? <><br /><Link href="/account/saved-quotes">{locale === "bn" ? "সংরক্ষিত কোট দেখুন" : "View saved quotes"}</Link></> : null}</div> : null}</aside>
     </div>
   </main>;
 }

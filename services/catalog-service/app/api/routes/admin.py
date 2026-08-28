@@ -27,6 +27,11 @@ from ...models import (
     SellerOffer,
 )
 from ...schemas import AdminPaymentDecisionIn
+from ...supplier_risk import (
+    HIGH_RISK_RATING_CUTOFF,
+    MEDIUM_RISK_RATING_CUTOFF,
+    supplier_risk_label,
+)
 from ...services.orders import (
     decide_manual_payment_record,
     order_loader_options,
@@ -47,6 +52,13 @@ ORDER_STAGES = (
 PAYMENT_DECISIONS = ("PENDING", "APPROVED", "REJECTED", "REVERSED")
 ACTIVE_ORDER_STATUSES = tuple(
     status for status in ORDER_STAGES if status not in {"DELIVERED", "CANCELLED"}
+)
+OUTSTANDING_ORDER_STATUSES = (
+    "CONFIRMED",
+    "PURCHASED",
+    "IN_TRANSIT",
+    "CUSTOMS",
+    "LOCAL_DISPATCH",
 )
 MAX_OVERVIEW_DAYS = 366
 
@@ -251,7 +263,20 @@ def _order_filters(
     country: str | None,
     mode: str | None,
 ) -> list[Any]:
-    filters: list[Any] = [Order.created_at >= start_at, Order.created_at < end_at]
+    return [
+        Order.created_at >= start_at,
+        Order.created_at < end_at,
+        *_order_dimensions(status=status, country=country, mode=mode),
+    ]
+
+
+def _order_dimensions(
+    *,
+    status: str | None,
+    country: str | None,
+    mode: str | None,
+) -> list[Any]:
+    filters: list[Any] = []
     if status:
         if status not in ORDER_STAGES:
             raise HTTPException(status_code=422, detail="Unknown order status")
@@ -265,7 +290,16 @@ def _order_filters(
     return filters
 
 
-def _period_metrics(session: Session, filters: list[Any]) -> dict[str, Decimal | int]:
+def _period_metrics(
+    session: Session,
+    filters: list[Any],
+    *,
+    start_at: datetime,
+    end_at: datetime,
+    status: str | None,
+    country: str | None,
+    mode: str | None,
+) -> dict[str, Decimal | int]:
     row = session.execute(
         select(
             func.count(Order.id),
@@ -277,42 +311,45 @@ def _period_metrics(session: Session, filters: list[Any]) -> dict[str, Decimal |
                 func.sum(case((Order.status != "CANCELLED", Order.shipping_bdt), else_=0)),
                 0,
             ),
-            func.coalesce(
-                func.sum(
-                    case(
-                        (
-                            and_(
-                                Order.status != "CANCELLED",
-                                ManualPaymentProof.verified.is_(True),
-                            ),
-                            Order.advance_bdt,
-                        ),
-                        else_=0,
-                    )
-                ),
-                0,
-            ),
-            func.coalesce(
-                func.sum(
-                    case(
-                        (Order.status.in_(ACTIVE_ORDER_STATUSES), Order.remaining_bdt),
-                        else_=0,
-                    )
-                ),
-                0,
-            ),
         )
         .select_from(Order)
-        .outerjoin(ManualPaymentProof, ManualPaymentProof.order_id == Order.id)
         .where(*filters)
     ).one()
+    verified_advance = session.scalar(
+        select(func.coalesce(func.sum(Order.advance_bdt), 0))
+        .join(ManualPaymentProof, ManualPaymentProof.order_id == Order.id)
+        .where(
+            Order.status != "CANCELLED",
+            ManualPaymentProof.decision == "APPROVED",
+            ManualPaymentProof.verified.is_(True),
+            ManualPaymentProof.verified_at >= start_at,
+            ManualPaymentProof.verified_at < end_at,
+            *_order_dimensions(status=status, country=country, mode=mode),
+        )
+    )
     return {
         "total_orders": int(row[0] or 0),
         "gross_order_value_bdt": _decimal(row[1]),
         "shipping_value_bdt": _decimal(row[2]),
-        "verified_advance_bdt": _decimal(row[3]),
-        "outstanding_bdt": _decimal(row[4]),
+        "verified_advance_bdt": _decimal(verified_advance),
     }
+
+
+def _outstanding_balance(
+    session: Session,
+    *,
+    status: str | None,
+    country: str | None,
+    mode: str | None,
+) -> Decimal:
+    return _decimal(
+        session.scalar(
+            select(func.coalesce(func.sum(Order.remaining_bdt), 0)).where(
+                Order.status.in_(OUTSTANDING_ORDER_STATUSES),
+                *_order_dimensions(status=status, country=country, mode=mode),
+            )
+        )
+    )
 
 
 def _metric_comparison(current: dict[str, Decimal | int], previous: dict[str, Decimal | int]) -> dict[str, Any]:
@@ -336,15 +373,21 @@ def _metric_comparison(current: dict[str, Decimal | int], previous: dict[str, De
     return result
 
 
-def _local_day_expression(session: Session, timezone_name: str, zone: ZoneInfo, anchor: date):
+def _local_day_expression(
+    session: Session,
+    column: Any,
+    timezone_name: str,
+    zone: ZoneInfo,
+    anchor: date,
+):
     if session.bind and session.bind.dialect.name == "sqlite":
         offset = zone.utcoffset(datetime.combine(anchor, time(12), tzinfo=zone)) or timedelta()
         total_minutes = int(offset.total_seconds() // 60)
         sign = "+" if total_minutes >= 0 else "-"
         hours, minutes = divmod(abs(total_minutes), 60)
         modifier = f"{sign}{hours:02d}:{minutes:02d}"
-        return func.date(Order.created_at, modifier)
-    return func.date(func.timezone(timezone_name, Order.created_at))
+        return func.date(column, modifier)
+    return func.date(func.timezone(timezone_name, column))
 
 
 @router.get("/api/admin/overview/")
@@ -373,7 +416,21 @@ def overview(
         country=country,
         mode=mode,
     )
-    metrics = _period_metrics(session, filters)
+    metrics = _period_metrics(
+        session,
+        filters,
+        start_at=start_at,
+        end_at=end_at,
+        status=status,
+        country=country,
+        mode=mode,
+    )
+    outstanding_balance = _outstanding_balance(
+        session,
+        status=status,
+        country=country,
+        mode=mode,
+    )
 
     duration_days = (end_date - start_date).days + 1
     previous_end_date = start_date - timedelta(days=1)
@@ -391,40 +448,75 @@ def overview(
         country=country,
         mode=mode,
     )
-    previous_metrics = _period_metrics(session, previous_filters) if compare else {}
+    previous_metrics = (
+        _period_metrics(
+            session,
+            previous_filters,
+            start_at=previous_start,
+            end_at=previous_end,
+            status=status,
+            country=country,
+            mode=mode,
+        )
+        if compare
+        else {}
+    )
 
-    day_expression = _local_day_expression(session, timezone_name, zone, start_date).label("local_day")
-    daily_rows = session.execute(
+    order_day_expression = _local_day_expression(
+        session, Order.created_at, timezone_name, zone, start_date
+    ).label("local_day")
+    daily_order_rows = session.execute(
         select(
-            day_expression,
+            order_day_expression,
             func.count(Order.id),
             func.coalesce(func.sum(Order.total_bdt), 0),
             func.coalesce(func.sum(Order.shipping_bdt), 0),
-            func.coalesce(
-                func.sum(
-                    case(
-                        (ManualPaymentProof.verified.is_(True), Order.advance_bdt),
-                        else_=0,
-                    )
-                ),
-                0,
-            ),
         )
         .select_from(Order)
-        .outerjoin(ManualPaymentProof, ManualPaymentProof.order_id == Order.id)
         .where(*filters, Order.status != "CANCELLED")
-        .group_by(day_expression)
-        .order_by(day_expression)
+        .group_by(order_day_expression)
+        .order_by(order_day_expression)
     ).all()
     daily_by_date = {
         str(row[0]): {
             "orders": int(row[1]),
             "order_value_bdt": _money(row[2]),
             "shipping_bdt": _money(row[3]),
-            "verified_advance_bdt": _money(row[4]),
+            "verified_advance_bdt": "0.00",
         }
-        for row in daily_rows
+        for row in daily_order_rows
     }
+    payment_day_expression = _local_day_expression(
+        session, ManualPaymentProof.verified_at, timezone_name, zone, start_date
+    ).label("local_day")
+    daily_payment_rows = session.execute(
+        select(
+            payment_day_expression,
+            func.coalesce(func.sum(Order.advance_bdt), 0),
+        )
+        .join(Order, Order.id == ManualPaymentProof.order_id)
+        .where(
+            Order.status != "CANCELLED",
+            ManualPaymentProof.decision == "APPROVED",
+            ManualPaymentProof.verified.is_(True),
+            ManualPaymentProof.verified_at >= start_at,
+            ManualPaymentProof.verified_at < end_at,
+            *_order_dimensions(status=status, country=country, mode=mode),
+        )
+        .group_by(payment_day_expression)
+        .order_by(payment_day_expression)
+    ).all()
+    for row in daily_payment_rows:
+        item = daily_by_date.setdefault(
+            str(row[0]),
+            {
+                "orders": 0,
+                "order_value_bdt": "0.00",
+                "shipping_bdt": "0.00",
+                "verified_advance_bdt": "0.00",
+            },
+        )
+        item["verified_advance_bdt"] = _money(row[1])
     daily_revenue = []
     cursor = start_date
     while cursor <= end_date:
@@ -593,7 +685,7 @@ def overview(
         "active_orders": active_orders,
         "gross_order_value_bdt": _money(metrics["gross_order_value_bdt"]),
         "verified_advance_bdt": _money(metrics["verified_advance_bdt"]),
-        "outstanding_bdt": _money(metrics["outstanding_bdt"]),
+        "outstanding_bdt": _money(outstanding_balance),
         "shipping_value_bdt": _money(metrics["shipping_value_bdt"]),
     }
     return {
@@ -643,7 +735,7 @@ def overview(
                 "name": seller.name,
                 "country": seller.country.name,
                 "rating": float(seller.rating),
-                "risk": "High" if seller.rating < 3.5 else "Medium" if seller.rating < 4.2 else "Low",
+                "risk": supplier_risk_label(seller.rating),
             }
             for seller in sellers
         ],
@@ -960,14 +1052,14 @@ def list_admin_suppliers(
     if country:
         statement = statement.where(Seller.country.has(Country.code == country.upper()))
     if risk == "High":
-        statement = statement.where(Seller.rating < Decimal("3.50"))
+        statement = statement.where(Seller.rating < HIGH_RISK_RATING_CUTOFF)
     elif risk == "Medium":
         statement = statement.where(
-            Seller.rating >= Decimal("3.50"),
-            Seller.rating < Decimal("4.20"),
+            Seller.rating >= HIGH_RISK_RATING_CUTOFF,
+            Seller.rating < MEDIUM_RISK_RATING_CUTOFF,
         )
     elif risk == "Low":
-        statement = statement.where(Seller.rating >= Decimal("4.20"))
+        statement = statement.where(Seller.rating >= MEDIUM_RISK_RATING_CUTOFF)
     elif risk:
         raise HTTPException(status_code=422, detail="Unknown supplier risk")
     search = q.strip()
@@ -999,7 +1091,7 @@ def list_admin_suppliers(
             "name": seller.name,
             "country": {"code": seller.country.code, "name": seller.country.name},
             "rating": float(seller.rating),
-            "risk": "High" if seller.rating < 3.5 else "Medium" if seller.rating < 4.2 else "Low",
+            "risk": supplier_risk_label(seller.rating),
             "note": seller.note,
             "offer_count": offer_counts.get(seller.id, 0),
             "is_active": seller.is_active,

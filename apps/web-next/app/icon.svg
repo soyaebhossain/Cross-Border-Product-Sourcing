@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="SourceAI">
+  <defs>
+    <linearGradient id="sourceai-mark" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2b6ff3"/>
+      <stop offset="1" stop-color="#0d2347"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#sourceai-mark)"/>
+  <path d="M42.5 19.5c-3-2.2-6.5-3.3-10.2-3.3-7.2 0-12 3.7-12 9.4 0 5.2 3.4 7.7 10.8 9.3 4.6 1 6 2 6 4.1 0 2.3-2.1 3.7-5.4 3.7-4 0-7.6-1.5-10.8-4.4l-3.7 4.5c4 3.7 8.8 5.5 14.3 5.5 7.6 0 12.6-3.8 12.6-9.8 0-5.5-3.5-8-11.2-9.7-4.3-.9-5.7-1.8-5.7-3.7 0-2.1 1.9-3.4 5-3.4 3 0 5.9 1 8.6 3z" fill="#fff"/>
+</svg>

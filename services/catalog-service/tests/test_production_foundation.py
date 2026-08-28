@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import importlib
 import json
 import logging
+import time
 from types import SimpleNamespace
 
 from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from fastapi.testclient import TestClient
 from starlette.requests import Request
@@ -14,8 +18,11 @@ from starlette.responses import JSONResponse
 
 from app.api.routes.catalog import readiness
 from app.config import Settings
-from app.db import Base
-from app.security import RequestLoggingMiddleware
+from app.db import Base, configure_sqlite_foreign_keys
+from app.security import RequestLoggingMiddleware, client_rate_key
+
+
+security_module = importlib.import_module("app.security")
 
 
 app_module = importlib.import_module("app.api.app")
@@ -26,6 +33,7 @@ def _request(
     *,
     query: str = "",
     request_id: str | None = None,
+    extra_headers: dict[str, str] | None = None,
 ) -> Request:
     headers: list[tuple[bytes, bytes]] = [
         (b"authorization", b"Bearer header-secret"),
@@ -33,6 +41,8 @@ def _request(
     ]
     if request_id is not None:
         headers.append((b"x-request-id", request_id.encode()))
+    for key, value in (extra_headers or {}).items():
+        headers.append((key.lower().encode(), value.encode()))
     return Request(
         {
             "type": "http",
@@ -141,6 +151,43 @@ def test_invalid_incoming_request_id_is_replaced(caplog) -> None:
     assert json.loads(caplog.records[-1].message)["request_id"] == request_id
 
 
+def test_rate_limit_uses_only_cryptographically_signed_proxy_client_ip(
+    monkeypatch,
+) -> None:
+    secret = "proxy-test-secret-that-is-longer-than-thirty-two-characters"
+    timestamp = int(time.time())
+    client_ip = "203.0.113.25"
+    signature = hmac.new(
+        secret.encode(),
+        f"{client_ip}\n{timestamp}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    monkeypatch.setattr(
+        security_module,
+        "get_settings",
+        lambda: _settings(proxy_shared_secret=secret),
+    )
+    signed = _request(
+        "/api/auth/login/",
+        extra_headers={
+            "x-sourceai-client-ip": client_ip,
+            "x-sourceai-proxy-timestamp": str(timestamp),
+            "x-sourceai-proxy-signature": signature,
+        },
+    )
+    forged = _request(
+        "/api/auth/login/",
+        extra_headers={
+            "x-sourceai-client-ip": "198.51.100.99",
+            "x-sourceai-proxy-timestamp": str(timestamp),
+            "x-sourceai-proxy-signature": signature,
+        },
+    )
+
+    assert client_rate_key(signed, "login") == f"login:{client_ip}"
+    assert client_rate_key(forged, "login") == "login:127.0.0.1"
+
+
 def test_readiness_checks_database_and_required_schema() -> None:
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
@@ -164,6 +211,26 @@ def test_readiness_checks_database_and_required_schema() -> None:
     unavailable_payload = json.loads(unavailable.body)
     assert unavailable_payload["database"] == "unavailable"
     assert unavailable_payload["password_reset_email_configured"] is False
+
+
+def test_sqlite_connections_enforce_foreign_keys() -> None:
+    engine = create_engine("sqlite:///:memory:")
+    configure_sqlite_foreign_keys(engine)
+    with engine.begin() as connection:
+        connection.execute(text("CREATE TABLE parent (id INTEGER PRIMARY KEY)"))
+        connection.execute(
+            text(
+                "CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER "
+                "REFERENCES parent(id))"
+            )
+        )
+        try:
+            connection.execute(text("INSERT INTO child (id, parent_id) VALUES (1, 999)"))
+        except IntegrityError:
+            pass
+        else:
+            raise AssertionError("SQLite accepted an orphaned foreign key")
+    engine.dispose()
 
 
 def test_password_reset_email_capability_requires_host_and_sender() -> None:
@@ -251,3 +318,13 @@ def test_noncanonical_api_paths_do_not_redirect_to_backend_origin() -> None:
     for response in responses:
         assert response.status_code == 404
         assert "location" not in response.headers
+
+
+def test_health_supports_head_for_platform_probes() -> None:
+    app = app_module.create_app(_settings())
+    client = TestClient(app)
+
+    response = client.head("/api/health")
+
+    assert response.status_code == 200
+    assert response.content == b""

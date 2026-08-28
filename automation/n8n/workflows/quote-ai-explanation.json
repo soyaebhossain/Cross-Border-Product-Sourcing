@@ -44,7 +44,7 @@
         "url": "={{ $env.OLLAMA_BASE_URL + '/api/generate' }}",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ { model: $env.OLLAMA_MODEL, stream: false, think: false, format: 'json', options: { temperature: 0.1, num_predict: 650 }, prompt: 'You are SourceAI, a cautious cross-border sourcing explanation assistant. Never change or recalculate monetary values. Explain only the supplied deterministic recommendation in ' + (($json.body.recommendation.response_language || 'en') === 'bn' ? 'natural, concise Bangla' : 'clear, concise English') + '. Return valid JSON only. Use short sentences. Schema: {\"summary_bn\":\"string\",\"advantages\":[\"string\"],\"risks\":[\"string\"],\"missing_information\":[\"string\"],\"recommended_checks\":[\"string\"],\"confidence\":0.0,\"human_review_required\":false}. Use at most 2 items in each array. Medium or High risk must require human review. Data: ' + JSON.stringify($json.body.recommendation) } }}",
+        "jsonBody": "={{ { model: $env.OLLAMA_MODEL, stream: false, think: false, format: 'json', options: { temperature: 0.1, num_predict: 650 }, prompt: 'You are SourceAI, a cautious cross-border sourcing explanation assistant. Never change or recalculate monetary values. The requested language is ' + (($json.body.recommendation.response_language || 'en') === 'bn' ? 'Bangla (bn)' : 'English (en)') + '. Every natural-language string, including every array item, must use that requested language. Never output Bangla when English is requested, and never output an English-only explanation when Bangla is requested. Explain only the supplied deterministic recommendation. Return valid JSON only. Use short sentences. Schema: {\"summary\":\"string\",\"language\":\"en or bn\",\"advantages\":[\"string\"],\"risks\":[\"string\"],\"missing_information\":[\"string\"],\"recommended_checks\":[\"string\"],\"confidence\":0.0,\"human_review_required\":false}. Use at most 2 items in each array. Medium or High risk must require human review. Data: ' + JSON.stringify($json.body.recommendation) } }}",
         "options": {"timeout": 45000}
       },
       "id": "ollama",
@@ -55,7 +55,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const raw = $json.response; let value; try { value = JSON.parse(raw); } catch { throw new Error('Ollama returned invalid JSON'); } const lists = ['advantages','risks','missing_information','recommended_checks']; const clean = { summary_bn: String(value.summary_bn || '').slice(0,2000), confidence: Number.isFinite(Number(value.confidence)) ? Math.max(0, Math.min(1, Number(value.confidence))) : null, human_review_required: Boolean(value.human_review_required) }; for (const key of lists) { const source = Array.isArray(value[key]) ? value[key] : (value[key] == null || value[key] === '' ? [] : [value[key]]); clean[key] = source.slice(0,3).map(v => String(v).slice(0,500)); } return [{ json: { explanation: clean } }];"
+        "jsCode": "const raw = $json.response; let value; try { value = JSON.parse(raw); } catch { throw new Error('Ollama returned invalid JSON'); } const lists = ['advantages','risks','missing_information','recommended_checks']; const summary = String(value.summary || value.summary_bn || '').slice(0,2000); const language = value.language === 'bn' ? 'bn' : 'en'; const clean = { summary, summary_bn: summary, language, confidence: Number.isFinite(Number(value.confidence)) ? Math.max(0, Math.min(1, Number(value.confidence))) : null, human_review_required: Boolean(value.human_review_required) }; for (const key of lists) { const source = Array.isArray(value[key]) ? value[key] : (value[key] == null || value[key] === '' ? [] : [value[key]]); clean[key] = source.slice(0,3).map(v => String(v).slice(0,500)); } return [{ json: { explanation: clean } }];"
       },
       "id": "validate",
       "name": "Validate Output",
@@ -95,7 +95,7 @@
     "Validate Output": {"main": [[{"node":"Return Explanation","type":"main","index":0}]]}
   },
   "settings": {"executionOrder": "v1", "errorWorkflow": "e81b7f9b-5586-4a29-81aa-80ca06562786"},
-  "active": true,
+  "active": false,
   "versionId": "f0b92979-2cad-4e0b-a934-7600373348bd",
   "meta": {"templateCredsSetupCompleted": true},
   "tags": []

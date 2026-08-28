@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from decimal import ROUND_CEILING, Decimal
+from decimal import ROUND_CEILING, ROUND_HALF_UP, Decimal
 from typing import Any
 
 from fastapi import HTTPException
@@ -21,6 +21,14 @@ from ..models import (
 )
 from ..schemas import CheapestCountryRecommendIn, QuoteRecommendIn, QuoteRequestIn
 from ..serializers import decimal_str
+
+
+BDT_QUANTUM = Decimal("0.01")
+
+
+def quantize_bdt(value: Decimal) -> Decimal:
+    """Return one accounting-safe BDT amount with exactly two decimals."""
+    return Decimal(value).quantize(BDT_QUANTUM, rounding=ROUND_HALF_UP)
 
 
 def get_variant_or_404(session: Session, variant_id: int) -> ProductVariant:
@@ -80,17 +88,21 @@ def get_variant_for_recommendation(
 
 
 def to_bdt(session: Session, amount: Decimal, currency: str) -> Decimal:
-    if currency.upper() == "BDT":
+    normalized_currency = (currency or "").strip().upper()
+    if normalized_currency == "BDT":
         return amount
     rate = session.scalar(
         select(CurrencyRate).where(
-            CurrencyRate.currency == currency.upper(),
+            CurrencyRate.currency == normalized_currency,
             CurrencyRate.is_active.is_(True),
         )
     )
-    if not rate:
-        return amount
-    return amount * rate.rate_to_bdt
+    if not rate or Decimal(rate.rate_to_bdt) <= 0:
+        raise HTTPException(
+            status_code=422,
+            detail=f"No active BDT exchange rate is configured for {normalized_currency or 'the offer currency'}",
+        )
+    return amount * Decimal(rate.rate_to_bdt)
 
 
 def shipping_cost_bdt(session: Session, country: Country, mode: str, total_weight: Decimal) -> Decimal:
@@ -182,17 +194,19 @@ def build_quote(session: Session, payload: QuoteRequestIn) -> dict[str, Any]:
 
     offers = sorted(offers, key=lambda item: (item.price_origin, -float(item.seller.rating)))
     top_offers = offers[:3]
-    selected = top_offers[0] if top_offers else None
+    if not top_offers:
+        raise HTTPException(
+            status_code=422,
+            detail="No eligible active supplier offer is available for this quote",
+        )
+    selected = top_offers[0]
 
-    origin_total = Decimal("0.00")
-    currency = "USD"
-    if selected:
-        currency = selected.currency
-        origin_total = Decimal(selected.price_origin) * Decimal(payload.qty)
-
-    origin_bdt = to_bdt(session, origin_total, currency)
+    origin_total = Decimal(selected.price_origin) * Decimal(payload.qty)
+    origin_bdt = quantize_bdt(to_bdt(session, origin_total, selected.currency))
     total_weight = Decimal(variant.weight_kg) * Decimal(payload.qty)
-    shipping_bdt = shipping_cost_bdt(session, country, payload.mode, total_weight)
+    shipping_bdt = quantize_bdt(
+        shipping_cost_bdt(session, country, payload.mode, total_weight)
+    )
     subtotal = origin_bdt + shipping_bdt
     now = datetime.now(timezone.utc)
     duty_rule = session.scalar(
@@ -210,20 +224,38 @@ def build_quote(session: Session, payload: QuoteRequestIn) -> dict[str, Any]:
         .order_by(DutyRule.category_id.desc().nullslast(), DutyRule.effective_from.desc())
         .limit(1)
     )
+    if duty_rule is None:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"No active customs duty rule is configured for {country.code} "
+                "and this product category"
+            ),
+        )
     customs_duty = (
         subtotal * (Decimal(duty_rule.percent) / Decimal("100"))
         + Decimal(duty_rule.fixed_bdt)
-        if duty_rule
-        else subtotal * Decimal("0.05")
     )
-    vat_tax = subtotal * Decimal("0.05")
-    handling_charge = service_fee_bdt(session, payload.mode, subtotal)
+    customs_duty = quantize_bdt(customs_duty)
+    vat_tax = quantize_bdt(subtotal * Decimal("0.05"))
+    handling_charge = quantize_bdt(
+        service_fee_bdt(session, payload.mode, subtotal)
+    )
     other_import_cost = Decimal("0.00")
     duty_vat = customs_duty + vat_tax
     service_fee = handling_charge
-    total = origin_bdt + shipping_bdt + customs_duty + vat_tax + handling_charge + other_import_cost
+    total = quantize_bdt(
+        origin_bdt
+        + shipping_bdt
+        + customs_duty
+        + vat_tax
+        + handling_charge
+        + other_import_cost
+    )
     advance_ratio = Decimal("0.60") if payload.mode == "LOCAL" else Decimal("0.80")
-    advance = total * advance_ratio
+    advance = quantize_bdt(total * advance_ratio)
+    # Derive the balance from the rounded total and advance.  Rounding each
+    # independently can create a one-paisa accounting mismatch.
     remaining = total - advance
     eta_min, eta_max = eta_range(session, country, payload.mode, payload.delivery_type)
 
@@ -240,7 +272,7 @@ def build_quote(session: Session, payload: QuoteRequestIn) -> dict[str, Any]:
             }
             for offer in top_offers
         ],
-        "selected_offer_id": selected.id if selected else None,
+        "selected_offer_id": selected.id,
         "breakdown": {
             "product_cost_bdt": decimal_str(origin_bdt),
             "origin_price_bdt": decimal_str(origin_bdt),
@@ -258,6 +290,13 @@ def build_quote(session: Session, payload: QuoteRequestIn) -> dict[str, Any]:
         "eta": {
             "min_days": eta_min,
             "max_days": eta_max,
+        },
+        "pricing_basis": {
+            "duty_rule_id": duty_rule.id,
+            "duty_percent": decimal_str(duty_rule.percent),
+            "duty_fixed_bdt": decimal_str(duty_rule.fixed_bdt),
+            "duty_scope": "category" if duty_rule.category_id is not None else "country",
+            "vat_percent": "5.00",
         },
     }
 
@@ -494,7 +533,19 @@ def recommend_routes(session: Session, payload: QuoteRecommendIn) -> list[dict[s
         "balanced": {"time": Decimal("0.50"), "cost": Decimal("0.50")},
     }
     weights = priorities.get(payload.priority.lower(), priorities["balanced"])
-    countries = session.scalars(select(Country).where(Country.code.in_(["CN", "SG", "TH"]))).all()
+    countries = session.scalars(
+        select(Country)
+        .join(SellerOffer, SellerOffer.country_id == Country.id)
+        .where(
+            SellerOffer.variant_id == payload.variant_id,
+            SellerOffer.stock >= payload.qty,
+            SellerOffer.moq <= payload.qty,
+            SellerOffer.is_active.is_(True),
+            SellerOffer.seller.has(is_active=True),
+        )
+        .distinct()
+        .order_by(Country.code.asc())
+    ).all()
     routes: list[dict[str, Any]] = []
 
     for country in countries:

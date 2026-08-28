@@ -37,6 +37,13 @@ ACTIVE_STATUSES = (
     "CUSTOMS",
     "LOCAL_DISPATCH",
 )
+OUTSTANDING_STATUSES = (
+    "CONFIRMED",
+    "PURCHASED",
+    "IN_TRANSIT",
+    "CUSTOMS",
+    "LOCAL_DISPATCH",
+)
 METRIC_VERSION = "2026-07-30.1"
 METRIC_DEFINITIONS = {
     "gross_order_value_bdt": (
@@ -48,8 +55,8 @@ METRIC_DEFINITIONS = {
         "refunds created in that window."
     ),
     "outstanding_bdt": (
-        "Point-in-time non-cancelled order value less net verified cash. It is labelled as-of, "
-        "not treated as a window flow."
+        "Point-in-time sum of remaining_bdt for confirmed, purchased, in-transit, customs, "
+        "and local-dispatch orders. It is labelled as-of, not treated as a window flow."
     ),
     "refunds_bdt": "Posted refund adjustments created in the selected window; reversed refunds are excluded.",
     "realized_margin_bdt": (
@@ -386,48 +393,23 @@ def _financial_metrics(
             *dimensional,
         )
     )
-    # The point-in-time outstanding card intentionally does not use the report
-    # window. It remains filterable by status/country/mode.
-    point_in_time_value = session.scalar(
-        select(func.coalesce(func.sum(Order.total_bdt), 0)).where(
-            Order.status != "CANCELLED", *dimensional
-        )
-    )
-    point_in_time_cash = session.scalar(
-        select(func.coalesce(func.sum(Order.advance_bdt), 0))
-        .join(ManualPaymentProof, ManualPaymentProof.order_id == Order.id)
-        .where(
-            Order.status != "CANCELLED",
-            ManualPaymentProof.decision == "APPROVED",
-            ManualPaymentProof.verified.is_(True),
-            *dimensional,
-        )
-    )
-    point_in_time_refunds = session.scalar(
-        select(func.coalesce(func.sum(PaymentAdjustment.amount_bdt), 0))
-        .join(Order, Order.id == PaymentAdjustment.order_id)
-        .where(
-            PaymentAdjustment.adjustment_type == "REFUND",
-            PaymentAdjustment.status == "POSTED",
-            Order.status != "CANCELLED",
-            *dimensional,
+    # Outstanding is a point-in-time receivables snapshot and intentionally
+    # does not use the report window. Keep it identical to the metric contract
+    # and the primary admin overview.
+    outstanding = session.scalar(
+        select(func.coalesce(func.sum(Order.remaining_bdt), 0)).where(
+            Order.status.in_(OUTSTANDING_STATUSES), *dimensional
         )
     )
     gross = _decimal(order_row[1])
-    verified_cash = max(Decimal("0"), _decimal(approved_cash) - _decimal(refunds))
-    outstanding = max(
-        Decimal("0"),
-        _decimal(point_in_time_value)
-        - _decimal(point_in_time_cash)
-        + _decimal(point_in_time_refunds),
-    )
+    verified_cash = _decimal(approved_cash) - _decimal(refunds)
     return {
         "total_orders": int(order_row[0] or 0),
         "gross_order_value_bdt": gross,
         "shipping_value_bdt": _decimal(order_row[2]),
         "verified_cash_bdt": verified_cash,
         "refunds_bdt": _decimal(refunds),
-        "outstanding_bdt": outstanding,
+        "outstanding_bdt": _decimal(outstanding),
         "realized_margin_bdt": _decimal(order_row[3]),
         "realized_margin_orders": int(order_row[4] or 0),
     }

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import re
 import sqlite3
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,7 @@ from .models import (
     Category,
     Country,
     CurrencyRate,
+    DutyRule,
     ETARule,
     Product,
     ProductVariant,
@@ -27,11 +29,259 @@ from .models import (
 _GENERAL_GOODS_MANIFEST_PATH = (
     Path(__file__).resolve().parent / "seed_data" / "general_goods_v1.json"
 )
+_PUBLIC_CATALOG_SNAPSHOT_FILENAME = "public-catalog.snapshot.json"
+_PUBLIC_CATALOG_EXPECTED_COUNTS = {
+    "categories": 27,
+    "countries": 7,
+    "products": 610,
+    "variants": 610,
+}
 _OWNED_PRODUCT_IMAGE_PATTERN = re.compile(
     r"^products/(?:[A-Za-z0-9][A-Za-z0-9_-]*/)*"
     r"[A-Za-z0-9][A-Za-z0-9._-]*\.(?:avif|gif|jpe?g|png|webp)$",
     re.IGNORECASE,
 )
+
+
+def _resolve_public_catalog_snapshot_path(explicit_path: Path | None = None) -> Path:
+    if explicit_path is not None:
+        path = Path(explicit_path)
+        if path.is_file():
+            return path
+        raise RuntimeError(f"Public catalog seed snapshot is missing: {path}")
+
+    service_root = Path(__file__).resolve().parent.parent
+    candidates = [
+        service_root.parent.parent
+        / "apps"
+        / "web-next"
+        / "data"
+        / _PUBLIC_CATALOG_SNAPSHOT_FILENAME,
+        Path(__file__).resolve().parent
+        / "seed_data"
+        / _PUBLIC_CATALOG_SNAPSHOT_FILENAME,
+    ]
+    for path in candidates:
+        if path.is_file():
+            return path
+    searched = ", ".join(str(path) for path in candidates)
+    raise RuntimeError(
+        "Public catalog seed snapshot is unavailable. "
+        f"Expected {_PUBLIC_CATALOG_SNAPSHOT_FILENAME} at one of: {searched}"
+    )
+
+
+def _snapshot_required_text(value: Any, label: str, *, max_length: int) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise RuntimeError(f"Public catalog snapshot {label} must be a non-empty string")
+    normalized = value.strip()
+    if len(normalized) > max_length:
+        raise RuntimeError(
+            f"Public catalog snapshot {label} exceeds {max_length} characters"
+        )
+    return normalized
+
+
+def _snapshot_positive_decimal(value: Any, label: str) -> Decimal:
+    try:
+        parsed = Decimal(str(value))
+    except Exception as exc:
+        raise RuntimeError(
+            f"Public catalog snapshot {label} must be numeric"
+        ) from exc
+    if not parsed.is_finite() or parsed <= 0:
+        raise RuntimeError(f"Public catalog snapshot {label} must be greater than zero")
+    return parsed
+
+
+def _snapshot_owned_image_path(value: Any, label: str) -> str | None:
+    if value in (None, ""):
+        return None
+    public_path = _snapshot_required_text(value, label, max_length=507)
+    if not public_path.startswith("/media/"):
+        raise RuntimeError(
+            f"Public catalog snapshot {label} must be an owned /media/ path"
+        )
+    owned_path = _owned_product_image_path(public_path.removeprefix("/media/"), label)
+    if owned_path is None:
+        return None
+    media_file = Path(__file__).resolve().parent.parent / "media" / owned_path
+    if not media_file.is_file():
+        raise RuntimeError(
+            f"Public catalog snapshot {label} points to missing media: {public_path}"
+        )
+    return owned_path
+
+
+def _load_public_catalog_snapshot(path: Path | None = None) -> dict[str, Any]:
+    snapshot_path = _resolve_public_catalog_snapshot_path(path)
+    try:
+        snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RuntimeError(
+            f"Public catalog seed snapshot is unreadable: {snapshot_path}"
+        ) from exc
+    if not isinstance(snapshot, dict):
+        raise RuntimeError("Public catalog snapshot root must be an object")
+    if snapshot.get("schema_version") != 2:
+        raise RuntimeError("Public catalog snapshot schema_version must be 2")
+
+    categories = snapshot.get("categories")
+    countries = snapshot.get("countries")
+    products = snapshot.get("products")
+    counts = snapshot.get("counts")
+    if not isinstance(categories, list) or not isinstance(countries, list) or not isinstance(products, list):
+        raise RuntimeError(
+            "Public catalog snapshot categories, countries and products must be arrays"
+        )
+    if not isinstance(counts, dict):
+        raise RuntimeError("Public catalog snapshot counts must be an object")
+
+    category_slugs: set[str] = set()
+    category_ids: set[int] = set()
+    for index, category in enumerate(categories):
+        if not isinstance(category, dict):
+            raise RuntimeError(f"Public catalog snapshot category #{index + 1} must be an object")
+        category_id = category.get("id")
+        if not isinstance(category_id, int) or category_id <= 0 or category_id in category_ids:
+            raise RuntimeError("Public catalog snapshot category IDs must be unique positive integers")
+        category_ids.add(category_id)
+        _snapshot_required_text(category.get("name"), f"category #{category_id} name", max_length=120)
+        slug = _snapshot_required_text(category.get("slug"), f"category #{category_id} slug", max_length=120)
+        normalized_slug = slug.casefold()
+        if normalized_slug in category_slugs:
+            raise RuntimeError("Public catalog snapshot category slugs must be case-insensitively unique")
+        category_slugs.add(normalized_slug)
+
+    country_codes: set[str] = set()
+    country_ids: set[int] = set()
+    for index, country in enumerate(countries):
+        if not isinstance(country, dict):
+            raise RuntimeError(f"Public catalog snapshot country #{index + 1} must be an object")
+        country_id = country.get("id")
+        if not isinstance(country_id, int) or country_id <= 0 or country_id in country_ids:
+            raise RuntimeError("Public catalog snapshot country IDs must be unique positive integers")
+        country_ids.add(country_id)
+        code = _snapshot_required_text(country.get("code"), f"country #{country_id} code", max_length=2).upper()
+        if len(code) != 2 or code in country_codes:
+            raise RuntimeError("Public catalog snapshot country codes must be unique ISO alpha-2 values")
+        country_codes.add(code)
+        _snapshot_required_text(country.get("name"), f"country {code} name", max_length=80)
+
+    product_slugs: set[str] = set()
+    product_ids: set[int] = set()
+    variant_ids: set[int] = set()
+    variant_skus: set[str] = set()
+    variant_count = 0
+    for index, product in enumerate(products):
+        if not isinstance(product, dict):
+            raise RuntimeError(f"Public catalog snapshot product #{index + 1} must be an object")
+        product_id = product.get("id")
+        if not isinstance(product_id, int) or product_id <= 0 or product_id in product_ids:
+            raise RuntimeError("Public catalog snapshot product IDs must be unique positive integers")
+        product_ids.add(product_id)
+        _snapshot_required_text(product.get("name"), f"product #{product_id} name", max_length=200)
+        slug = _snapshot_required_text(product.get("slug"), f"product #{product_id} slug", max_length=200)
+        normalized_slug = slug.casefold()
+        if normalized_slug in product_slugs:
+            raise RuntimeError("Public catalog snapshot product slugs must be case-insensitively unique")
+        product_slugs.add(normalized_slug)
+        model = product.get("model")
+        if model not in (None, ""):
+            _snapshot_required_text(model, f"product {slug} model", max_length=120)
+        _snapshot_owned_image_path(product.get("image"), f"product {slug} image")
+
+        category = product.get("category")
+        if not isinstance(category, dict):
+            raise RuntimeError(f"Public catalog snapshot product {slug} category must be an object")
+        category_slug = _snapshot_required_text(
+            category.get("slug"), f"product {slug} category slug", max_length=120
+        )
+        if category_slug.casefold() not in category_slugs:
+            raise RuntimeError(
+                f"Public catalog snapshot product {slug} references unknown category {category_slug}"
+            )
+
+        market = product.get("market")
+        if not isinstance(market, dict):
+            raise RuntimeError(f"Public catalog snapshot product {slug} market must be an object")
+        eligible_countries = market.get("countries")
+        if not isinstance(eligible_countries, list) or not eligible_countries:
+            raise RuntimeError(
+                f"Public catalog snapshot product {slug} must have eligible countries"
+            )
+        for code in eligible_countries:
+            normalized_code = _snapshot_required_text(
+                code, f"product {slug} country code", max_length=2
+            ).upper()
+            if normalized_code not in country_codes:
+                raise RuntimeError(
+                    f"Public catalog snapshot product {slug} references unknown country {normalized_code}"
+                )
+        currency = _snapshot_required_text(
+            market.get("currency"), f"product {slug} currency", max_length=10
+        ).upper()
+        if currency != "USD":
+            raise RuntimeError(
+                f"Public catalog snapshot product {slug} must use the USD reference currency"
+            )
+        _snapshot_positive_decimal(market.get("min_price"), f"product {slug} minimum price")
+
+        variants = product.get("variants")
+        if not isinstance(variants, list) or not variants:
+            raise RuntimeError(f"Public catalog snapshot product {slug} must have variants")
+        local_variant_ids: set[int] = set()
+        for variant_index, variant in enumerate(variants):
+            if not isinstance(variant, dict):
+                raise RuntimeError(
+                    f"Public catalog snapshot product {slug} variant #{variant_index + 1} must be an object"
+                )
+            variant_id = variant.get("id")
+            if not isinstance(variant_id, int) or variant_id <= 0 or variant_id in variant_ids:
+                raise RuntimeError("Public catalog snapshot variant IDs must be unique positive integers")
+            variant_ids.add(variant_id)
+            local_variant_ids.add(variant_id)
+            variant_count += 1
+            sku = variant.get("sku")
+            if sku not in (None, ""):
+                normalized_sku = _snapshot_required_text(
+                    sku, f"product {slug} variant SKU", max_length=80
+                ).casefold()
+                if normalized_sku in variant_skus:
+                    raise RuntimeError(
+                        "Public catalog snapshot non-empty variant SKUs must be case-insensitively unique"
+                    )
+                variant_skus.add(normalized_sku)
+            variant_name = variant.get("variant_name")
+            if variant_name not in (None, ""):
+                _snapshot_required_text(
+                    variant_name, f"product {slug} variant name", max_length=120
+                )
+            for field in ("weight_kg", "length_cm", "width_cm", "height_cm"):
+                _snapshot_positive_decimal(
+                    variant.get(field), f"product {slug} variant {field}"
+                )
+        if product.get("default_variant_id") not in local_variant_ids:
+            raise RuntimeError(
+                f"Public catalog snapshot product {slug} default variant is invalid"
+            )
+
+    actual_counts = {
+        "categories": len(categories),
+        "countries": len(countries),
+        "products": len(products),
+        "variants": variant_count,
+    }
+    if counts != actual_counts:
+        raise RuntimeError(
+            f"Public catalog snapshot counts are inconsistent: declared {counts}, actual {actual_counts}"
+        )
+    if actual_counts != _PUBLIC_CATALOG_EXPECTED_COUNTS:
+        raise RuntimeError(
+            "Public catalog snapshot must contain the canonical launch catalog: "
+            f"expected {_PUBLIC_CATALOG_EXPECTED_COUNTS}, got {actual_counts}"
+        )
+    return snapshot
 
 
 def _slugify(value: str) -> str:
@@ -332,6 +582,26 @@ def _ensure_reference_data(
         session.add(ServiceFeeRule(mode="LOCAL", fee_bdt=Decimal("450.00"), percent=Decimal("5.00")))
     if "BULK" not in existing_fee_modes:
         session.add(ServiceFeeRule(mode="BULK", fee_bdt=Decimal("1200.00"), percent=Decimal("3.50")))
+
+    # Keep launch estimates explicit and operator-manageable.  The quote engine
+    # intentionally refuses to invent a tariff when no active rule exists.
+    # These country-wide defaults are reference estimates and can be replaced
+    # with category-specific rules from the admin control centre.
+    countries_with_global_duty = set(
+        session.scalars(
+            select(DutyRule.country_id).where(DutyRule.category_id.is_(None))
+        ).all()
+    )
+    for country in countries.values():
+        if country.id not in countries_with_global_duty:
+            session.add(
+                DutyRule(
+                    country=country,
+                    category_id=None,
+                    percent=Decimal("5.00"),
+                    fixed_bdt=Decimal("0.00"),
+                )
+            )
 
     shipping_cards = [
         ("CN", "AIR", "0.000", "0.999", "580.00"),
@@ -1395,6 +1665,379 @@ def _remove_unstable_placeholder_images(session: Session) -> None:
         product.image = None
 
 
+def _deterministic_snapshot_sku(product_slug: str, variant_index: int) -> str:
+    digest = hashlib.sha256(
+        f"public-catalog-v2:{product_slug.casefold()}:{variant_index}".encode("utf-8")
+    ).hexdigest()[:16]
+    return f"SNAP-{digest.upper()}"
+
+
+def _ensure_public_catalog_snapshot(
+    session: Session,
+    snapshot: dict[str, Any],
+    countries: dict[str, Country],
+) -> dict[str, int]:
+    """Create missing public snapshot rows without overwriting managed catalog data."""
+
+    existing_categories: dict[str, Category] = {}
+    for category in session.scalars(select(Category).order_by(Category.id.asc())).all():
+        key = category.slug.casefold()
+        if key in existing_categories:
+            raise RuntimeError(
+                f"Existing category slugs collide case-insensitively: {category.slug}"
+            )
+        existing_categories[key] = category
+
+    created_categories = 0
+    for category_spec in snapshot["categories"]:
+        slug = str(category_spec["slug"])
+        key = slug.casefold()
+        if key in existing_categories:
+            continue
+        category = Category(name=str(category_spec["name"]), slug=slug)
+        session.add(category)
+        existing_categories[key] = category
+        created_categories += 1
+    session.flush()
+
+    existing_products: dict[str, Product] = {}
+    for product in session.scalars(select(Product).order_by(Product.id.asc())).all():
+        key = product.slug.casefold()
+        if key in existing_products:
+            raise RuntimeError(
+                f"Existing product slugs collide case-insensitively: {product.slug}"
+            )
+        existing_products[key] = product
+
+    created_product_keys: set[str] = set()
+    product_specs_by_key: dict[str, dict[str, Any]] = {}
+    filled_images = 0
+    for product_spec in snapshot["products"]:
+        slug = str(product_spec["slug"])
+        key = slug.casefold()
+        product_specs_by_key[key] = product_spec
+        image = _snapshot_owned_image_path(
+            product_spec.get("image"), f"product {slug} image"
+        )
+        product = existing_products.get(key)
+        if product is not None:
+            if not (product.image or "").strip() and image:
+                product.image = image
+                filled_images += 1
+            continue
+
+        category_slug = str(product_spec["category"]["slug"])
+        product = Product(
+            name=str(product_spec["name"]),
+            slug=slug,
+            model=(str(product_spec["model"]) if product_spec.get("model") else None),
+            description=(
+                str(product_spec["description"])
+                if product_spec.get("description")
+                else None
+            ),
+            image=image,
+            category=existing_categories[category_slug.casefold()],
+        )
+        session.add(product)
+        existing_products[key] = product
+        created_product_keys.add(key)
+    session.flush()
+
+    variants_by_sku: dict[str, ProductVariant] = {}
+    variants_by_product_and_name: dict[tuple[int, str], list[ProductVariant]] = {}
+    for variant in session.scalars(
+        select(ProductVariant).order_by(ProductVariant.id.asc())
+    ).all():
+        if variant.sku:
+            sku_key = variant.sku.casefold()
+            if sku_key in variants_by_sku:
+                raise RuntimeError(
+                    f"Existing variant SKUs collide case-insensitively: {variant.sku}"
+                )
+            variants_by_sku[sku_key] = variant
+        name_key = (variant.variant_name or "").strip().casefold()
+        variants_by_product_and_name.setdefault(
+            (variant.product_id, name_key), []
+        ).append(variant)
+
+    created_variants_by_product: dict[str, list[ProductVariant]] = {
+        key: [] for key in created_product_keys
+    }
+    created_variants = 0
+    for product_spec in snapshot["products"]:
+        product_key = str(product_spec["slug"]).casefold()
+        product = existing_products[product_key]
+        for variant_index, variant_spec in enumerate(product_spec["variants"]):
+            source_sku = (str(variant_spec.get("sku") or "").strip() or None)
+            variant: ProductVariant | None = None
+            if source_sku:
+                variant = variants_by_sku.get(source_sku.casefold())
+                if variant is not None and variant.product_id != product.id:
+                    raise RuntimeError(
+                        f"Snapshot SKU {source_sku} already belongs to another product"
+                    )
+            if variant is None:
+                name_key = str(variant_spec.get("variant_name") or "").strip().casefold()
+                name_matches = variants_by_product_and_name.get(
+                    (product.id, name_key), []
+                )
+                if len(name_matches) > 1:
+                    raise RuntimeError(
+                        f"Product {product.slug} has ambiguous variants named "
+                        f"{variant_spec.get('variant_name') or ''}"
+                    )
+                if name_matches:
+                    variant = name_matches[0]
+            if variant is not None:
+                continue
+
+            sku = source_sku or _deterministic_snapshot_sku(product.slug, variant_index)
+            sku_key = sku.casefold()
+            conflicting_variant = variants_by_sku.get(sku_key)
+            if conflicting_variant is not None:
+                raise RuntimeError(
+                    f"Generated snapshot SKU {sku} already belongs to another product"
+                )
+            variant = ProductVariant(
+                product=product,
+                sku=sku,
+                variant_name=(
+                    str(variant_spec["variant_name"])
+                    if variant_spec.get("variant_name")
+                    else None
+                ),
+                weight_kg=Decimal(str(variant_spec["weight_kg"])),
+                length_cm=Decimal(str(variant_spec["length_cm"])),
+                width_cm=Decimal(str(variant_spec["width_cm"])),
+                height_cm=Decimal(str(variant_spec["height_cm"])),
+            )
+            session.add(variant)
+            variants_by_sku[sku_key] = variant
+            variants_by_product_and_name.setdefault(
+                (product.id, (variant.variant_name or "").strip().casefold()), []
+            ).append(variant)
+            if product_key in created_variants_by_product:
+                created_variants_by_product[product_key].append(variant)
+            created_variants += 1
+    session.flush()
+
+    reference_sellers: dict[str, Seller] = {}
+    for seller in session.scalars(
+        select(Seller)
+        .where(Seller.is_active.is_(True))
+        .order_by(Seller.country_id.asc(), Seller.name.asc(), Seller.id.asc())
+    ).all():
+        reference_sellers.setdefault(seller.country.code, seller)
+
+    created_offers = 0
+    for product_key in sorted(created_product_keys):
+        product_spec = product_specs_by_key[product_key]
+        eligible_country: Country | None = None
+        reference_seller: Seller | None = None
+        for raw_code in product_spec["market"]["countries"]:
+            code = str(raw_code).upper()
+            if code in countries and code in reference_sellers:
+                eligible_country = countries[code]
+                reference_seller = reference_sellers[code]
+                break
+        if eligible_country is None or reference_seller is None:
+            raise RuntimeError(
+                f"No active reference supplier is available for snapshot product "
+                f"{product_spec['slug']}"
+            )
+
+        local_price = Decimal(str(product_spec["market"]["min_price"])).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        bulk_price = max(local_price * Decimal("0.90"), Decimal("0.01")).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP
+        )
+        stock_seed = int(
+            hashlib.sha256(product_key.encode("utf-8")).hexdigest()[:8], 16
+        )
+        for variant in created_variants_by_product[product_key]:
+            for mode, price, stock, moq in (
+                ("LOCAL", local_price, 100 + stock_seed % 400, 1),
+                ("BULK", bulk_price, 500 + stock_seed % 1500, 10),
+            ):
+                session.add(
+                    SellerOffer(
+                        variant=variant,
+                        country=eligible_country,
+                        seller=reference_seller,
+                        mode=mode,
+                        price_origin=price,
+                        currency="USD",
+                        stock=stock,
+                        moq=moq,
+                        source_url=(
+                            "development-reference:public-catalog-snapshot-v2:"
+                            f"{product_spec['slug']}:{mode.lower()}"
+                        ),
+                    )
+                )
+                created_offers += 1
+
+    session.flush()
+    return {
+        "categories": created_categories,
+        "products": len(created_product_keys),
+        "variants": created_variants,
+        "offers": created_offers,
+        "images": filled_images,
+    }
+
+
+_LEGACY_DEMO_FINGERPRINTS: dict[str, dict[str, Any]] = {
+    "anker-ganprime-735-charger": {
+        "name": "Anker GaNPrime 735 Charger",
+        "model": "A2668",
+        "description": "65W GaN charger suited for local and bulk sourcing flows.",
+        "image": "https://images.unsplash.com/photo-1583863788434-e58a36330cf0?auto=format&fit=crop&w=900&q=80",
+        "category": ("consumer-electronics", "Consumer Electronics"),
+        "variants": {
+            "ANKER-A2668-US": ("US Plug", "0.220", "10.00", "6.00", "4.50", 1),
+            "ANKER-A2668-EU": ("EU Plug", "0.230", "10.00", "6.50", "4.50", 2),
+        },
+    },
+    "xiaomi-smart-air-purifier-4-compact": {
+        "name": "Xiaomi Smart Air Purifier 4 Compact",
+        "model": "AC-M18-SC",
+        "description": "Compact appliance for cross-border home delivery sourcing.",
+        "image": "https://images.unsplash.com/photo-1585771724684-38269d6639fd?auto=format&fit=crop&w=900&q=80",
+        "category": ("home-appliances", "Home Appliances"),
+        "variants": {
+            "XI-AIR-4C-WHITE": ("White", "2.200", "22.00", "22.00", "35.50", 3),
+        },
+    },
+    "baseus-bowie-h1i-headphones": {
+        "name": "Baseus Bowie H1i Headphones",
+        "model": "H1i",
+        "description": "Wireless ANC headset with strong marketplace availability.",
+        "image": "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=900&q=80",
+        "category": ("smart-devices", "Smart Devices"),
+        "variants": {
+            "BASEUS-H1I-BLK": ("Black", "0.480", "19.00", "17.00", "8.00", 4),
+        },
+    },
+}
+
+
+def _legacy_demo_offer_is_untouched(offer: SellerOffer, *, seed_index: int, weight: Decimal) -> bool:
+    base = Decimal("18.00") + (weight * Decimal("14.0")) + Decimal(seed_index)
+    expected = {
+        ("CN", "Shenzhen Prime Hub", "LOCAL"): (
+            base,
+            120 + seed_index * 5,
+            1,
+        ),
+        ("CN", "Guangzhou SourceLink", "BULK"): (
+            max(base - Decimal("2.10"), Decimal("10.00")),
+            300 + seed_index * 12,
+            5,
+        ),
+        ("SG", "Lion City Retail Export", "LOCAL"): (
+            base + Decimal("4.20"),
+            60 + seed_index * 3,
+            1,
+        ),
+    }
+    expected_row = expected.get(
+        (offer.country.code, offer.seller.name, offer.mode)
+    )
+    return bool(
+        expected_row
+        and offer.is_active
+        and offer.currency == "USD"
+        and offer.source_url in (None, "")
+        and Decimal(offer.price_origin) == expected_row[0]
+        and offer.stock == expected_row[1]
+        and offer.moq == expected_row[2]
+    )
+
+
+def _remove_untouched_legacy_demo_catalog(session: Session) -> int:
+    """Retire only exact, unmodified rows from the superseded three-item demo."""
+
+    removed = 0
+    retired_category_slugs: set[str] = set()
+    for slug, fingerprint in _LEGACY_DEMO_FINGERPRINTS.items():
+        product = session.scalar(select(Product).where(Product.slug == slug))
+        if product is None:
+            continue
+        expected_category_slug, expected_category_name = fingerprint["category"]
+        if not (
+            product.is_active
+            and product.name == fingerprint["name"]
+            and product.model == fingerprint["model"]
+            and product.description == fingerprint["description"]
+            and product.image == fingerprint["image"]
+            and product.category.slug == expected_category_slug
+            and product.category.name == expected_category_name
+            and product.category.is_active
+        ):
+            continue
+
+        expected_variants = fingerprint["variants"]
+        actual_variants = {variant.sku: variant for variant in product.variants}
+        if set(actual_variants) != set(expected_variants):
+            continue
+        untouched = True
+        for sku, expected_variant in expected_variants.items():
+            variant = actual_variants[sku]
+            name, weight, length, width, height, seed_index = expected_variant
+            if not (
+                variant.is_active
+                and variant.variant_name == name
+                and Decimal(variant.weight_kg) == Decimal(weight)
+                and Decimal(variant.length_cm) == Decimal(length)
+                and Decimal(variant.width_cm) == Decimal(width)
+                and Decimal(variant.height_cm) == Decimal(height)
+            ):
+                untouched = False
+                break
+            if variant.offers and (
+                len(variant.offers) != 3
+                or not all(
+                    _legacy_demo_offer_is_untouched(
+                        offer,
+                        seed_index=seed_index,
+                        weight=Decimal(weight),
+                    )
+                    for offer in variant.offers
+                )
+            ):
+                untouched = False
+                break
+        if not untouched:
+            continue
+
+        retired_category_slugs.add(expected_category_slug)
+        session.delete(product)
+        removed += 1
+
+    if not removed:
+        return 0
+    session.flush()
+    for category_slug in retired_category_slugs:
+        category = session.scalar(select(Category).where(Category.slug == category_slug))
+        if category is None:
+            continue
+        has_products = session.scalar(
+            select(Product.id).where(Product.category_id == category.id).limit(1)
+        )
+        expected_name = next(
+            fingerprint["category"][1]
+            for fingerprint in _LEGACY_DEMO_FINGERPRINTS.values()
+            if fingerprint["category"][0] == category_slug
+        )
+        if not has_products and category.is_active and category.name == expected_name:
+            session.delete(category)
+    session.flush()
+    return removed
+
+
 def _seed_demo_catalog(session: Session) -> None:
     categories = {
         "consumer-electronics": Category(name="Consumer Electronics", slug="consumer-electronics"),
@@ -1556,14 +2199,22 @@ def seed_database(
     session: Session,
     legacy_sqlite_path: Path | None = None,
     supply_chain_csv_path: Path | None = None,
+    public_catalog_snapshot_path: Path | None = None,
 ) -> None:
     general_goods_manifest = _load_general_goods_manifest()
+    public_catalog_snapshot = _load_public_catalog_snapshot(
+        public_catalog_snapshot_path
+    )
+    _remove_untouched_legacy_demo_catalog(session)
     has_products = session.scalar(select(Product.id).limit(1))
 
     if not has_products:
-        imported = _import_legacy_catalog(session, legacy_sqlite_path) if legacy_sqlite_path else False
-        if not imported:
-            _seed_demo_catalog(session)
+        # The committed public snapshot is now the canonical development
+        # catalog. Legacy import remains optional, but the three-product demo
+        # is intentionally not added because it is outside that 610-product
+        # launch catalog.
+        if legacy_sqlite_path:
+            _import_legacy_catalog(session, legacy_sqlite_path)
 
     # Legacy data can grow after the rebuild DB is first created, so keep it synchronized.
     if legacy_sqlite_path and has_products:
@@ -1582,5 +2233,6 @@ def seed_database(
         _sync_legacy_offers(session, legacy_sqlite_path)
     if supply_chain_csv_path:
         _ensure_supply_chain_dataset(session, supply_chain_csv_path, countries)
+    _ensure_public_catalog_snapshot(session, public_catalog_snapshot, countries)
     _remove_unstable_placeholder_images(session)
     session.commit()

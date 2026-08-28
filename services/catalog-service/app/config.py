@@ -33,8 +33,10 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3001,http://127.0.0.1:3001"
     media_path: str | None = None
     supply_chain_csv_path: str | None = None
+    ai_insights_data_path: str | None = None
     media_url_path: str = "/media"
     frontend_url: str = "http://localhost:3000"
+    proxy_shared_secret: SecretStr | None = None
     google_client_id: str | None = None
     google_client_secret: str | None = None
     secure_cookies: bool | None = None
@@ -123,6 +125,15 @@ class Settings(BaseSettings):
     def smtp_email_configured(self) -> bool:
         return bool((self.smtp_host or "").strip() and (self.smtp_from_email or "").strip())
 
+    @property
+    def signed_proxy_identity_configured(self) -> bool:
+        value = (
+            self.proxy_shared_secret.get_secret_value().strip()
+            if self.proxy_shared_secret
+            else ""
+        )
+        return len(value) >= 32
+
     def resolved_media_path(self) -> Path:
         if self.media_path:
             return Path(self.media_path)
@@ -132,6 +143,14 @@ class Settings(BaseSettings):
         if self.supply_chain_csv_path:
             return Path(self.supply_chain_csv_path)
         return ROOT_DIR / "Data" / "supply_chain_data.csv"
+
+    def resolved_ai_insights_data_path(self) -> Path:
+        if self.ai_insights_data_path:
+            configured = Path(self.ai_insights_data_path).expanduser()
+            if configured.is_absolute():
+                return configured
+            return ROOT_DIR / configured
+        return ROOT_DIR / "datasets" / "ml-starter-v1"
 
     def resolved_mfa_encryption_key(self) -> bytes:
         if self.mfa_encryption_key:
@@ -213,6 +232,13 @@ class Settings(BaseSettings):
             errors.append("Persistent account lockout settings are too weak")
         if not self.allowed_browser_origins:
             errors.append("At least one browser origin must be configured")
+        proxy_secret = (
+            self.proxy_shared_secret.get_secret_value().strip()
+            if self.proxy_shared_secret
+            else ""
+        )
+        if proxy_secret and len(proxy_secret) < 32:
+            errors.append("CATALOG_PROXY_SHARED_SECRET must be at least 32 characters")
         if self.request_log_level.strip().upper() not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
             errors.append("CATALOG_REQUEST_LOG_LEVEL must be DEBUG, INFO, WARNING, ERROR, or CRITICAL")
         if not self.error_monitoring_dsn:
@@ -269,6 +295,26 @@ class Settings(BaseSettings):
                 errors.append("CATALOG_AUTOMATION_WEBHOOK_URL must use HTTPS in production")
         if not 1 <= self.automation_timeout_seconds <= 60:
             errors.append("CATALOG_AUTOMATION_TIMEOUT_SECONDS must be between 1 and 60")
+        ai_data_path = self.resolved_ai_insights_data_path()
+        missing_ai_files = [
+            filename
+            for filename in (
+                "manifest.json",
+                "catalog_bootstrap.csv",
+                "product_monthly_trends_synthetic.csv",
+            )
+            if not (ai_data_path / filename).is_file()
+        ]
+        if missing_ai_files:
+            errors.append(
+                "CATALOG_AI_INSIGHTS_DATA_PATH must contain the checked-in ML starter "
+                f"dataset pack; missing: {', '.join(missing_ai_files)}"
+            )
+        normalized_model = self.automation_model.strip()
+        if not normalized_model or len(normalized_model) > 100 or any(
+            ord(character) < 32 for character in normalized_model
+        ):
+            errors.append("CATALOG_AUTOMATION_MODEL must be a valid non-empty model name")
         for origin in self.allowed_browser_origins:
             parsed_origin = urlsplit(origin)
             if (
