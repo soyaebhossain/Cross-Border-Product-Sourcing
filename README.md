@@ -4,6 +4,14 @@ SourceAI is a Next.js storefront and role-aware control center backed by
 FastAPI, SQLAlchemy, Alembic, and PostgreSQL. The retired Vite and Django
 applications are not part of the active tree.
 
+## Ownership
+
+SourceAI owns and maintains the application branding and original project
+content. Copyright © 2026 SourceAI. All rights reserved. Development tools,
+automation services, and hosting providers are infrastructure only; they are
+not authors, co-authors, owners, or collaborators of this project. Third-party
+packages remain subject to their respective licenses.
+
 ## Active applications
 
 - `apps/web-next` — customer storefront, account area, admin control center,
