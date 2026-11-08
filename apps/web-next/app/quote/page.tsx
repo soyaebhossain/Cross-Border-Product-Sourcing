@@ -305,7 +305,7 @@ export default function QuotePage() {
                 </div>
                 <small>
                   {aiMetadata?.automation_available
-                    ? (bn ? `${aiMetadata.model || "AI"} দিয়ে তৈরি।` : `Generated with ${aiMetadata.model || "AI"}.`)
+                    ? (bn ? "AI দিয়ে তৈরি।" : "Generated with AI.")
                     : (bn ? "AI সেবা পাওয়া যায়নি; নির্ধারিত fallback দেখানো হয়েছে।" : "AI service unavailable; deterministic fallback shown.")}
                   {aiExplanation.confidence !== null
                     ? (bn ? ` স্ব-প্রতিবেদিত আস্থা: ${Math.round(aiExplanation.confidence * 100)}%।` : ` Self-reported confidence: ${Math.round(aiExplanation.confidence * 100)}%.`)

@@ -82,7 +82,7 @@ export function SourcingWorkspace({ variantId }: { variantId: number }) {
         <div>
           <span className="market-kicker">{bn ? "স্বয়ংক্রিয় দেশভিত্তিক সুপারিশ" : "Automated country recommendation"}</span>
           <h2>{bn ? "কোন দেশ থেকে সোর্সিং বেশি লাভজনক?" : "Which country is the best sourcing option?"}</h2>
-          <p>{bn ? "দাম, ল্যান্ডেড কস্ট, ডেলিভারি, সাপ্লায়ারের নির্ভরযোগ্যতা ও ঝুঁকি দিয়ে র‍্যাঙ্কিং হয়; Ollama ফলটির ব্যাখ্যা দেয়।" : "Rankings use price, landed cost, delivery, supplier reliability, and risk; Ollama explains the result."}</p>
+          <p>{bn ? "দাম, ল্যান্ডেড কস্ট, ডেলিভারি, সাপ্লায়ারের নির্ভরযোগ্যতা ও ঝুঁকি দিয়ে র‍্যাঙ্কিং হয়; AI ফলটির ব্যাখ্যা দেয়।" : "Rankings use price, landed cost, delivery, supplier reliability, and risk; AI explains the result."}</p>
         </div>
         <label className="qty-control">{bn ? "পরিমাণ" : "Quantity"}<input type="number" min="1" value={qty} onChange={(event) => setQty(Math.max(1, Number(event.target.value) || 1))} /></label>
       </div>
@@ -141,7 +141,7 @@ export function SourcingWorkspace({ variantId }: { variantId: number }) {
               <h3 id="country-ai-title">{bn ? "কেন এই দেশটি সুপারিশ করা হয়েছে" : "Why this country is recommended"}</h3>
             </div>
             <span className={`workspace-ai__status${data.ai_metadata?.automation_available ? " workspace-ai__status--active" : ""}`}>
-              {data.ai_metadata?.automation_available ? `Ollama · ${data.ai_metadata.model || "local model"}` : (bn ? "নির্ধারিত fallback" : "Deterministic fallback")}
+              {data.ai_metadata?.automation_available ? (bn ? "AI দিয়ে তৈরি" : "AI-generated") : (bn ? "নির্ধারিত fallback" : "Deterministic fallback")}
             </span>
           </div>
           <p className="workspace-ai__summary">{aiSummary}</p>

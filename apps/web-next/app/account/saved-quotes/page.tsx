@@ -16,17 +16,14 @@ function isExpired(quote: SavedQuote) {
 function explanationSource(quote: SavedQuote, bn: boolean) {
   const metadata = quote.response?.ai_metadata;
   const source = typeof metadata?.source === "string" ? metadata.source.trim() : "";
-  const model = typeof metadata?.model === "string" ? metadata.model.trim() : "";
-  if (source === "claude-api") {
-    return model ? `Claude · ${model}` : "Claude API";
-  }
-  if (metadata?.automation_available || source === "ollama-via-n8n") {
-    return model ? `Ollama · ${model}` : "Ollama via n8n";
+  // Show only that AI wrote the explanation; provider and model names stay internal.
+  if (metadata?.automation_available || source === "claude-api" || source === "ollama-via-n8n") {
+    return bn ? "AI দিয়ে তৈরি" : "AI-generated";
   }
   if (source === "deterministic-fallback") {
     return bn ? "নির্ধারিত ফলব্যাক" : "Deterministic fallback";
   }
-  if (source) return model ? `${source} · ${model}` : source;
+  if (source) return source;
   return bn ? "উৎসের তথ্য নেই" : "Source unavailable";
 }
 

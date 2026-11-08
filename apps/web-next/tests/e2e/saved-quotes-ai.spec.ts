@@ -112,7 +112,8 @@ test("saved quotes show AI decision support and tolerate legacy response shapes"
   await page.goto("/account/saved-quotes");
   await expect(page.getByRole("heading", { name: "Saved quotes" })).toBeVisible();
   await expect(page.getByText("AI decision support", { exact: true })).toHaveCount(2);
-  await expect(page.getByText("Ollama · qwen3:1.7b", { exact: true })).toBeVisible();
+  await expect(page.getByText("AI-generated", { exact: true })).toBeVisible();
+  await expect(page.getByText("qwen3:1.7b")).toHaveCount(0);
   await expect(page.getByText("Lowest landed cost among eligible routes", { exact: true })).toBeVisible();
   await expect(page.getByText("Supplier lead time should be reconfirmed", { exact: true })).toBeVisible();
   await expect(page.getByText("Verify warranty and final stock before payment", { exact: true })).toBeVisible();
