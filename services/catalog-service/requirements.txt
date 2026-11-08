@@ -9,3 +9,4 @@ cryptography==50.0.0
 email-validator==2.3.0
 sentry-sdk[fastapi]==2.66.0
 resend==2.34.0
+anthropic==2.3.0

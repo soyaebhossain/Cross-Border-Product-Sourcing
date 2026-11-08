@@ -40,7 +40,7 @@ def quote_ai_explanation(
         "ai_explanation": automation.explanation,
         "ai_metadata": {
             "source": automation.source,
-            "model": settings.automation_model if automation.automation_available else None,
+            "model": automation.model if automation.automation_available else None,
             "prompt_version": "quote-v1",
             "automation_available": automation.automation_available,
             "monetary_calculations_are_deterministic": True,
@@ -81,7 +81,7 @@ def cheapest_country_ai_explanation(
         "ai_explanation": automation.explanation,
         "ai_metadata": {
             "source": automation.source,
-            "model": settings.automation_model if automation.automation_available else None,
+            "model": automation.model if automation.automation_available else None,
             "automation_available": automation.automation_available,
             "monetary_calculations_are_deterministic": True,
         },

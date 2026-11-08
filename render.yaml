@@ -40,6 +40,10 @@ services:
         value: production
       - key: CATALOG_ERROR_MONITORING_DSN
         sync: false
+      - key: CATALOG_ANTHROPIC_API_KEY
+        sync: false
+      - key: CATALOG_ANTHROPIC_MODEL
+        value: claude-haiku-5-5
       - key: CATALOG_RESEND_API_KEY
         sync: false
       - key: CATALOG_RESEND_FROM_EMAIL

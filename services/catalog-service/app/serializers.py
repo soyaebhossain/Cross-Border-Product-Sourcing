@@ -121,7 +121,7 @@ def serialize_saved_quote(saved_quote: SavedQuote) -> dict[str, Any]:
             "source": stored_explanation.provider,
             "model": stored_explanation.model,
             "prompt_version": stored_explanation.prompt_version,
-            "automation_available": stored_explanation.provider == "ollama-via-n8n",
+            "automation_available": stored_explanation.provider in {"claude-api", "ollama-via-n8n"},
             "monetary_calculations_are_deterministic": True,
         }
     return {

@@ -17,6 +17,9 @@ function explanationSource(quote: SavedQuote, bn: boolean) {
   const metadata = quote.response?.ai_metadata;
   const source = typeof metadata?.source === "string" ? metadata.source.trim() : "";
   const model = typeof metadata?.model === "string" ? metadata.model.trim() : "";
+  if (source === "claude-api") {
+    return model ? `Claude · ${model}` : "Claude API";
+  }
   if (metadata?.automation_available || source === "ollama-via-n8n") {
     return model ? `Ollama · ${model}` : "Ollama via n8n";
   }
@@ -125,7 +128,7 @@ export default function SavedQuotesPage() {
           const recommendedChecks = explanation
             ? localizedAiItems(explanation.recommended_checks, locale, bn ? "কোনো যাচাইয়ের তথ্য দেওয়া হয়নি।" : "No checks were supplied.", explanation.language)
             : [];
-          const aiIsLive = Boolean(quote.response?.ai_metadata?.automation_available || quote.response?.ai_metadata?.source === "ollama-via-n8n");
+          const aiIsLive = Boolean(quote.response?.ai_metadata?.automation_available || ["claude-api", "ollama-via-n8n"].includes(quote.response?.ai_metadata?.source ?? ""));
           return <article key={quote.id} className={`comparison-card saved-quote-card ${selected.has(quote.id) ? "comparison-card--selected" : ""} ${expired ? "comparison-card--expired" : ""}`}>
             <div className="comparison-card__top"><label className="comparison-select"><input type="checkbox" checked={selected.has(quote.id)} disabled={!selected.has(quote.id) && selected.size >= 3} onChange={event => setSelected(current => { const next = new Set(current); if (event.target.checked) next.add(quote.id); else next.delete(quote.id); return next; })} /><span>{bn ? "তুলনা করুন" : "Compare"}</span></label><div>{best ? <span className="badge">{bn ? "সেরা মূল্য" : "Best value"}</span> : null}<span className={`admin-status admin-status--${expired ? "expired" : (quote.status || "requested").toLowerCase()}`}>{expired ? "EXPIRED" : (quote.status || "requested").toUpperCase()}</span></div></div>
             <small>{bn ? "কোট" : "Quote"} #{quote.id} · {formatDateTime(quote.created_at, intlLocale)}</small>

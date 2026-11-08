@@ -113,7 +113,7 @@ export type QuoteResponse = {
   };
   ai_explanation?: AiExplanation;
   ai_metadata?: {
-    source: "ollama-via-n8n" | "deterministic-fallback" | string;
+    source: "claude-api" | "ollama-via-n8n" | "deterministic-fallback" | string;
     model?: string | null;
     prompt_version?: string;
     automation_available: boolean;
@@ -244,7 +244,7 @@ export type CheapestCountryRecommendation = {
   data_gaps: string[];
   ai_explanation?: AiExplanation;
   ai_metadata?: {
-    source: "ollama-via-n8n" | "deterministic-fallback" | string;
+    source: "claude-api" | "ollama-via-n8n" | "deterministic-fallback" | string;
     model?: string | null;
     automation_available: boolean;
     monetary_calculations_are_deterministic: boolean;

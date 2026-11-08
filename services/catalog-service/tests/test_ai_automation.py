@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from urllib.error import URLError
 
 import pytest
 
@@ -303,3 +304,172 @@ def test_country_automation_context_is_bounded() -> None:
     assert context["recommendations"][0]["supplier"] == "Supplier CN"
     assert "large_unused_field" not in context["recommendations"][0]
     assert len(context["data_gaps"]) == 5
+
+
+class _FakeClaudeMessages:
+    def __init__(self, outcome):
+        self.outcome = outcome
+        self.calls: list[dict] = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        if isinstance(self.outcome, BaseException):
+            raise self.outcome
+        return self.outcome
+
+
+class _FakeClaudeClient:
+    def __init__(self, outcome):
+        self.messages = _FakeClaudeMessages(outcome)
+
+
+def _claude_message(payload, stop_reason: str = "end_turn"):
+    from types import SimpleNamespace
+
+    text = payload if isinstance(payload, str) else json.dumps(payload, ensure_ascii=False)
+    return SimpleNamespace(
+        stop_reason=stop_reason,
+        content=[
+            SimpleNamespace(type="thinking", thinking=""),
+            SimpleNamespace(type="text", text=text),
+        ],
+    )
+
+
+def _claude_settings(**overrides) -> Settings:
+    values = {
+        "database_url": "sqlite://",
+        "anthropic_api_key": "test-anthropic-key",
+        "automation_webhook_url": "http://n8n:5678/webhook/sourceai-quote-explanation",
+        "automation_webhook_token": "secret-token",
+    }
+    values.update(overrides)
+    return Settings(**values)
+
+
+def _use_fake_claude(monkeypatch, outcome) -> _FakeClaudeClient:
+    client = _FakeClaudeClient(outcome)
+    monkeypatch.setattr(automation, "_claude_client", lambda *_args: client)
+
+    def fail_webhook(*_args, **_kwargs):
+        raise AssertionError("n8n webhook must not be called when Claude is configured")
+
+    monkeypatch.setattr(automation, "urlopen", fail_webhook)
+    return client
+
+
+def test_claude_explanation_is_validated_and_takes_priority_over_n8n(monkeypatch) -> None:
+    client = _use_fake_claude(
+        monkeypatch,
+        _claude_message(
+            {
+                "summary": "China is the strongest option at the calculated landed cost.",
+                "language": "en",
+                "advantages": ["Lowest landed cost"],
+                "risks": ["Long delivery window"],
+                "missing_information": ["Live carrier quote"],
+                "recommended_checks": ["Confirm the HS code"],
+                "confidence": 0.62,
+                "human_review_required": False,
+            }
+        ),
+    )
+
+    result = automation.explain_recommendation(_recommendation("High"), _claude_settings())
+
+    assert result.source == "claude-api"
+    assert result.automation_available is True
+    assert result.model == "claude-haiku-5-5"
+    assert result.explanation["summary"].startswith("China is the strongest option")
+    assert result.explanation["confidence"] == 0.62
+    # High risk keeps mandatory review even when the model says otherwise.
+    assert result.explanation["human_review_required"] is True
+    call = client.messages.calls[0]
+    assert call["model"] == "claude-haiku-5-5"
+    assert call["output_config"]["format"]["type"] == "json_schema"
+    assert "12000.00" in call["messages"][0]["content"]
+
+
+def test_claude_bangla_request_rejects_english_copy(monkeypatch) -> None:
+    _use_fake_claude(
+        monkeypatch,
+        _claude_message(
+            {
+                "summary": "English-only summary",
+                "language": "en",
+                "advantages": ["lowest landed cost"],
+                "risks": [],
+                "missing_information": [],
+                "recommended_checks": [],
+                "confidence": 0.5,
+                "human_review_required": False,
+            }
+        ),
+    )
+    recommendation = _recommendation()
+    recommendation["response_language"] = "bn"
+
+    result = automation.explain_recommendation(recommendation, _claude_settings())
+
+    assert result.source == "claude-api"
+    assert result.explanation["language"] == "bn"
+    assert "বর্তমান যাচাইযোগ্য হিসাব" in result.explanation["summary"]
+
+
+@pytest.mark.parametrize("stop_reason", ["refusal", "max_tokens"])
+def test_claude_incomplete_response_falls_back(monkeypatch, stop_reason: str) -> None:
+    _use_fake_claude(monkeypatch, _claude_message('{"summary": "trunc', stop_reason=stop_reason))
+
+    result = automation.explain_recommendation(_recommendation(), _claude_settings())
+
+    assert result.source == "deterministic-fallback"
+    assert result.automation_available is False
+    assert result.model is None
+
+
+def test_claude_connection_error_falls_back(monkeypatch) -> None:
+    import anthropic
+    import httpx2
+
+    request = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
+    _use_fake_claude(monkeypatch, anthropic.APIConnectionError(request=request))
+
+    result = automation.explain_recommendation(_recommendation(), _claude_settings())
+
+    assert result.source == "deterministic-fallback"
+    assert "China" in result.explanation["summary"]
+
+
+def test_claude_invalid_key_falls_back(monkeypatch) -> None:
+    import anthropic
+    import httpx2
+
+    request = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
+    response = httpx2.Response(401, request=request)
+    _use_fake_claude(
+        monkeypatch,
+        anthropic.AuthenticationError("invalid x-api-key", response=response, body=None),
+    )
+
+    result = automation.explain_recommendation(_recommendation(), _claude_settings())
+
+    assert result.source == "deterministic-fallback"
+
+
+def test_blank_claude_key_keeps_existing_n8n_path(monkeypatch) -> None:
+    settings = _claude_settings(anthropic_api_key="   ")
+    assert settings.claude_explanations_configured is False
+    monkeypatch.setattr(
+        automation,
+        "_claude_client",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("Claude must not be called")),
+    )
+    monkeypatch.setattr(
+        automation,
+        "urlopen",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(URLError("n8n offline")),
+    )
+
+    result = automation.explain_recommendation(_recommendation(), settings)
+
+    assert result.source == "deterministic-fallback"

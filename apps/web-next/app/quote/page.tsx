@@ -285,7 +285,9 @@ export default function QuotePage() {
               <article className="form-card" aria-labelledby="ai-explanation-title">
                 <div className="section__header">
                   <div>
-                    <p className="eyebrow">{bn ? "AI-সহায়িত ব্যাখ্যা" : "AI-assisted explanation"}</p>
+                    <p className="eyebrow">{aiMetadata?.automation_available
+                      ? (bn ? "AI-সহায়িত ব্যাখ্যা" : "AI-assisted explanation")
+                      : (bn ? "নিয়মভিত্তিক ব্যাখ্যা" : "Rule-based explanation")}</p>
                     <h2 id="ai-explanation-title">{bn ? "সোর্সিং সিদ্ধান্তের ব্যাখ্যা" : "Sourcing decision explanation"}</h2>
                   </div>
                   <span className={`admin-status admin-status--${aiExplanation.human_review_required ? "pending" : "approved"}`}>
@@ -303,7 +305,7 @@ export default function QuotePage() {
                 </div>
                 <small>
                   {aiMetadata?.automation_available
-                    ? (bn ? `${aiMetadata.model || "local AI"} দিয়ে তৈরি।` : `Generated with ${aiMetadata.model || "local AI"}.`)
+                    ? (bn ? `${aiMetadata.model || "AI"} দিয়ে তৈরি।` : `Generated with ${aiMetadata.model || "AI"}.`)
                     : (bn ? "AI সেবা পাওয়া যায়নি; নির্ধারিত fallback দেখানো হয়েছে।" : "AI service unavailable; deterministic fallback shown.")}
                   {aiExplanation.confidence !== null
                     ? (bn ? ` স্ব-প্রতিবেদিত আস্থা: ${Math.round(aiExplanation.confidence * 100)}%।` : ` Self-reported confidence: ${Math.round(aiExplanation.confidence * 100)}%.`)

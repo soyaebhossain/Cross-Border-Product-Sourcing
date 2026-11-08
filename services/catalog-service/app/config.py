@@ -93,6 +93,10 @@ class Settings(BaseSettings):
     automation_webhook_token: str | None = None
     automation_timeout_seconds: float = 50.0
     automation_model: str = "qwen3:1.7b"
+    # When set, sourcing explanations are written by the Claude API and the
+    # n8n/Ollama webhook is not called. Monetary values stay server-calculated.
+    anthropic_api_key: SecretStr | None = None
+    anthropic_model: str = "claude-haiku-5-5"
 
     model_config = SettingsConfigDict(
         env_prefix="CATALOG_",
@@ -120,6 +124,11 @@ class Settings(BaseSettings):
     def resend_email_configured(self) -> bool:
         api_key = self.resend_api_key.get_secret_value().strip() if self.resend_api_key else ""
         return bool(api_key and (self.resend_from_email or "").strip())
+
+    @property
+    def claude_explanations_configured(self) -> bool:
+        api_key = self.anthropic_api_key.get_secret_value().strip() if self.anthropic_api_key else ""
+        return bool(api_key and self.anthropic_model.strip())
 
     @property
     def smtp_email_configured(self) -> bool:

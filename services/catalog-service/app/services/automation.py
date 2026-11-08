@@ -1,12 +1,62 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+import anthropic
+
 from ..config import Settings
+
+logger = logging.getLogger(__name__)
+
+CLAUDE_SOURCE = "claude-api"
+OLLAMA_SOURCE = "ollama-via-n8n"
+FALLBACK_SOURCE = "deterministic-fallback"
+LIVE_AI_SOURCES = frozenset({CLAUDE_SOURCE, OLLAMA_SOURCE})
+
+_CLAUDE_SYSTEM_PROMPT = """\
+You are SourceAI, a cautious cross-border sourcing explanation assistant for importers in Bangladesh.
+
+You receive a recommendation that the server has already calculated. Explain only that recommendation:
+- Never change, recalculate, or invent monetary values, delivery times, supplier names, or ratings. Quote figures \
+exactly as supplied, or leave them out.
+- Write every natural-language string, including every array item, in the requested language only. For Bangla, \
+write natural Bangla; product names and technical terms such as HS code or MOQ may stay in Latin script. For \
+English, use no Bangla script.
+- Use short, plain sentences a small-business buyer can act on. Give at most 3 items in each list.
+- If the supplied risk level is Medium or High, set human_review_required to true.
+- confidence is your own 0-1 estimate of how well the supplied data supports the recommendation; use lower values \
+when data gaps are listed."""
+
+_CLAUDE_OUTPUT_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "summary": {"type": "string"},
+        "language": {"type": "string", "enum": ["en", "bn"]},
+        "advantages": {"type": "array", "items": {"type": "string"}},
+        "risks": {"type": "array", "items": {"type": "string"}},
+        "missing_information": {"type": "array", "items": {"type": "string"}},
+        "recommended_checks": {"type": "array", "items": {"type": "string"}},
+        "confidence": {"type": "number"},
+        "human_review_required": {"type": "boolean"},
+    },
+    "required": [
+        "summary",
+        "language",
+        "advantages",
+        "risks",
+        "missing_information",
+        "recommended_checks",
+        "confidence",
+        "human_review_required",
+    ],
+    "additionalProperties": False,
+}
 
 
 @dataclass(frozen=True)
@@ -14,6 +64,7 @@ class AutomationResult:
     explanation: dict[str, Any]
     source: str
     automation_available: bool
+    model: str | None = None
 
 
 def normalize_explanation_language(value: Any) -> str:
@@ -145,8 +196,10 @@ def explain_recommendation(
 ) -> AutomationResult:
     language = normalize_explanation_language(recommendation.get("response_language"))
     fallback = fallback_explanation(recommendation)
+    if settings.claude_explanations_configured:
+        return _explain_with_claude(recommendation, fallback, language, settings)
     if not settings.automation_webhook_url or not settings.automation_webhook_token:
-        return AutomationResult(fallback, "deterministic-fallback", False)
+        return AutomationResult(fallback, FALLBACK_SOURCE, False)
 
     payload = json.dumps(
         {
@@ -179,15 +232,84 @@ def explain_recommendation(
     try:
         with urlopen(request, timeout=settings.automation_timeout_seconds) as response:  # noqa: S310
             if not 200 <= int(response.status) < 300:
-                return AutomationResult(fallback, "deterministic-fallback", False)
+                return AutomationResult(fallback, FALLBACK_SOURCE, False)
             body = json.loads(response.read(131_072).decode("utf-8"))
     except (HTTPError, URLError, OSError, TimeoutError, json.JSONDecodeError, UnicodeDecodeError):
-        return AutomationResult(fallback, "deterministic-fallback", False)
+        return AutomationResult(fallback, FALLBACK_SOURCE, False)
     explanation = body.get("explanation", body) if isinstance(body, dict) else body
     return AutomationResult(
         validated_explanation(explanation, fallback, language=language),
-        "ollama-via-n8n",
+        OLLAMA_SOURCE,
         True,
+        settings.automation_model,
+    )
+
+
+@lru_cache(maxsize=4)
+def _claude_client(api_key: str, timeout_seconds: float) -> anthropic.Anthropic:
+    # One pooled client per key/timeout; constructing a client per request
+    # would discard the HTTP connection pool on every explanation.
+    return anthropic.Anthropic(api_key=api_key, timeout=timeout_seconds, max_retries=1)
+
+
+def _explain_with_claude(
+    recommendation: dict[str, Any],
+    fallback: dict[str, Any],
+    language: str,
+    settings: Settings,
+) -> AutomationResult:
+    assert settings.anthropic_api_key is not None
+    model = settings.anthropic_model.strip()
+    client = _claude_client(
+        settings.anthropic_api_key.get_secret_value().strip(),
+        settings.automation_timeout_seconds,
+    )
+    requested = "Bangla (bn)" if language == "bn" else "English (en)"
+    user_content = (
+        f"Requested language: {requested}.\n\n"
+        "Recommendation data (JSON):\n"
+        f"{json.dumps(recommendation, default=str, ensure_ascii=False)}"
+    )
+    try:
+        response = client.messages.create(
+            model=model,
+            max_tokens=8000,
+            system=_CLAUDE_SYSTEM_PROMPT,
+            messages=[{"role": "user", "content": user_content}],
+            output_config={
+                "effort": "low",
+                "format": {"type": "json_schema", "schema": _CLAUDE_OUTPUT_SCHEMA},
+            },
+        )
+    except (anthropic.AuthenticationError, anthropic.PermissionDeniedError) as error:
+        logger.error("Claude explanation rejected the configured API key (status %s)", error.status_code)
+        return AutomationResult(fallback, FALLBACK_SOURCE, False)
+    except anthropic.RateLimitError:
+        logger.warning("Claude explanation rate limited; serving deterministic fallback")
+        return AutomationResult(fallback, FALLBACK_SOURCE, False)
+    except anthropic.APIStatusError as error:
+        # The API error message (e.g. "credit balance is too low") never contains the key.
+        logger.warning("Claude explanation failed with status %s: %s", error.status_code, str(error.message)[:300])
+        return AutomationResult(fallback, FALLBACK_SOURCE, False)
+    except anthropic.APIConnectionError:
+        logger.warning("Claude explanation unreachable or timed out; serving deterministic fallback")
+        return AutomationResult(fallback, FALLBACK_SOURCE, False)
+
+    if response.stop_reason != "end_turn":
+        # refusal or max_tokens: the JSON may be absent or truncated.
+        logger.warning("Claude explanation stopped with %s; serving deterministic fallback", response.stop_reason)
+        return AutomationResult(fallback, FALLBACK_SOURCE, False)
+    text = next((block.text for block in response.content if block.type == "text"), "")
+    try:
+        explanation = json.loads(text)
+    except json.JSONDecodeError:
+        logger.warning("Claude explanation returned invalid JSON; serving deterministic fallback")
+        return AutomationResult(fallback, FALLBACK_SOURCE, False)
+    return AutomationResult(
+        validated_explanation(explanation, fallback, language=language),
+        CLAUDE_SOURCE,
+        True,
+        model,
     )
 
 

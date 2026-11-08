@@ -36,7 +36,14 @@ from ..schemas import (
     UpdateOrderStatusIn,
 )
 from .sourcing import build_quote, get_variant_or_404
-from .automation import fallback_explanation, quote_automation_context, validated_explanation
+from .automation import (
+    FALLBACK_SOURCE,
+    LIVE_AI_SOURCES,
+    OLLAMA_SOURCE,
+    fallback_explanation,
+    quote_automation_context,
+    validated_explanation,
+)
 
 
 CurrentUser = dict[str, Any]
@@ -188,16 +195,14 @@ def save_quote_record(session: Session, payload: SaveQuoteIn, current_user: Curr
         )
         metadata = payload.response.get("ai_metadata")
         metadata = metadata if isinstance(metadata, dict) else {}
-        provider = (
-            "ollama-via-n8n"
-            if metadata.get("source") == "ollama-via-n8n"
-            else "deterministic-fallback"
-        )
+        reported_source = metadata.get("source")
+        provider = reported_source if reported_source in LIVE_AI_SOURCES else FALLBACK_SOURCE
         reported_model = str(metadata.get("model") or "").strip()[:100]
+        default_model = "qwen3:1.7b" if provider == OLLAMA_SOURCE else None
         review_required = bool(explanation.get("human_review_required"))
         saved_quote.ai_explanation = AIDecisionExplanation(
             provider=provider,
-            model=(reported_model or "qwen3:1.7b") if provider == "ollama-via-n8n" else None,
+            model=(reported_model or default_model) if provider in LIVE_AI_SOURCES else None,
             prompt_version="quote-v1",
             deterministic_snapshot=context,
             explanation=explanation,
