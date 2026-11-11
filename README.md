@@ -91,6 +91,33 @@ Supplier offers, freight and duty still come from the catalog dataset or
 administrator entry. Marketplace, carrier and customs-tariff feeds can be added
 as further `price_source = "api"` adapters without changing the quote logic.
 
+## Exchange-rate outlook and country risk
+
+Both features use published external data, stored with its source and date.
+Neither is produced by the AI layer.
+
+- **FX outlook.** The API stores one observed BDT rate per currency per day
+  (`pricing_fx_rate_history`, from the open fawazahmed0 currency-api dataset,
+  150 days by default). The outlook is a random walk with drift on daily log
+  returns over a 30-day horizon, reported as an expected rate with a 90%
+  interval. Every response includes a walk-forward backtest (mean absolute
+  percent error and interval coverage on past forecasts), so the stated
+  accuracy is measured, not assumed. Quotes turn the interval into a landed
+  cost range; only the product cost and the percentage charges on it move with
+  the rate. It needs at least 30 stored days and says so when it has fewer.
+  It forecasts exchange rates only, not supplier prices or freight.
+- **Country risk.** `sourcing_country_risk_indicators` holds three World Bank
+  indicators per origin country: political stability (WGI), regulatory quality
+  (WGI) and the Logistics Performance Index, each with its data year. The
+  composite is their mean on a 0-100 scale (Low from 70, Medium from 55,
+  otherwise High; these thresholds are a project choice). Medium and High
+  country risk add to a route's risk score and appear as a weakness.
+- **Refresh.** With FX auto-refresh enabled the API fills missing history days
+  and refreshes the indicators monthly. Admins can run
+  `POST /api/admin/market-data/refresh/`. Public reads:
+  `GET /api/market/fx-outlook/?currency=USD` and
+  `GET /api/market/country-risk/`.
+
 ## Run locally on Windows
 
 Install the backend and frontend dependencies once:

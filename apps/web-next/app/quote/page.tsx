@@ -7,6 +7,7 @@ import { getCountries, getProducts, quoteProductWithAi, saveQuote, type Country,
 import { localizedAiItems, localizedAiSummary } from "../../lib/ai-explanation-locale";
 import { formatBdt } from "../../lib/format";
 import { PricingProvenance } from "../../components/pricing-provenance";
+import { FxOutlookPanel } from "../../components/fx-outlook";
 import { useLocale } from "../../lib/locale-context";
 
 export default function QuotePage() {
@@ -280,6 +281,7 @@ export default function QuotePage() {
               </div>
             </div>
             <PricingProvenance pricing={response?.pricing} bn={bn} intlLocale={intlLocale} />
+            <FxOutlookPanel outlook={response?.fx_outlook} bn={bn} intlLocale={intlLocale} />
             <div className="form-actions">
               <button type="button" className="button button--primary" onClick={handleSave} disabled={savedQuoteId !== null}>{savedQuoteId ? "Saved to comparisons" : "Save for comparison"}</button>
             </div>

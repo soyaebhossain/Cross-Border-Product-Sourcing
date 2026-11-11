@@ -108,6 +108,12 @@ class Settings(BaseSettings):
     pricing_freight_max_age_days: int = 30
     pricing_duty_max_age_days: int = 365
     quote_reprice_tolerance_percent: float = 2.0
+    # Market intelligence: observed FX history for the outlook, World Bank country risk.
+    fx_history_url_template: str = (
+        "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@{date}/v1/currencies/usd.min.json"
+    )
+    fx_history_days: int = 150
+    fx_outlook_horizon_days: int = 30
 
     model_config = SettingsConfigDict(
         env_prefix="CATALOG_",

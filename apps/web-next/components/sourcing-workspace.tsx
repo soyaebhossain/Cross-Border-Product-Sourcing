@@ -125,6 +125,7 @@ export function SourcingWorkspace({ variantId }: { variantId: number }) {
               <div><small>{bn ? "ল্যান্ডেড কস্ট" : "Landed cost"}{item.pricing_status === "indicative" ? (bn ? " · আনুমানিক" : " · indicative") : item.pricing_status === "verified" ? (bn ? " · যাচাইকৃত" : " · verified") : ""}</small><strong>{formatBdt(item.estimated_total_bdt, intlLocale)}</strong></div>
               <div><small>{bn ? "ডেলিভারি" : "Delivery"}</small><strong>{item.eta.min_days}–{item.eta.max_days} {bn ? "দিন" : "days"}</strong></div>
               <div><small>{bn ? "স্কোর" : "Score"}</small><strong>{Number(item.score).toFixed(1)}/100</strong></div>
+              {item.country_risk ? <div title={item.country_risk.indicators.map((indicator) => `${indicator.name}: ${indicator.score} (${indicator.year})`).join("\n")}><small>{bn ? "দেশের স্থিতিশীলতা" : "Country stability"}</small><strong>{item.country_risk.score.toFixed(0)}/100</strong></div> : null}
               <span className={`risk-badge risk-badge--${item.risk_level.toLowerCase()}`}>{riskLabel(item.risk_level)}</span>
               <p>{localizedRecommendationText(locale, item.reason)}{item.weaknesses.length ? ` ${bn ? "সতর্কতা" : "Watch"}: ${item.weaknesses.map((value) => localizedRecommendationText(locale, value)).join(", ")}.` : ""}</p>
               {index === 0 ? <span className="best-badge">{bn ? "সুপারিশকৃত" : "Recommended"}</span> : selectedIndex === index ? <span className="selected-badge">{bn ? "নির্বাচিত" : "Selected"}</span> : null}

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Boolean, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint, func, text
+from sqlalchemy import BigInteger, Boolean, Date, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -882,3 +882,35 @@ class PaymentProofDecision(Base):
     )
 
     attempt: Mapped["PaymentProofAttempt"] = relationship(back_populates="decisions")
+
+
+class FxRateHistory(Base):
+    """One observed BDT rate per currency per day, kept for volatility and forecasting."""
+
+    __tablename__ = "pricing_fx_rate_history"
+    __table_args__ = (UniqueConstraint("currency", "rate_date", name="uq_fx_history_currency_date"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False, index=True)
+    rate_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    rate_to_bdt: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
+    source: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CountryRiskIndicator(Base):
+    """A published country-level indicator (0-100, higher is better) with its source and year."""
+
+    __tablename__ = "sourcing_country_risk_indicators"
+    __table_args__ = (UniqueConstraint("country_id", "indicator_code", name="uq_country_risk_indicator"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    country_id: Mapped[int] = mapped_column(ForeignKey("sourcing_countries.id"), nullable=False, index=True)
+    indicator_code: Mapped[str] = mapped_column(String(40), nullable=False)
+    indicator_name: Mapped[str] = mapped_column(String(160), nullable=False)
+    score: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
+    data_year: Mapped[int] = mapped_column(Integer, nullable=False)
+    source: Mapped[str] = mapped_column(String(160), nullable=False)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    country: Mapped["Country"] = relationship()

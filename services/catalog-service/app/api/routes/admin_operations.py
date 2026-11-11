@@ -1974,6 +1974,19 @@ def refresh_fx_rates_now(
     return result.as_dict()
 
 
+@router.post("/api/admin/market-data/refresh/")
+def refresh_market_data(
+    session: Session = Depends(get_session),
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, int]:
+    """Pull missing FX history and the latest World Bank country indicators now."""
+
+    require_admin(user)
+    from ...services.market_intelligence import sync_market_data
+
+    return sync_market_data(session, get_settings())
+
+
 @router.get("/api/admin/pricing/freshness/")
 def pricing_freshness(
     session: Session = Depends(get_session),

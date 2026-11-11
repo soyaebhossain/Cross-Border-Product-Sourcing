@@ -304,6 +304,15 @@ class FxRefreshScheduler:
                 return None
             return refresh_currency_rates(session, self._settings)
 
+    def sync_market_data_if_due(self) -> dict[str, int] | None:
+        # Imported here because market_intelligence depends on this module.
+        from .market_intelligence import market_data_due, sync_market_data
+
+        with self._session_factory() as session:
+            if not market_data_due(session):
+                return None
+            return sync_market_data(session, self._settings)
+
     def _run(self) -> None:
         # Let the API finish starting before the first network call.
         if self._stop.wait(5):
@@ -313,6 +322,10 @@ class FxRefreshScheduler:
                 self.run_once()
             except Exception:  # noqa: BLE001 - a failed refresh must never stop the scheduler
                 logger.exception("FX refresh scheduler iteration failed")
+            try:
+                self.sync_market_data_if_due()
+            except Exception:  # noqa: BLE001
+                logger.exception("Market data sync failed")
             # Check hourly; run_once only calls the provider when rates are due.
             if self._stop.wait(min(self.interval.total_seconds(), 3600)):
                 return

@@ -22,6 +22,7 @@ from ..models import (
 from ..config import get_settings
 from ..schemas import CheapestCountryRecommendIn, QuoteRecommendIn, QuoteRequestIn
 from ..serializers import decimal_str
+from .market_intelligence import country_risk_map, fx_outlook
 from .pricing import FreshnessPolicy, price_component, pricing_summary
 
 
@@ -317,7 +318,17 @@ def build_quote(session: Session, payload: QuoteRequestIn) -> dict[str, Any]:
         )
     )
 
+    outlook = _landed_cost_outlook(
+        session,
+        fx_rate=fx_rate,
+        origin_bdt=origin_bdt,
+        total=total,
+        duty_percent=Decimal(duty_rule.percent),
+        mode=payload.mode,
+    )
+
     return {
+        "fx_outlook": outlook,
         "offers_top": [
             {
                 "id": offer.id,
@@ -357,6 +368,41 @@ def build_quote(session: Session, payload: QuoteRequestIn) -> dict[str, Any]:
             "duty_scope": "category" if duty_rule.category_id is not None else "country",
             "vat_percent": "5.00",
         },
+    }
+
+
+def _landed_cost_outlook(
+    session: Session,
+    *,
+    fx_rate: CurrencyRate | None,
+    origin_bdt: Decimal,
+    total: Decimal,
+    duty_percent: Decimal,
+    mode: str,
+) -> dict[str, Any] | None:
+    """Landed-cost range if the offer currency moves within its FX outlook interval.
+
+    Only the product cost and the percentage charges on it move with the
+    exchange rate; freight and fixed fees are BDT amounts and stay constant.
+    """
+
+    if fx_rate is None:
+        return None
+    outlook = fx_outlook(session, fx_rate.currency, get_settings().fx_outlook_horizon_days)
+    if not outlook.get("available"):
+        return outlook
+    fee_rule = session.scalar(
+        select(ServiceFeeRule).where(ServiceFeeRule.mode == mode, ServiceFeeRule.is_active.is_(True))
+    )
+    fee_percent = Decimal(fee_rule.percent) if fee_rule else Decimal("0")
+    # Total changes by this much for every 1 BDT change in product cost (5% is the VAT rate used above).
+    multiplier = Decimal("1") + (duty_percent + Decimal("5") + fee_percent) / Decimal("100")
+    low = total + origin_bdt * Decimal(str(outlook["low_change_percent"])) / Decimal("100") * multiplier
+    high = total + origin_bdt * Decimal(str(outlook["high_change_percent"])) / Decimal("100") * multiplier
+    return {
+        **outlook,
+        "total_low_bdt": decimal_str(quantize_bdt(low)),
+        "total_high_bdt": decimal_str(quantize_bdt(high)),
     }
 
 
@@ -408,7 +454,13 @@ def normalized_weights(payload: CheapestCountryRecommendIn) -> dict[str, Decimal
     return {key: value / total for key, value in mapped.items()}
 
 
-def risk_assessment(reliability: Decimal, quality: Decimal, eta_max: int, mode: str) -> tuple[str, Decimal, list[str]]:
+def risk_assessment(
+    reliability: Decimal,
+    quality: Decimal,
+    eta_max: int,
+    mode: str,
+    country_risk_level: str | None = None,
+) -> tuple[str, Decimal, list[str]]:
     points = Decimal("0")
     weaknesses: list[str] = []
     if reliability < Decimal("0.65"):
@@ -419,6 +471,10 @@ def risk_assessment(reliability: Decimal, quality: Decimal, eta_max: int, mode: 
         points += Decimal("0.25"); weaknesses.append("delivery time is long")
     if mode == "BULK":
         points += Decimal("0.10"); weaknesses.append("sea freight has higher delay exposure")
+    if country_risk_level == "High":
+        points += Decimal("0.25"); weaknesses.append("country risk is elevated")
+    elif country_risk_level == "Medium":
+        points += Decimal("0.10"); weaknesses.append("country risk is moderate")
     level = "High" if points >= Decimal("0.60") else "Medium" if points >= Decimal("0.30") else "Low"
     return level, min(points, Decimal("1")), weaknesses
 
@@ -442,6 +498,7 @@ def build_country_recommendations(
     if not countries:
         raise HTTPException(status_code=404, detail="No sourcing countries found")
 
+    country_risks = country_risk_map(session)
     recommendations: list[dict[str, Any]] = []
     for country in countries:
         for mode in ("LOCAL", "BULK"):
@@ -479,7 +536,14 @@ def build_country_recommendations(
             eta_max = Decimal(str(quote["eta"]["max_days"]))
             quality_score = Decimal(selected_offer.seller.rating or 0) * Decimal("2.00")
             reliability_score = build_reliability_score(selected_offer, payload.qty)
-            risk_level, risk_score, weaknesses = risk_assessment(reliability_score, quality_score, int(eta_max), mode)
+            country_risk = country_risks.get(country.id)
+            risk_level, risk_score, weaknesses = risk_assessment(
+                reliability_score,
+                quality_score,
+                int(eta_max),
+                mode,
+                country_risk["level"] if country_risk else None,
+            )
 
             recommendations.append(
                 {
@@ -493,6 +557,8 @@ def build_country_recommendations(
                     "eta": quote["eta"],
                     "pricing_status": quote["pricing"]["status"],
                     "stale_price_components": quote["pricing"]["stale_components"],
+                    "country_risk": country_risk,
+                    "fx_outlook": quote.get("fx_outlook"),
                     "quality_score": quality_score,
                     "reliability_score": reliability_score,
                     "selected_offer": {
@@ -552,6 +618,8 @@ def build_country_recommendations(
                 "eta": item["eta"],
                 "pricing_status": item["pricing_status"],
                 "stale_price_components": item["stale_price_components"],
+                "country_risk": item["country_risk"],
+                "fx_outlook": item["fx_outlook"],
                 "quality_score": decimal_str(item["quality_score"]),
                 "reliability_score": decimal_str(item["reliability_score"]),
                 "risk_level": item["risk_level"],

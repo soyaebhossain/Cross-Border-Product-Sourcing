@@ -117,7 +117,9 @@ def fallback_explanation(recommendation: dict[str, Any]) -> dict[str, Any]:
         "Delivery time is long": "ডেলিভারি সময় বেশি",
         "Sea freight has additional delay exposure": "সমুদ্রপথে অতিরিক্ত বিলম্বের ঝুঁকি রয়েছে",
         "Carrier quote, tariff classification and supplier documents require final verification.": "ক্যারিয়ার কোট, ট্যারিফ শ্রেণিবিন্যাস ও সাপ্লায়ারের নথি চূড়ান্তভাবে যাচাই করা প্রয়োজন।",
-        STALE_PRICE_WEAKNESS: "কিছু দামের তথ্য নির্ধারিত সময়সীমার চেয়ে পুরনো",
+        "country risk is elevated": "দেশভিত্তিক ঝুঁকি বেশি (World Bank সূচক)",
+        "country risk is moderate": "দেশভিত্তিক ঝুঁকি মাঝারি (World Bank সূচক)",
+        STALE_PRICE_WEAKNESS:"কিছু দামের তথ্য নির্ধারিত সময়সীমার চেয়ে পুরনো",
         INDICATIVE_PRICE_GAP: "দাম আনুমানিক: অর্ডারের আগে কিছু দামের তথ্য আবার যাচাই করতে হবে।",
         "Carrier quote is not live":"লাইভ ক্যারিয়ার কোট পাওয়া যায়নি",
     }
@@ -393,6 +395,8 @@ def country_automation_context(recommendation: dict[str, Any], *, language: str 
                 "supplier": offer.get("seller_name"),
                 "pricing_status": route.get("pricing_status"),
                 "stale_price_components": list(route.get("stale_price_components") or []),
+                "country_risk_level": (route.get("country_risk") or {}).get("level"),
+                "country_risk_score": (route.get("country_risk") or {}).get("score"),
             }
         )
     data_gaps = list(recommendation.get("data_gaps") or [])

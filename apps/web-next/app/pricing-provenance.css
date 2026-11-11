@@ -10,3 +10,6 @@
 @media (max-width: 560px) {
   .pricing-provenance__status { text-align: left; }
 }
+@media (min-width: 901px) {
+  .supplier-option { grid-template-columns: 40px 1.5fr 1fr 1fr .7fr .9fr auto; }
+}

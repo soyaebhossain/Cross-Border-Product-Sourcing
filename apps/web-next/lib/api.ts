@@ -104,6 +104,34 @@ export type QuotePricing = {
   stale_components: string[];
 };
 
+export type FxOutlook = {
+  currency: string;
+  horizon_days: number;
+  history_points: number;
+  source: string;
+  method: string;
+  available: boolean;
+  reason?: string;
+  history_from?: string;
+  history_to?: string;
+  last_rate_to_bdt?: number;
+  expected_rate_to_bdt?: number;
+  low_rate_to_bdt?: number;
+  high_rate_to_bdt?: number;
+  low_change_percent?: number;
+  high_change_percent?: number;
+  total_low_bdt?: string;
+  total_high_bdt?: string;
+  backtest?: { forecasts_scored: number; mean_absolute_percent_error: number; interval_coverage_percent: number } | null;
+};
+
+export type CountryRisk = {
+  score: number;
+  level: "Low" | "Medium" | "High";
+  source: string;
+  indicators: Array<{ code: string; name: string; score: number; year: number }>;
+};
+
 export type QuoteResponse = {
   offers_top?: Array<{
     id: number;
@@ -116,6 +144,7 @@ export type QuoteResponse = {
   }>;
   selected_offer_id?: number;
   pricing?: QuotePricing;
+  fx_outlook?: FxOutlook | null;
   breakdown?: {
     product_cost_bdt: string;
     origin_price_bdt: string;
@@ -228,6 +257,8 @@ export type RecommendationItem = {
   estimated_total_bdt: string;
   pricing_status?: "verified" | "indicative";
   stale_price_components?: string[];
+  country_risk?: CountryRisk | null;
+  fx_outlook?: FxOutlook | null;
   estimated_shipping_bdt: string;
   estimated_duty_vat_bdt: string;
   estimated_service_fee_bdt: string;

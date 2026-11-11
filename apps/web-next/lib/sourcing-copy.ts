@@ -96,6 +96,8 @@ const recommendationTextBn: Record<string, string> = {
   "quality evidence is below target": "গুণমানের প্রমাণ লক্ষ্যমাত্রার নিচে",
   "delivery time is long": "ডেলিভারি সময় বেশি",
   "sea freight has higher delay exposure": "সমুদ্রপথে বিলম্বের ঝুঁকি বেশি",
+  "country risk is elevated": "দেশভিত্তিক ঝুঁকি বেশি",
+  "country risk is moderate": "দেশভিত্তিক ঝুঁকি মাঝারি",
 };
 
 export function localizedRecommendationText(locale: AppLocale, value: string) {
