@@ -19,6 +19,9 @@ OLLAMA_SOURCE = "ollama-via-n8n"
 FALLBACK_SOURCE = "deterministic-fallback"
 LIVE_AI_SOURCES = frozenset({CLAUDE_SOURCE, OLLAMA_SOURCE})
 
+STALE_PRICE_WEAKNESS = "Some price inputs are older than the freshness policy"
+INDICATIVE_PRICE_GAP = "Prices are indicative: some price inputs must be re-verified before ordering."
+
 _CLAUDE_SYSTEM_PROMPT = """\
 You are SourceAI, a cautious cross-border sourcing explanation assistant for importers in Bangladesh.
 
@@ -30,6 +33,9 @@ write natural Bangla; product names and technical terms such as HS code or MOQ m
 English, use no Bangla script.
 - Use short, plain sentences a small-business buyer can act on. Give at most 3 items in each list.
 - If the supplied risk level is Medium or High, set human_review_required to true.
+- pricing_status tells you whether every price input is within its freshness policy. If it is "indicative", say \
+the prices are indicative and must be re-verified before ordering, and set human_review_required to true. Never \
+describe prices as live, current, or guaranteed.
 - confidence is your own 0-1 estimate of how well the supplied data supports the recommendation; use lower values \
 when data gaps are listed."""
 
@@ -111,7 +117,9 @@ def fallback_explanation(recommendation: dict[str, Any]) -> dict[str, Any]:
         "Delivery time is long": "ডেলিভারি সময় বেশি",
         "Sea freight has additional delay exposure": "সমুদ্রপথে অতিরিক্ত বিলম্বের ঝুঁকি রয়েছে",
         "Carrier quote, tariff classification and supplier documents require final verification.": "ক্যারিয়ার কোট, ট্যারিফ শ্রেণিবিন্যাস ও সাপ্লায়ারের নথি চূড়ান্তভাবে যাচাই করা প্রয়োজন।",
-        "Carrier quote is not live": "লাইভ ক্যারিয়ার কোট পাওয়া যায়নি",
+        STALE_PRICE_WEAKNESS: "কিছু দামের তথ্য নির্ধারিত সময়সীমার চেয়ে পুরনো",
+        INDICATIVE_PRICE_GAP: "দাম আনুমানিক: অর্ডারের আগে কিছু দামের তথ্য আবার যাচাই করতে হবে।",
+        "Carrier quote is not live":"লাইভ ক্যারিয়ার কোট পাওয়া যায়নি",
     }
     translate = lambda value: translations.get(str(value), str(value)) if language == "bn" else str(value)  # noqa: E731
     advantages = [translate(value) for value in top.get("advantages") or []][:5]
@@ -337,9 +345,17 @@ def quote_automation_context(
     if mode == "BULK":
         risk_points += 1
         weaknesses.append("Sea freight has additional delay exposure")
+    pricing = quote.get("pricing") if isinstance(quote.get("pricing"), dict) else {}
+    stale_components = [str(item) for item in pricing.get("stale_components") or []]
+    if stale_components:
+        risk_points += 1
+        weaknesses.append(STALE_PRICE_WEAKNESS)
     risk_level = "High" if risk_points >= 2 else "Medium" if risk_points == 1 else "Low"
+    data_gaps = [INDICATIVE_PRICE_GAP] if stale_components else []
+    data_gaps.append("Carrier quote, tariff classification and supplier documents require final verification.")
     return {
         "response_language": language,
+        "pricing_status": pricing.get("status"),
         "recommendations": [
             {
                 "country": {"code": country_code.upper(), "name": country_code.upper()},
@@ -350,11 +366,11 @@ def quote_automation_context(
                 "estimated_total_bdt": (quote.get("breakdown") or {}).get("total_bdt"),
                 "eta": quote.get("eta"),
                 "selected_offer": offers[0] if offers else None,
+                "pricing_status": pricing.get("status"),
+                "stale_price_components": stale_components,
             }
         ],
-        "data_gaps": [
-            "Carrier quote, tariff classification and supplier documents require final verification."
-        ],
+        "data_gaps": data_gaps,
     }
 
 
@@ -375,13 +391,19 @@ def country_automation_context(recommendation: dict[str, Any], *, language: str 
                 "advantages": list(route.get("advantages") or [])[:3],
                 "weaknesses": list(route.get("weaknesses") or [])[:3],
                 "supplier": offer.get("seller_name"),
+                "pricing_status": route.get("pricing_status"),
+                "stale_price_components": list(route.get("stale_price_components") or []),
             }
         )
+    data_gaps = list(recommendation.get("data_gaps") or [])
+    if recommendation.get("pricing_status") == "indicative":
+        data_gaps.insert(0, INDICATIVE_PRICE_GAP)
     return {
         "response_language": language,
+        "pricing_status": recommendation.get("pricing_status"),
         "product": recommendation.get("product"),
         "priority": recommendation.get("priority"),
         "qty": recommendation.get("qty"),
         "recommendations": compact_routes,
-        "data_gaps": list(recommendation.get("data_gaps") or [])[:5],
+        "data_gaps": data_gaps[:5],
     }

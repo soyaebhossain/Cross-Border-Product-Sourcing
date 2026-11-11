@@ -48,6 +48,49 @@ python services/catalog-service/scripts/export_ml_starter_datasets.py
 python services/catalog-service/scripts/export_ml_starter_datasets.py --check
 ```
 
+## Live pricing and price freshness
+
+Cross-border costs move daily, so SourceAI never presents a stored price as a
+current market price without saying where it came from and how old it is.
+
+Pipeline: verified or live data → deterministic landed-cost rules → AI
+explanation → human verification. The AI layer never calculates or changes a
+monetary value.
+
+- **Provenance.** Supplier offers, currency rates, freight rate cards and duty
+  rules record `price_source` (`seeded`, `csv_import`, `admin`,
+  `supplier_quote`, `api`), `source_reference`, `verified_at` and an optional
+  `valid_until`. Seeded and migrated rows have no `verified_at`, so they are
+  reported as unverified. An administrator saving a price stamps it as
+  admin-verified at that moment.
+- **Freshness policy.** Every quote returns a `pricing` block listing each
+  input with its source, verification time and maximum age (defaults: FX 48 h,
+  supplier offer 7 days, freight 30 days, duty 365 days or its `effective_to`).
+  If any input is stale or unverified the quote is `indicative`; otherwise it
+  is `verified`. The quote page shows this to the customer, and the AI
+  explanation must say indicative prices need re-verification and requires
+  human review.
+- **Live FX.** With `CATALOG_FX_AUTO_REFRESH_ENABLED=true` the API refreshes
+  every active currency's BDT rate from
+  [ExchangeRate-API](https://www.exchangerate-api.com) (open access, daily
+  updates, attribution shown on the quote page) every
+  `CATALOG_FX_REFRESH_INTERVAL_HOURS`. A move larger than
+  `CATALOG_FX_MAX_CHANGE_PERCENT` against a recent live rate is held for an
+  administrator instead of repricing every quote. Admins can also refresh from
+  **Admin → Rules → Refresh live FX**, or a scheduler can run
+  `python -m scripts.refresh_fx_rates`.
+- **Re-pricing before ordering.** Ordering from a saved quote recalculates the
+  landed cost with current data. A change within
+  `CATALOG_QUOTE_REPRICE_TOLERANCE_PERCENT` (default 2%) keeps the saved price;
+  a larger change blocks the order and asks the customer for a new quote. The
+  check is stored in the order's `quote_snapshot.reprice_check`.
+- **Admin visibility.** `GET /api/admin/pricing/freshness/` and the Rules page
+  show how many active inputs of each kind are stale or unverified.
+
+Supplier offers, freight and duty still come from the catalog dataset or
+administrator entry. Marketplace, carrier and customs-tariff feeds can be added
+as further `price_source = "api"` adapters without changing the quote logic.
+
 ## Run locally on Windows
 
 Install the backend and frontend dependencies once:

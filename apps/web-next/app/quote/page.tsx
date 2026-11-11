@@ -6,6 +6,7 @@ import type { Route } from "next";
 import { getCountries, getProducts, quoteProductWithAi, saveQuote, type Country, type Product, type QuoteResponse } from "../../lib/api";
 import { localizedAiItems, localizedAiSummary } from "../../lib/ai-explanation-locale";
 import { formatBdt } from "../../lib/format";
+import { PricingProvenance } from "../../components/pricing-provenance";
 import { useLocale } from "../../lib/locale-context";
 
 export default function QuotePage() {
@@ -278,6 +279,7 @@ export default function QuotePage() {
                 <span>{formatBdt(summary.remaining_bdt, intlLocale)}</span>
               </div>
             </div>
+            <PricingProvenance pricing={response?.pricing} bn={bn} intlLocale={intlLocale} />
             <div className="form-actions">
               <button type="button" className="button button--primary" onClick={handleSave} disabled={savedQuoteId !== null}>{savedQuoteId ? "Saved to comparisons" : "Save for comparison"}</button>
             </div>

@@ -4,9 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminModal } from "../../../components/admin-modal";
 import {
   archiveAdminSetting,
+  getAdminPricingFreshness,
   getAdminSettings,
+  refreshAdminFxRates,
   saveAdminSetting,
   type AdminSettings,
+  type PricingFreshness,
 } from "../../../lib/admin-api";
 import { getLiveCategories, getLiveCountries, type Category, type Country } from "../../../lib/api";
 import { formatAmount, formatDateTime } from "../../../lib/format";
@@ -43,6 +46,26 @@ function rowValue(row: RuleRow, intlLocale: string) {
   if ("method" in row) return `${row.min_kg}–${row.max_kg} kg · ৳${formatAmount(row.cost_bdt, intlLocale)}`;
   if ("delivery_type" in row) return `${row.min_days}–${row.max_days} days`;
   return `${formatAmount(row.percent, intlLocale)}% + ৳${formatAmount(row.fixed_bdt, intlLocale)}`;
+}
+
+const SOURCE_LABELS: Record<string, { en: string; bn: string }> = {
+  api: { en: "Live feed", bn: "লাইভ ফিড" },
+  admin: { en: "Admin verified", bn: "অ্যাডমিন যাচাই" },
+  supplier_quote: { en: "Supplier quote", bn: "সাপ্লায়ার কোট" },
+  csv_import: { en: "CSV import", bn: "CSV import" },
+  seeded: { en: "Seeded, unverified", bn: "Seed ডেটা, যাচাই হয়নি" },
+};
+const FRESHNESS_LABELS: Record<string, { en: string; bn: string }> = {
+  supplier_offer: { en: "Supplier offers", bn: "সাপ্লায়ার অফার" },
+  fx_rate: { en: "Exchange rates", bn: "বিনিময় হার" },
+  freight: { en: "Freight rates", bn: "শিপিং রেট" },
+  customs_duty: { en: "Duty rules", bn: "ডিউটি রুল" },
+};
+
+function provenanceText(row: RuleRow, bn: boolean, intlLocale: string) {
+  if (!("price_source" in row) || !row.price_source) return "—";
+  const label = SOURCE_LABELS[row.price_source]?.[bn ? "bn" : "en"] ?? row.price_source;
+  return row.verified_at ? `${label} · ${formatDateTime(row.verified_at, intlLocale)}` : label;
 }
 
 function blankFields(type: RuleType, countries: Country[], categories: Category[]): Record<string, string> {
@@ -89,8 +112,15 @@ export default function AdminRulesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [toast, setToast] = useState<{ message: string; kind: "success" | "error" } | null>(null);
+  const [freshness, setFreshness] = useState<PricingFreshness | null>(null);
+  const [refreshingFx, setRefreshingFx] = useState(false);
   const { locale, intlLocale } = useLocale();
   const bn = locale === "bn";
+
+  // Freshness is advisory: a failure here must never hide the rules table.
+  const loadFreshness = useCallback(async () => {
+    try { setFreshness(await getAdminPricingFreshness()); } catch { setFreshness(null); }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -108,6 +138,7 @@ export default function AdminRulesPage() {
   }, [bn]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void loadFreshness(); }, [loadFreshness]);
 
   const tab = tabs.find(item => item.type === type) || tabs[0];
   const rows = useMemo(() => (settings?.[tab.key] || []) as RuleRow[], [settings, tab.key]);
@@ -131,6 +162,24 @@ export default function AdminRulesPage() {
   const setField = (key: string, value: string) => setFields(current => ({ ...current, [key]: value }));
   const switchType = (next: RuleType) => {
     setType(next); setPage(1); setSelected(new Set()); setQ(""); setActiveFilter(""); setDateFrom(""); setDateTo("");
+  };
+  const runFxRefresh = async () => {
+    setRefreshingFx(true);
+    try {
+      const result = await refreshAdminFxRates();
+      if (!result.ok) {
+        notify(result.error || (bn ? "লাইভ FX আনা যায়নি।" : "Live FX rates could not be fetched."), "error");
+      } else {
+        const rejected = result.rejected.length ? (bn ? `, ${result.rejected.length}টি অস্বাভাবিক পরিবর্তন আটকানো হয়েছে` : `, ${result.rejected.length} unusual moves held for review`) : "";
+        notify(bn ? `${result.updated.length}টি বিনিময় হার ${result.provider} থেকে আপডেট হয়েছে${rejected}।` : `${result.updated.length} exchange rates updated from ${result.provider}${rejected}.`, result.rejected.length ? "error" : "success");
+      }
+      await load();
+      await loadFreshness();
+    } catch (reason) {
+      notify(reason instanceof Error ? reason.message : (bn ? "লাইভ FX আনা যায়নি।" : "Live FX rates could not be fetched."), "error");
+    } finally {
+      setRefreshingFx(false);
+    }
   };
   const openNew = () => { setEditing("new"); setFields(blankFields(type, countries, categories)); setNote(""); setError(""); };
   const openEdit = (row: RuleRow) => { setEditing(row); setFields(fieldsFromRow(type, row)); setNote(""); setError(""); };
@@ -204,8 +253,10 @@ export default function AdminRulesPage() {
   return <div className="admin-page">
     <header className="admin-page-header">
       <div><p className="admin-eyebrow">{bn ? "গ্লোবাল অপারেশন কনফিগারেশন" : "Global operations configuration"}</p><h1>{bn ? "Shipping, currency ও duty rules" : "Shipping, currency and duty rules"}</h1><p>{bn ? "Price calculation ও delivery estimate-এ ব্যবহৃত server-side rules পরিচালনা করুন।" : "Manage the server-side rules used in price calculation and delivery estimates."}</p></div>
-      <div className="admin-toolbar"><button className="admin-button admin-button--secondary" type="button" disabled={!filtered.length} onClick={() => window.print()}>{bn ? "প্রিন্ট / PDF" : "Print / PDF"}</button><button className="admin-button admin-button--secondary" type="button" disabled={!filtered.length} onClick={exportCsv}>{bn ? "CSV এক্সপোর্ট" : "Export CSV"}</button><button className="admin-button admin-button--primary" type="button" onClick={openNew}>{bn ? "রুল যোগ করুন" : "Add rule"}</button></div>
+      <div className="admin-toolbar"><button className="admin-button admin-button--secondary" type="button" disabled={!filtered.length} onClick={() => window.print()}>{bn ? "প্রিন্ট / PDF" : "Print / PDF"}</button><button className="admin-button admin-button--secondary" type="button" disabled={!filtered.length} onClick={exportCsv}>{bn ? "CSV এক্সপোর্ট" : "Export CSV"}</button><button className="admin-button admin-button--secondary" type="button" disabled={refreshingFx} onClick={() => void runFxRefresh()}>{refreshingFx ? (bn ? "FX আনা হচ্ছে…" : "Fetching FX…") : (bn ? "লাইভ FX রিফ্রেশ" : "Refresh live FX")}</button><button className="admin-button admin-button--primary" type="button" onClick={openNew}>{bn ? "রুল যোগ করুন" : "Add rule"}</button></div>
     </header>
+
+    {freshness ? <section className="admin-kpi-grid" aria-label={bn ? "দামের তথ্যের সতেজতা" : "Price data freshness"}>{freshness.components.map(item => <article className="admin-kpi" key={item.component}><div><span>{FRESHNESS_LABELS[item.component]?.[bn ? "bn" : "en"] ?? item.component}</span></div><strong>{new Intl.NumberFormat(intlLocale).format(item.stale)} / {new Intl.NumberFormat(intlLocale).format(item.active)}</strong><small>{bn ? `পুরনো বা অযাচাইকৃত · সর্বোচ্চ বয়স ${item.max_age_hours} ঘণ্টা` : `stale or unverified · max age ${item.max_age_hours} h`}</small></article>)}</section> : null}
 
     <nav className="admin-subnav" aria-label={bn ? "রুলের ধরন" : "Rule types"}>{tabs.map(item => <button key={item.type} type="button" className={type === item.type ? "admin-subnav--active" : ""} onClick={() => switchType(item.type)}>{item.label}</button>)}</nav>
 
@@ -220,8 +271,8 @@ export default function AdminRulesPage() {
         {selected.size ? <div className="admin-bulk-actions"><button className="admin-row-button admin-row-button--danger" type="button" onClick={() => { setBulkArchived(true); setNote(""); }}>Archive ({selected.size})</button><button className="admin-row-button admin-row-button--approve" type="button" onClick={() => { setBulkArchived(false); setNote(""); }}>Restore ({selected.size})</button></div> : null}
       </div>
       <div className="admin-table-wrap"><table className="admin-data-table">
-        <thead><tr><th className="admin-checkbox-cell"><input type="checkbox" aria-label={bn ? "সব rule নির্বাচন" : "Select all rules"} checked={allSelected} onChange={event => setSelected(event.target.checked ? new Set(visibleRows.map(row => row.id)) : new Set())} /></th><th>ID</th><th>{bn ? "Rule" : "Rule"}</th><th>{bn ? "মান" : "Value"}</th><th>{bn ? "অবস্থা" : "Status"}</th><th>{bn ? "আপডেট" : "Updated"}</th><th><span className="sr-only">{bn ? "অ্যাকশন" : "Actions"}</span></th></tr></thead>
-        <tbody>{visibleRows.map(row => <tr key={row.id}><td className="admin-checkbox-cell"><input type="checkbox" aria-label={`Select rule ${row.id}`} checked={selected.has(row.id)} onChange={event => setSelected(current => { const next = new Set(current); if (event.target.checked) next.add(row.id); else next.delete(row.id); return next; })} /></td><td>#{row.id}</td><td><strong>{rowSummary(row)}</strong></td><td>{rowValue(row, intlLocale)}</td><td><span className={`admin-status admin-status--${row.is_active ? "active" : "inactive"}`}>{row.is_active ? "ACTIVE" : "ARCHIVED"}</span></td><td>{formatDateTime(row.updated_at, intlLocale)}</td><td className="admin-actions-cell"><div className="admin-inline-actions"><button className="admin-row-button" type="button" onClick={() => openEdit(row)}>Edit</button><button className={row.is_active ? "admin-row-button admin-row-button--danger" : "admin-row-button admin-row-button--approve"} type="button" onClick={() => { setArchiveTarget({ row, archived: row.is_active }); setNote(""); }}>{row.is_active ? "Archive" : "Restore"}</button></div></td></tr>)}</tbody>
+        <thead><tr><th className="admin-checkbox-cell"><input type="checkbox" aria-label={bn ? "সব rule নির্বাচন" : "Select all rules"} checked={allSelected} onChange={event => setSelected(event.target.checked ? new Set(visibleRows.map(row => row.id)) : new Set())} /></th><th>ID</th><th>{bn ? "Rule" : "Rule"}</th><th>{bn ? "মান" : "Value"}</th><th>{bn ? "উৎস ও যাচাই" : "Source / verified"}</th><th>{bn ? "অবস্থা" : "Status"}</th><th>{bn ? "আপডেট" : "Updated"}</th><th><span className="sr-only">{bn ? "অ্যাকশন" : "Actions"}</span></th></tr></thead>
+        <tbody>{visibleRows.map(row => <tr key={row.id}><td className="admin-checkbox-cell"><input type="checkbox" aria-label={`Select rule ${row.id}`} checked={selected.has(row.id)} onChange={event => setSelected(current => { const next = new Set(current); if (event.target.checked) next.add(row.id); else next.delete(row.id); return next; })} /></td><td>#{row.id}</td><td><strong>{rowSummary(row)}</strong></td><td>{rowValue(row, intlLocale)}</td><td>{provenanceText(row, bn, intlLocale)}</td><td><span className={`admin-status admin-status--${row.is_active ? "active" : "inactive"}`}>{row.is_active ? "ACTIVE" : "ARCHIVED"}</span></td><td>{formatDateTime(row.updated_at, intlLocale)}</td><td className="admin-actions-cell"><div className="admin-inline-actions"><button className="admin-row-button" type="button" onClick={() => openEdit(row)}>Edit</button><button className={row.is_active ? "admin-row-button admin-row-button--danger" : "admin-row-button admin-row-button--approve"} type="button" onClick={() => { setArchiveTarget({ row, archived: row.is_active }); setNote(""); }}>{row.is_active ? "Archive" : "Restore"}</button></div></td></tr>)}</tbody>
       </table></div>
       {!visibleRows.length ? <div className="admin-empty"><strong>{bn ? "কোনো rule পাওয়া যায়নি" : "No rules found"}</strong><span>{bn ? "Filter পরিবর্তন করুন বা নতুন rule যোগ করুন।" : "Change the filters or add a new rule."}</span></div> : null}
       <footer className="admin-pagination"><span>{filtered.length} {bn ? "রেকর্ড" : "records"}</span><div><button type="button" disabled={page <= 1} onClick={() => setPage(current => Math.max(1, current - 1))}>{bn ? "আগের" : "Previous"}</button><span>{bn ? "পৃষ্ঠা" : "Page"} {Math.min(page, pages)} / {pages}</span><button type="button" disabled={page >= pages} onClick={() => setPage(current => current + 1)}>{bn ? "পরের" : "Next"}</button></div><label><span>{bn ? "প্রতি পৃষ্ঠা" : "Per page"}</span><select value={pageSize} onChange={event => { setPageSize(Number(event.target.value)); setPage(1); }}><option value="10">10</option><option value="20">20</option><option value="50">50</option></select></label></footer>
@@ -229,7 +280,7 @@ export default function AdminRulesPage() {
 
     <AdminModal open={editing !== null} onClose={() => !saving && setEditing(null)} title={editing === "new" ? (bn ? "রুল যোগ করুন" : "Add rule") : (bn ? "রুল সম্পাদনা" : "Edit rule")} description={bn ? "এই মানগুলো live price ও ETA calculation-এ ব্যবহৃত হবে; প্রতিটি পরিবর্তন audit করা হয়।" : "These values feed live price and ETA calculations; every change is audited."}>
       <form className="admin-modal__form" onSubmit={save}>
-        {type === "currencies" ? <><label><span>{bn ? "মুদ্রা কোড" : "Currency code"}</span><input minLength={3} maxLength={10} pattern="[A-Za-z]+" required value={fields.currency || ""} onChange={event => setField("currency", event.target.value)} /></label><label><span>{bn ? "BDT rate" : "Rate to BDT"}</span><input type="number" min=".0001" step=".0001" required value={fields.rate_to_bdt || ""} onChange={event => setField("rate_to_bdt", event.target.value)} /></label></> : null}
+        {type === "currencies" ? <><label><span>{bn ? "মুদ্রা কোড" : "Currency code"}</span><input minLength={3} maxLength={10} pattern="[A-Za-z]+" required value={fields.currency || ""} onChange={event => setField("currency", event.target.value)} /></label><label><span>{bn ? "BDT rate" : "Rate to BDT"}</span><input type="number" min="0.00000001" step="any" required value={fields.rate_to_bdt || ""} onChange={event => setField("rate_to_bdt", event.target.value)} /></label></> : null}
         {type === "service-fees" ? <><label><span>{bn ? "মোড" : "Mode"}</span><select value={fields.mode || "LOCAL"} onChange={event => setField("mode", event.target.value)}><option value="LOCAL">LOCAL</option><option value="BULK">BULK</option></select></label><label><span>{bn ? "স্থির fee (BDT)" : "Fixed fee (BDT)"}</span><input type="number" min="0" step=".01" required value={fields.fee_bdt || "0"} onChange={event => setField("fee_bdt", event.target.value)} /></label><label><span>{bn ? "শতাংশ" : "Percent"}</span><input type="number" min="0" max="100" step=".01" required value={fields.percent || "0"} onChange={event => setField("percent", event.target.value)} /></label></> : null}
         {type === "shipping-rates" || type === "eta-rules" || type === "duty-rules" ? <label><span>{bn ? "দেশ" : "Country"}</span><select required value={fields.country_id || ""} onChange={event => setField("country_id", event.target.value)}>{countries.map(country => <option key={country.id} value={country.id}>{country.code} · {country.name}</option>)}</select></label> : null}
         {type === "shipping-rates" ? <><label><span>{bn ? "পদ্ধতি" : "Method"}</span><select value={fields.method || "AIR"} onChange={event => setField("method", event.target.value)}><option value="AIR">AIR</option><option value="SEA">SEA</option></select></label><label><span>Min kg</span><input type="number" min="0" step=".001" required value={fields.min_kg || "0"} onChange={event => setField("min_kg", event.target.value)} /></label><label><span>Max kg</span><input type="number" min=".001" step=".001" required value={fields.max_kg || ""} onChange={event => setField("max_kg", event.target.value)} /></label><label><span>{bn ? "খরচ (BDT)" : "Cost (BDT)"}</span><input type="number" min="0" step=".01" required value={fields.cost_bdt || "0"} onChange={event => setField("cost_bdt", event.target.value)} /></label></> : null}

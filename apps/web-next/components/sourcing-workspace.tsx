@@ -122,7 +122,7 @@ export function SourcingWorkspace({ variantId }: { variantId: number }) {
             >
               <div className="supplier-rank">#{item.rank}</div>
               <div><strong>{item.selected_offer.seller_name}</strong><span>{item.country.name} · {item.mode}</span></div>
-              <div><small>{bn ? "ল্যান্ডেড কস্ট" : "Landed cost"}</small><strong>{formatBdt(item.estimated_total_bdt, intlLocale)}</strong></div>
+              <div><small>{bn ? "ল্যান্ডেড কস্ট" : "Landed cost"}{item.pricing_status === "indicative" ? (bn ? " · আনুমানিক" : " · indicative") : item.pricing_status === "verified" ? (bn ? " · যাচাইকৃত" : " · verified") : ""}</small><strong>{formatBdt(item.estimated_total_bdt, intlLocale)}</strong></div>
               <div><small>{bn ? "ডেলিভারি" : "Delivery"}</small><strong>{item.eta.min_days}–{item.eta.max_days} {bn ? "দিন" : "days"}</strong></div>
               <div><small>{bn ? "স্কোর" : "Score"}</small><strong>{Number(item.score).toFixed(1)}/100</strong></div>
               <span className={`risk-badge risk-badge--${item.risk_level.toLowerCase()}`}>{riskLabel(item.risk_level)}</span>

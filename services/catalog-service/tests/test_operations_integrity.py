@@ -18,7 +18,9 @@ from app.models import (
     Base,
     Category,
     Country,
+    CurrencyRate,
     CustomerAddress,
+    DutyRule,
     ManualPaymentProof,
     Order,
     OrderItem,
@@ -30,6 +32,7 @@ from app.models import (
     Seller,
     SellerOffer,
     Shipment,
+    ShippingRateCard,
 )
 from app.schema_upgrade import upgrade_sqlite_schema
 from app.schemas import AdminPaymentDecisionIn, CreateOrderIn, UpdateOrderStatusIn
@@ -91,6 +94,22 @@ class OperationsIntegrityTests(unittest.TestCase):
             moq=1,
         )
         self.session.add_all([self.product, self.user, self.country, self.seller, self.offer])
+        # Current pricing data that reproduces the saved 1000.00 total exactly:
+        # 2 x 10 USD x 40 = 800 + freight 100 + duty 55 + VAT 5% of 900 (45).
+        self.usd_rate = CurrencyRate(currency="USD", rate_to_bdt=Decimal("40"))
+        self.session.add_all(
+            [
+                self.usd_rate,
+                ShippingRateCard(
+                    country=self.country,
+                    method="AIR",
+                    min_kg=Decimal("0"),
+                    max_kg=Decimal("100"),
+                    cost_bdt=Decimal("100.00"),
+                ),
+                DutyRule(country=self.country, percent=Decimal("0"), fixed_bdt=Decimal("55.00")),
+            ]
+        )
         self.session.add(
             CustomerAddress(
                 user_id=CUSTOMER["sub"],
@@ -216,6 +235,46 @@ class OperationsIntegrityTests(unittest.TestCase):
         with self.assertRaises(HTTPException) as raised:
             create_manual_order_record(self.session, duplicate_payload, CUSTOMER)
         self.assertEqual(raised.exception.status_code, 409)
+
+    def test_saved_quote_is_repriced_and_blocked_when_prices_move(self) -> None:
+        quote = self._quote()
+        # USD strengthens 25%: 800 -> 1000 product cost, so the total moves well past 2%.
+        self.usd_rate.rate_to_bdt = Decimal("50")
+        self.session.commit()
+
+        with self.assertRaises(HTTPException) as raised:
+            create_manual_order_record(self.session, self._payload(quote), CUSTOMER)
+
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("Prices changed since this quote was saved", raised.exception.detail)
+        self.assertIn("1000.00", raised.exception.detail)
+        self.assertIsNone(self.session.scalar(select(Order.id).where(Order.saved_quote_id == quote.id)))
+
+    def test_small_price_move_keeps_saved_price_and_records_check(self) -> None:
+        quote = self._quote()
+        # 40 -> 40.2 moves the total by about 0.8%, inside the 2% tolerance.
+        self.usd_rate.rate_to_bdt = Decimal("40.2")
+        self.session.commit()
+
+        order, _ = create_manual_order_record(self.session, self._payload(quote), CUSTOMER)
+
+        self.assertEqual(order.total_bdt, Decimal("1000.00"))
+        check = order.quote_snapshot["reprice_check"]
+        self.assertEqual(check["saved_total_bdt"], "1000.00")
+        self.assertNotEqual(check["current_total_bdt"], "1000.00")
+        self.assertLessEqual(Decimal(check["change_percent"]), Decimal("2"))
+        self.assertEqual(check["current_pricing"]["status"], "indicative")
+
+    def test_saved_quote_without_current_pricing_data_cannot_be_ordered(self) -> None:
+        quote = self._quote()
+        self.usd_rate.is_active = False
+        self.session.commit()
+
+        with self.assertRaises(HTTPException) as raised:
+            create_manual_order_record(self.session, self._payload(quote), CUSTOMER)
+
+        self.assertEqual(raised.exception.status_code, 409)
+        self.assertIn("can no longer be priced", raised.exception.detail)
 
     def test_expired_saved_quote_cannot_create_order(self) -> None:
         quote = self._quote(expired=True)

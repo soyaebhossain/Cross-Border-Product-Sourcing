@@ -97,6 +97,17 @@ class Settings(BaseSettings):
     # n8n/Ollama webhook is not called. Monetary values stay server-calculated.
     anthropic_api_key: SecretStr | None = None
     anthropic_model: str = "claude-haiku-5-5"
+    # Live pricing. Every quote reports each price input's source and age; an
+    # input older than its maximum age makes the quote "indicative".
+    fx_auto_refresh_enabled: bool = False
+    fx_refresh_interval_hours: float = 12.0
+    fx_rates_url: str = "https://open.er-api.com/v6/latest/USD"
+    fx_max_change_percent: float = 15.0
+    pricing_fx_max_age_hours: int = 48
+    pricing_offer_max_age_days: int = 7
+    pricing_freight_max_age_days: int = 30
+    pricing_duty_max_age_days: int = 365
+    quote_reprice_tolerance_percent: float = 2.0
 
     model_config = SettingsConfigDict(
         env_prefix="CATALOG_",
@@ -304,6 +315,8 @@ class Settings(BaseSettings):
                 errors.append("CATALOG_AUTOMATION_WEBHOOK_URL must use HTTPS in production")
         if not 1 <= self.automation_timeout_seconds <= 60:
             errors.append("CATALOG_AUTOMATION_TIMEOUT_SECONDS must be between 1 and 60")
+        if self.fx_auto_refresh_enabled and urlsplit(self.fx_rates_url).scheme != "https":
+            errors.append("CATALOG_FX_RATES_URL must use HTTPS in production")
         ai_data_path = self.resolved_ai_insights_data_path()
         missing_ai_files = [
             filename

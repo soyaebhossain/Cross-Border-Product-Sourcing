@@ -151,11 +151,11 @@ export type AdminAIReview = {
 };
 
 export type AdminSettings = {
-  currencies: Array<{ id: number; currency: string; rate_to_bdt: string; is_active: boolean; updated_at?: string }>;
+  currencies: Array<{ id: number; currency: string; rate_to_bdt: string; price_source?: string; source_reference?: string | null; verified_at?: string | null; valid_until?: string | null; is_active: boolean; updated_at?: string }>;
   service_fees: Array<{ id: number; mode: "LOCAL" | "BULK"; fee_bdt: string; percent: string; is_active: boolean; updated_at?: string }>;
-  shipping_rates: Array<{ id: number; country_id: number; country: string; method: "AIR" | "SEA"; min_kg: string; max_kg: string; cost_bdt: string; is_active: boolean; updated_at?: string }>;
+  shipping_rates: Array<{ id: number; country_id: number; country: string; method: "AIR" | "SEA"; min_kg: string; max_kg: string; cost_bdt: string; price_source?: string; source_reference?: string | null; verified_at?: string | null; valid_until?: string | null; is_active: boolean; updated_at?: string }>;
   eta_rules: Array<{ id: number; country_id: number; country: string; mode: "LOCAL" | "BULK"; delivery_type: "DOOR" | "PICKUP"; min_days: number; max_days: number; is_active: boolean; updated_at?: string }>;
-  duty_rules: Array<{ id: number; country_id: number; country: string; category_id?: number | null; category?: string | null; percent: string; fixed_bdt: string; effective_from?: string | null; effective_to?: string | null; is_active: boolean; updated_at?: string }>;
+  duty_rules: Array<{ id: number; country_id: number; country: string; category_id?: number | null; category?: string | null; percent: string; fixed_bdt: string; effective_from?: string | null; effective_to?: string | null; price_source?: string; source_reference?: string | null; verified_at?: string | null; valid_until?: string | null; is_active: boolean; updated_at?: string }>;
 };
 
 export type AnalyticsOverview = {
@@ -285,6 +285,23 @@ export function createAdminRefund(orderId: number, payload: { amount_bdt: number
 export function reverseAdminRefund(id: number, note: string) { return requestJson<{ refund: AdminAdjustment; financials: Record<string, string | number | null> }>(`/api/admin/refunds/${id}/reverse/`, json("POST", { note })); }
 
 export function getAdminSettings() { return requestJson<AdminSettings>("/api/admin/settings/"); }
+
+export type FxRefreshResult = {
+  ok: boolean;
+  provider: string;
+  provider_url: string;
+  provider_updated_at?: string | null;
+  updated: Array<{ currency: string; previous_rate_to_bdt: string; rate_to_bdt: string; change_percent: string }>;
+  rejected: Array<{ currency: string; previous_rate_to_bdt: string; rate_to_bdt: string; change_percent: string }>;
+  missing: string[];
+  error?: string | null;
+};
+export type PricingFreshness = {
+  checked_at: string;
+  components: Array<{ component: string; active: number; stale: number; max_age_hours: number; oldest_verified_at?: string | null; sources: Record<string, number> }>;
+};
+export function refreshAdminFxRates() { return requestJson<FxRefreshResult>("/api/admin/pricing/fx-refresh/", json("POST", {})); }
+export function getAdminPricingFreshness() { return requestJson<PricingFreshness>("/api/admin/pricing/freshness/"); }
 export function saveAdminSetting<T extends Record<string, unknown>>(type: "currencies" | "service-fees" | "shipping-rates" | "eta-rules" | "duty-rules", payload: T, id?: number) {
   const path = id ? `/api/admin/settings/${type}/${id}/` : `/api/admin/settings/${type}/`;
   return requestJson<Record<string, unknown>>(path, json(id ? "PUT" : "POST", payload));

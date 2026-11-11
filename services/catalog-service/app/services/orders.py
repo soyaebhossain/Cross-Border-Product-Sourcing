@@ -336,6 +336,56 @@ def _require_eligible_locked_offer(
     return offer
 
 
+def _reprice_saved_quote(session: Session, quote: SavedQuote, saved_breakdown: dict[str, Any]) -> dict[str, Any]:
+    """Recalculate the landed cost with current data before honouring a saved quote.
+
+    Prices, FX rates, freight and duty can move after a quote is saved. A small
+    move within the configured tolerance keeps the saved price; a larger one
+    blocks the order so the customer reviews a new quote.
+    """
+
+    try:
+        current = build_quote(
+            session,
+            QuoteRequestIn(
+                variant_id=quote.variant_id,
+                country=quote.country_code,
+                mode=quote.mode,
+                qty=quote.qty,
+                delivery_type=quote.delivery_type,
+            ),
+        )
+    except HTTPException as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="This saved quote can no longer be priced with current data; request a new quote",
+        ) from exc
+    saved_total = _decimal_breakdown(saved_breakdown, "total_bdt")
+    current_total = Decimal(str(current["breakdown"]["total_bdt"]))
+    if saved_total > 0:
+        change_percent = abs(current_total - saved_total) / saved_total * Decimal("100")
+    else:
+        change_percent = Decimal("0") if current_total == saved_total else Decimal("100")
+    change_percent = change_percent.quantize(Decimal("0.01"))
+    tolerance = Decimal(str(get_settings().quote_reprice_tolerance_percent))
+    if change_percent > tolerance:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                f"Prices changed since this quote was saved (BDT {saved_total} -> BDT {current_total}, "
+                f"{change_percent}%). Request a new quote to continue."
+            ),
+        )
+    return {
+        "checked_at": utc_now().isoformat(),
+        "saved_total_bdt": str(saved_total),
+        "current_total_bdt": str(current_total),
+        "change_percent": str(change_percent),
+        "tolerance_percent": str(tolerance),
+        "current_pricing": current.get("pricing"),
+    }
+
+
 def _require_checkout_addresses(session: Session, user_id: int) -> None:
     """Require durable delivery and billing destinations before taking payment."""
     defaults = session.execute(
@@ -457,6 +507,7 @@ def create_manual_order_record(
             mode=quote.mode,
             qty=quote.qty,
         )
+        reprice_check = _reprice_saved_quote(session, quote, breakdown)
         order_country = quote.country_code.upper()
         order_mode = quote.mode
         order_delivery = quote.delivery_type
@@ -498,6 +549,7 @@ def create_manual_order_record(
         order_mode = payload.mode
         order_delivery = payload.delivery_type
         order_qty = payload.qty
+        reprice_check = None
 
     trx_normalized = normalize_transaction_id(payload.trx_id)
     duplicate_payment = _payment_reference_exists(
@@ -528,6 +580,7 @@ def create_manual_order_record(
         "qty": order_qty,
         "offer_id": int(offer_id) if offer_id is not None else None,
         "response": copy.deepcopy(quote_result),
+        "reprice_check": reprice_check,
     }
     order = Order(
         user_id=current_user["sub"],

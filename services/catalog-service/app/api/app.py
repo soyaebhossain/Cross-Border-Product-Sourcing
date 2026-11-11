@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 
 from ..config import Settings, get_settings
-from ..db import Base, engine
+from ..db import Base, SessionLocal, engine
 from ..observability import configure_error_monitoring
 from ..security import (
     BrowserSecurityMiddleware,
@@ -17,6 +17,7 @@ from ..security import (
     configure_request_logging,
 )
 from ..seed import seed_database
+from ..services.pricing import FxRefreshScheduler
 from .routes.auth import router as auth_router
 from .routes.admin import router as admin_router
 from .routes.admin_analytics import router as admin_analytics_router
@@ -47,8 +48,17 @@ def _initialize_database(runtime_settings: Settings) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    _initialize_database(app.state.catalog_settings)
-    yield
+    runtime_settings: Settings = app.state.catalog_settings
+    _initialize_database(runtime_settings)
+    fx_scheduler: FxRefreshScheduler | None = None
+    if runtime_settings.fx_auto_refresh_enabled:
+        fx_scheduler = FxRefreshScheduler(runtime_settings, SessionLocal)
+        fx_scheduler.start()
+    try:
+        yield
+    finally:
+        if fx_scheduler is not None:
+            fx_scheduler.stop()
 
 
 def create_app(app_settings: Settings | None = None) -> FastAPI:

@@ -9,6 +9,21 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base
 
 
+class PriceProvenanceMixin:
+    """Where a price input came from and how long it may be trusted.
+
+    price_source: seeded | csv_import | admin | supplier_quote | api
+    verified_at: when the value was last confirmed against its source. NULL means it
+    was never verified (seeded demo data), so quotes report it as stale.
+    valid_until: optional hard expiry published by the source.
+    """
+
+    price_source: Mapped[str] = mapped_column(String(30), default="seeded", server_default="seeded", nullable=False)
+    source_reference: Mapped[str | None] = mapped_column(String(500))
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class AccountUser(Base):
     __tablename__ = "accounts_users"
 
@@ -175,7 +190,7 @@ class Seller(Base):
     offers: Mapped[list["SellerOffer"]] = relationship(back_populates="seller", cascade="all, delete-orphan")
 
 
-class SellerOffer(Base):
+class SellerOffer(PriceProvenanceMixin, Base):
     __tablename__ = "sourcing_seller_offers"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -198,12 +213,12 @@ class SellerOffer(Base):
     seller: Mapped["Seller"] = relationship(back_populates="offers")
 
 
-class CurrencyRate(Base):
+class CurrencyRate(PriceProvenanceMixin, Base):
     __tablename__ = "pricing_currency_rates"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     currency: Mapped[str] = mapped_column(String(10), unique=True, nullable=False)
-    rate_to_bdt: Mapped[Decimal] = mapped_column(Numeric(12, 4), nullable=False)
+    rate_to_bdt: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1", index=True)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     archived_by_user_id: Mapped[int | None] = mapped_column(Integer)
@@ -227,7 +242,7 @@ class ServiceFeeRule(Base):
     )
 
 
-class ShippingRateCard(Base):
+class ShippingRateCard(PriceProvenanceMixin, Base):
     __tablename__ = "shipping_rate_cards"
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -265,7 +280,7 @@ class ETARule(Base):
     country: Mapped["Country"] = relationship()
 
 
-class DutyRule(Base):
+class DutyRule(PriceProvenanceMixin, Base):
     __tablename__ = "pricing_duty_rules"
 
     id: Mapped[int] = mapped_column(primary_key=True)

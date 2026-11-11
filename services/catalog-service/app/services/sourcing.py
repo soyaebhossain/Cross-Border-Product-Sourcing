@@ -19,8 +19,10 @@ from ..models import (
     ServiceFeeRule,
     ShippingRateCard,
 )
+from ..config import get_settings
 from ..schemas import CheapestCountryRecommendIn, QuoteRecommendIn, QuoteRequestIn
 from ..serializers import decimal_str
+from .pricing import FreshnessPolicy, price_component, pricing_summary
 
 
 BDT_QUANTUM = Decimal("0.01")
@@ -87,10 +89,12 @@ def get_variant_for_recommendation(
     return product.variants[0]
 
 
-def to_bdt(session: Session, amount: Decimal, currency: str) -> Decimal:
+def currency_rate_row(session: Session, currency: str) -> CurrencyRate | None:
+    """Return the active BDT rate row, or None for BDT itself."""
+
     normalized_currency = (currency or "").strip().upper()
     if normalized_currency == "BDT":
-        return amount
+        return None
     rate = session.scalar(
         select(CurrencyRate).where(
             CurrencyRate.currency == normalized_currency,
@@ -102,10 +106,23 @@ def to_bdt(session: Session, amount: Decimal, currency: str) -> Decimal:
             status_code=422,
             detail=f"No active BDT exchange rate is configured for {normalized_currency or 'the offer currency'}",
         )
-    return amount * Decimal(rate.rate_to_bdt)
+    return rate
+
+
+def to_bdt(session: Session, amount: Decimal, currency: str) -> Decimal:
+    rate = currency_rate_row(session, currency)
+    return amount if rate is None else amount * Decimal(rate.rate_to_bdt)
 
 
 def shipping_cost_bdt(session: Session, country: Country, mode: str, total_weight: Decimal) -> Decimal:
+    return shipping_quote(session, country, mode, total_weight)[0]
+
+
+def shipping_quote(
+    session: Session, country: Country, mode: str, total_weight: Decimal
+) -> tuple[Decimal, ShippingRateCard]:
+    """Return the freight cost and the rate card it was taken from."""
+
     method = "AIR" if mode == "LOCAL" else "SEA"
     card = session.scalar(
         select(ShippingRateCard)
@@ -120,7 +137,7 @@ def shipping_cost_bdt(session: Session, country: Country, mode: str, total_weigh
         .limit(1)
     )
     if card:
-        return Decimal(card.cost_bdt)
+        return Decimal(card.cost_bdt), card
 
     largest_card = session.scalar(
         select(ShippingRateCard)
@@ -144,7 +161,7 @@ def shipping_cost_bdt(session: Session, country: Country, mode: str, total_weigh
     band_count = (
         total_weight / Decimal(largest_card.max_kg)
     ).to_integral_value(rounding=ROUND_CEILING)
-    return Decimal(largest_card.cost_bdt) * max(band_count, Decimal("1"))
+    return Decimal(largest_card.cost_bdt) * max(band_count, Decimal("1")), largest_card
 
 
 def eta_range(session: Session, country: Country, mode: str, delivery_type: str) -> tuple[int, int]:
@@ -202,11 +219,11 @@ def build_quote(session: Session, payload: QuoteRequestIn) -> dict[str, Any]:
     selected = top_offers[0]
 
     origin_total = Decimal(selected.price_origin) * Decimal(payload.qty)
-    origin_bdt = quantize_bdt(to_bdt(session, origin_total, selected.currency))
+    fx_rate = currency_rate_row(session, selected.currency)
+    origin_bdt = quantize_bdt(origin_total if fx_rate is None else origin_total * Decimal(fx_rate.rate_to_bdt))
     total_weight = Decimal(variant.weight_kg) * Decimal(payload.qty)
-    shipping_bdt = quantize_bdt(
-        shipping_cost_bdt(session, country, payload.mode, total_weight)
-    )
+    raw_shipping, shipping_card = shipping_quote(session, country, payload.mode, total_weight)
+    shipping_bdt = quantize_bdt(raw_shipping)
     subtotal = origin_bdt + shipping_bdt
     now = datetime.now(timezone.utc)
     duty_rule = session.scalar(
@@ -259,6 +276,47 @@ def build_quote(session: Session, payload: QuoteRequestIn) -> dict[str, Any]:
     remaining = total - advance
     eta_min, eta_max = eta_range(session, country, payload.mode, payload.delivery_type)
 
+    policy = FreshnessPolicy.from_settings(get_settings())
+    components = [
+        price_component(
+            "supplier_offer",
+            selected,
+            max_age=policy.offer_max_age,
+            now=now,
+            reference=selected.source_url or selected.source_reference,
+            details={"currency": selected.currency, "price_origin": decimal_str(selected.price_origin)},
+        )
+    ]
+    if fx_rate is not None:
+        components.append(
+            price_component(
+                "fx_rate",
+                fx_rate,
+                max_age=policy.fx_max_age,
+                now=now,
+                details={"currency": fx_rate.currency, "rate_to_bdt": format(Decimal(fx_rate.rate_to_bdt), "f")},
+            )
+        )
+    components.append(
+        price_component(
+            "freight",
+            shipping_card,
+            max_age=policy.freight_max_age,
+            now=now,
+            details={"method": shipping_card.method},
+        )
+    )
+    components.append(
+        price_component(
+            "customs_duty",
+            duty_rule,
+            max_age=policy.duty_max_age,
+            now=now,
+            valid_until=duty_rule.effective_to,
+            details={"percent": decimal_str(duty_rule.percent)},
+        )
+    )
+
     return {
         "offers_top": [
             {
@@ -273,6 +331,7 @@ def build_quote(session: Session, payload: QuoteRequestIn) -> dict[str, Any]:
             for offer in top_offers
         ],
         "selected_offer_id": selected.id,
+        "pricing": pricing_summary(components, now=now, policy=policy),
         "breakdown": {
             "product_cost_bdt": decimal_str(origin_bdt),
             "origin_price_bdt": decimal_str(origin_bdt),
@@ -432,6 +491,8 @@ def build_country_recommendations(
                     "estimated_duty_vat_bdt": quote["breakdown"]["duty_vat_bdt"],
                     "estimated_service_fee_bdt": quote["breakdown"]["service_fee_bdt"],
                     "eta": quote["eta"],
+                    "pricing_status": quote["pricing"]["status"],
+                    "stale_price_components": quote["pricing"]["stale_components"],
                     "quality_score": quality_score,
                     "reliability_score": reliability_score,
                     "selected_offer": {
@@ -489,6 +550,8 @@ def build_country_recommendations(
                 "estimated_duty_vat_bdt": item["estimated_duty_vat_bdt"],
                 "estimated_service_fee_bdt": item["estimated_service_fee_bdt"],
                 "eta": item["eta"],
+                "pricing_status": item["pricing_status"],
+                "stale_price_components": item["stale_price_components"],
                 "quality_score": decimal_str(item["quality_score"]),
                 "reliability_score": decimal_str(item["reliability_score"]),
                 "risk_level": item["risk_level"],
@@ -523,6 +586,11 @@ def build_country_recommendations(
             "Shipping and tariff rules are still normalized reference estimates until carrier-specific feeds are connected.",
             "External marketplace and tariff feeds should replace seeded heuristics before production rollout.",
         ],
+        "pricing_status": (
+            "verified"
+            if ranked_recommendations and all(item["pricing_status"] == "verified" for item in ranked_recommendations)
+            else "indicative"
+        ),
     }
 
 

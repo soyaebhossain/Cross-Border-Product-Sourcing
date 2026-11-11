@@ -82,6 +82,28 @@ export type AiExplanation = {
   human_review_required: boolean;
 };
 
+export type PriceComponent = {
+  component: "supplier_offer" | "fx_rate" | "freight" | "customs_duty" | string;
+  source: "api" | "admin" | "supplier_quote" | "csv_import" | "seeded" | string;
+  reference?: string | null;
+  verified_at?: string | null;
+  valid_until?: string | null;
+  max_age_hours: number;
+  age_hours?: number | null;
+  fresh: boolean;
+  stale_reasons: string[];
+  currency?: string;
+  rate_to_bdt?: string;
+  method?: string;
+};
+
+export type QuotePricing = {
+  status: "verified" | "indicative";
+  calculated_at: string;
+  components: PriceComponent[];
+  stale_components: string[];
+};
+
 export type QuoteResponse = {
   offers_top?: Array<{
     id: number;
@@ -93,6 +115,7 @@ export type QuoteResponse = {
     moq: number;
   }>;
   selected_offer_id?: number;
+  pricing?: QuotePricing;
   breakdown?: {
     product_cost_bdt: string;
     origin_price_bdt: string;
@@ -203,6 +226,8 @@ export type RecommendationItem = {
   mode: string;
   score: string;
   estimated_total_bdt: string;
+  pricing_status?: "verified" | "indicative";
+  stale_price_components?: string[];
   estimated_shipping_bdt: string;
   estimated_duty_vat_bdt: string;
   estimated_service_fee_bdt: string;

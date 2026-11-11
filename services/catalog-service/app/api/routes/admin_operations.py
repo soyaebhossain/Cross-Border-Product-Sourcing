@@ -36,6 +36,7 @@ from ...admin_schemas import (
 )
 from ...analytics_cache import invalidate_admin_analytics
 from ...auth import get_current_user
+from ...config import get_settings
 from ...db import get_session
 from ...models import (
     AccountUser,
@@ -71,6 +72,7 @@ from ...services.orders import (
     record_admin_audit,
     utc_now,
 )
+from ...services.pricing import FreshnessPolicy, as_aware_utc, refresh_currency_rates
 
 
 router = APIRouter()
@@ -200,6 +202,29 @@ def require_operator(user: dict[str, Any]) -> None:
 def require_admin(user: dict[str, Any]) -> None:
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Administrator access required")
+
+
+def _provenance_json(item: Any) -> dict[str, Any]:
+    return {
+        "price_source": item.price_source,
+        "source_reference": item.source_reference,
+        "verified_at": item.verified_at,
+        "valid_until": item.valid_until,
+    }
+
+
+def _stamp_admin_provenance(item: Any) -> None:
+    """An administrator entering a price is a manual verification at this moment."""
+
+    if hasattr(item, "price_source"):
+        item.price_source = "admin"
+        item.source_reference = None
+        item.verified_at = utc_now()
+        item.valid_until = None
+
+
+def _rate_str(value: Any) -> str:
+    return format(Decimal(value).quantize(Decimal("0.00000001")).normalize(), "f")
 
 
 def _money(value: Any) -> str:
@@ -368,6 +393,7 @@ def _offer_json(item: SellerOffer) -> dict[str, Any]:
         "stock": item.stock,
         "moq": item.moq,
         "source_url": item.source_url,
+        **_provenance_json(item),
         "is_active": item.is_active,
         "archived_at": item.archived_at,
         "archived_by_user_id": item.archived_by_user_id,
@@ -1052,6 +1078,7 @@ def create_offer(
     values = payload.model_dump()
     values["currency"] = _normalized_currency(payload.currency)
     offer = SellerOffer(**values, is_active=True)
+    _stamp_admin_provenance(offer)
     session.add(offer)
     session.flush()
     record_admin_audit(
@@ -1128,6 +1155,8 @@ def update_offer(
     _require_active_currency_rate(session, str(values.get("currency", offer.currency)))
     for field, value in values.items():
         setattr(offer, field, value.strip() if isinstance(value, str) else value)
+    if "price_origin" in values or "currency" in values:
+        _stamp_admin_provenance(offer)
     offer.updated_at = utc_now()
     record_admin_audit(
         session,
@@ -1524,7 +1553,8 @@ def _setting_json(item: Any) -> dict[str, Any]:
         return {
             "id": item.id,
             "currency": item.currency,
-            "rate_to_bdt": format(item.rate_to_bdt, ".4f"),
+            "rate_to_bdt": _rate_str(item.rate_to_bdt),
+            **_provenance_json(item),
             "is_active": item.is_active,
             "updated_at": item.updated_at,
         }
@@ -1546,6 +1576,7 @@ def _setting_json(item: Any) -> dict[str, Any]:
             "min_kg": format(item.min_kg, ".3f"),
             "max_kg": format(item.max_kg, ".3f"),
             "cost_bdt": _money(item.cost_bdt),
+            **_provenance_json(item),
             "is_active": item.is_active,
             "updated_at": item.updated_at,
         }
@@ -1572,6 +1603,7 @@ def _setting_json(item: Any) -> dict[str, Any]:
             "fixed_bdt": _money(item.fixed_bdt),
             "effective_from": item.effective_from,
             "effective_to": item.effective_to,
+            **_provenance_json(item),
             "is_active": item.is_active,
             "updated_at": item.updated_at,
         }
@@ -1642,6 +1674,7 @@ def _upsert_setting(
         session.add(item)
     for field, value in values.items():
         setattr(item, field, value)
+    _stamp_admin_provenance(item)
     item.is_active = True
     item.updated_at = utc_now()
     session.flush()
@@ -1915,3 +1948,70 @@ def archive_setting(
         _require_currency_unused_by_active_offers(session, item.currency)
     _archive(session, item, payload, user, entity_type=entity_type)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/api/admin/pricing/fx-refresh/")
+def refresh_fx_rates_now(
+    session: Session = Depends(get_session),
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Pull live FX rates now instead of waiting for the background refresh."""
+
+    require_admin(user)
+    result = refresh_currency_rates(session, get_settings())
+    if result.ok:
+        record_admin_audit(
+            session,
+            user,
+            action="currency_rate.live_refresh",
+            entity_type="currency_rate",
+            entity_id="live",
+            after=result.as_dict(),
+            note="Manual live FX refresh",
+        )
+        session.commit()
+        invalidate_admin_analytics()
+    return result.as_dict()
+
+
+@router.get("/api/admin/pricing/freshness/")
+def pricing_freshness(
+    session: Session = Depends(get_session),
+    user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Count active price inputs that are past their freshness policy."""
+
+    require_operator(user)
+    policy = FreshnessPolicy.from_settings(get_settings())
+    now = utc_now()
+    groups = (
+        ("supplier_offer", SellerOffer, policy.offer_max_age),
+        ("fx_rate", CurrencyRate, policy.fx_max_age),
+        ("freight", ShippingRateCard, policy.freight_max_age),
+        ("customs_duty", DutyRule, policy.duty_max_age),
+    )
+    components: list[dict[str, Any]] = []
+    for name, model, max_age in groups:
+        rows = session.scalars(select(model).where(model.is_active.is_(True))).all()
+        stale = 0
+        oldest: datetime | None = None
+        sources: dict[str, int] = {}
+        for row in rows:
+            verified_at = as_aware_utc(row.verified_at)
+            expiry = as_aware_utc(row.valid_until)
+            if verified_at is None or now - verified_at > max_age or (expiry is not None and expiry <= now):
+                stale += 1
+            if verified_at is not None and (oldest is None or verified_at < oldest):
+                oldest = verified_at
+            sources[row.price_source] = sources.get(row.price_source, 0) + 1
+        components.append(
+            {
+                "component": name,
+                "active": len(rows),
+                "stale": stale,
+                "max_age_hours": int(max_age.total_seconds() // 3600),
+                "oldest_verified_at": oldest,
+                "sources": sources,
+            }
+        )
+    return {"checked_at": now, "policy": policy.as_dict(), "components": components}

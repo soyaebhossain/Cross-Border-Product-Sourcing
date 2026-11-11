@@ -13,7 +13,7 @@ from sqlalchemy import create_engine, inspect, text
 
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
-HEAD_REVISION = "20260827_07"
+HEAD_REVISION = "20261111_08"
 EXPECTED_TABLES = {
     "accounts_auth_challenges",
     "accounts_refresh_sessions",
@@ -78,6 +78,42 @@ def _upgrade_to_head(database_url: str, revision: str = "head") -> None:
 
 
 class AlembicMigrationTests(unittest.TestCase):
+    def test_price_provenance_migration_marks_legacy_prices_unverified(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            database_url = _sqlite_url(Path(directory) / "provenance.sqlite3")
+            _upgrade_to_head(database_url, "20260827_07")
+            engine = create_engine(database_url)
+            with engine.begin() as connection:
+                connection.execute(
+                    text("INSERT INTO pricing_currency_rates (currency, rate_to_bdt, is_active, updated_at) "
+                         "VALUES ('USD', 110.1234, 1, CURRENT_TIMESTAMP)")
+                )
+            engine.dispose()
+
+            _upgrade_to_head(database_url)
+
+            engine = create_engine(database_url)
+            inspector = inspect(engine)
+            for table_name in (
+                "sourcing_seller_offers",
+                "pricing_currency_rates",
+                "shipping_rate_cards",
+                "pricing_duty_rules",
+            ):
+                columns = {column["name"] for column in inspector.get_columns(table_name)}
+                self.assertTrue(
+                    {"price_source", "source_reference", "verified_at", "valid_until"}.issubset(columns),
+                    table_name,
+                )
+            with engine.connect() as connection:
+                row = connection.execute(
+                    text("SELECT price_source, verified_at, rate_to_bdt FROM pricing_currency_rates")
+                ).one()
+            engine.dispose()
+            self.assertEqual(row[0], "seeded")
+            self.assertIsNone(row[1])
+            self.assertAlmostEqual(float(row[2]), 110.1234, places=4)
+
     def test_latest_migration_configures_duty_and_repairs_known_catalog_rows(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             database_path = Path(directory) / "catalog-quality.sqlite3"
