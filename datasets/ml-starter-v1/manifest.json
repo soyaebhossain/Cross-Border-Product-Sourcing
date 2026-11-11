@@ -69,7 +69,7 @@
     },
     {
       "path": "services/catalog-service/app/seed_data/general_goods_v1.json",
-      "sha256": "80285229e6627bccc1b81cbbbcd0b91a93256cc71dda655c033dc4a36350c20d",
+      "sha256": "8a9b26c4b3a54053649ddba92f46bd4eed32e8b39a1bcb61a4c0f2aaf82cf4a3",
       "source_revision": "general-goods-v2-media-2026-07-30"
     }
   ],
