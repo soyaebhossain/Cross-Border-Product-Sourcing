@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Route } from "next";
-import { getCountries, getProducts, quoteProductWithAi, saveQuote, type Country, type Product, type QuoteResponse } from "../../lib/api";
+import { ApiError, getCountries, getProducts, quoteProductWithAi, saveQuote, type Country, type Product, type QuoteResponse } from "../../lib/api";
 import { localizedAiItems, localizedAiSummary } from "../../lib/ai-explanation-locale";
 import { formatBdt } from "../../lib/format";
 import { PricingProvenance } from "../../components/pricing-provenance";
 import { FxOutlookPanel } from "../../components/fx-outlook";
+import { OrderSteps } from "../../components/order-steps";
 import { useLocale } from "../../lib/locale-context";
 
 export default function QuotePage() {
@@ -23,6 +25,10 @@ export default function QuotePage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [catalogPreview, setCatalogPreview] = useState(false);
+  const [ordering, setOrdering] = useState(false);
+  // "Order now" links arrive with auto=1 and should show the cost without another click.
+  const autoRequest = useRef(false);
+  const router = useRouter();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -33,6 +39,7 @@ export default function QuotePage() {
       : 1;
     const requestedCountry = params.get("country");
     const requestedMode = params.get("mode");
+    autoRequest.current = params.get("auto") === "1";
     setForm((prev) => ({ ...prev, qty: requestedQty, country: requestedCountry || prev.country, mode: requestedMode || prev.mode }));
     getProducts().then((items) => {
       setProducts(items);
@@ -66,6 +73,10 @@ export default function QuotePage() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    await runQuote();
+  };
+
+  const runQuote = async () => {
     setError(null);
     if (!selectedVariantId) {
       setError("Select a product variant before requesting a quote.");
@@ -88,6 +99,34 @@ export default function QuotePage() {
       setError("Quote request failed. Please try a different product, country, or quantity.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!autoRequest.current || !selectedVariantId || catalogPreview) return;
+    autoRequest.current = false;
+    void runQuote();
+    // runQuote reads the current form state; this runs once when the linked variant is resolved.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedVariantId, catalogPreview]);
+
+  // One step from a calculated cost to the order page: save the quote, then open checkout.
+  const continueToOrder = async () => {
+    if (!response || !selectedVariantId) return;
+    setOrdering(true);
+    setError(null);
+    try {
+      const id = savedQuoteId ?? (await saveQuote({ variant_id: selectedVariantId, country: form.country, mode: form.mode, qty: form.qty, delivery_type: form.delivery_type, response })).id;
+      setSavedQuoteId(id);
+      router.push(`/account/saved-quotes/${id}/order` as Route);
+    } catch (reason) {
+      if (reason instanceof ApiError && reason.status === 401) {
+        const back = `/quote?variant=${selectedVariantId}&qty=${form.qty}&country=${form.country}&mode=${form.mode}&auto=1`;
+        router.push(`/login?next=${encodeURIComponent(back)}` as Route);
+        return;
+      }
+      setError(bn ? "অর্ডারের ধাপে যাওয়া যায়নি। আবার চেষ্টা করুন।" : "Could not continue to the order step. Please try again.");
+      setOrdering(false);
     }
   };
 
@@ -140,6 +179,8 @@ export default function QuotePage() {
             <h1>Request a sourcing estimate</h1>
           </div>
         </div>
+
+        <OrderSteps current={2} />
 
         <form className="form-card" onSubmit={handleSubmit}>
           <fieldset className="form-grid" disabled={catalogPreview}>
@@ -283,7 +324,9 @@ export default function QuotePage() {
             <PricingProvenance pricing={response?.pricing} bn={bn} intlLocale={intlLocale} />
             <FxOutlookPanel outlook={response?.fx_outlook} bn={bn} intlLocale={intlLocale} />
             <div className="form-actions">
-              <button type="button" className="button button--primary" onClick={handleSave} disabled={savedQuoteId !== null}>{savedQuoteId ? "Saved to comparisons" : "Save for comparison"}</button>
+              <button type="button" className="button button--primary" onClick={continueToOrder} disabled={ordering}>{ordering ? (bn ? "অর্ডারের ধাপে নেওয়া হচ্ছে…" : "Opening order step…") : (bn ? "অর্ডারে এগিয়ে যান" : "Continue to order")}</button>
+              <button type="button" className="button button--ghost" onClick={handleSave} disabled={savedQuoteId !== null}>{savedQuoteId ? (bn ? "তুলনার জন্য সংরক্ষিত" : "Saved to comparisons") : (bn ? "পরে তুলনার জন্য রাখুন" : "Save for comparison")}</button>
+              <small className="form-actions__note">{bn ? "সাইন ইন করা না থাকলে আগে সাইন ইন করতে বলা হবে; আপনার হিসাব থেকে যাবে।" : "If you are not signed in you will be asked to sign in first; your quote is kept."}</small>
             </div>
             {aiExplanation ? (
               <article className="form-card" aria-labelledby="ai-explanation-title">

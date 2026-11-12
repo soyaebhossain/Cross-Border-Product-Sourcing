@@ -3,7 +3,7 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { resolveImageUrl, type ProductMediaKind, type ResolvedProductMedia } from "../lib/api";
 import { useLocale } from "../lib/locale-context";
-import { ProductLightbox } from "./product-lightbox";
+import { useZoom } from "./use-zoom";
 
 type CategoryVisual = {
   accent: string;
@@ -268,6 +268,7 @@ type ProductImageProps = {
   priority?: boolean;
   showLabel?: boolean;
   onFailed?: () => void;
+  assetStyle?: React.CSSProperties;
 };
 
 function imageLabel(kind: ProductMediaKind, verified: boolean) {
@@ -290,6 +291,7 @@ export function ProductImage({
   priority = false,
   showLabel = true,
   onFailed,
+  assetStyle,
 }: ProductImageProps) {
   const fallback = fallbackDataUrl(category);
   const preferred = resolveImageUrl(src);
@@ -316,6 +318,7 @@ export function ProductImage({
     >
       <Image
         className="product-image__asset"
+        style={assetStyle}
         src={current}
         alt={usingFallback
           ? `${category || "Product"} illustrative preview for ${name}`
@@ -359,7 +362,8 @@ export function ProductGallery({ media, name, category }: ProductGalleryProps) {
       }];
   const signature = safeMedia.map((item) => item.key).join("|");
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const zoom = useZoom();
+  const resetZoom = zoom.reset;
   const [failedKeys, setFailedKeys] = useState<Set<string>>(new Set());
   const { locale } = useLocale();
 
@@ -367,14 +371,23 @@ export function ProductGallery({ media, name, category }: ProductGalleryProps) {
     setSelectedIndex(0);
   }, [signature]);
 
+  // A different photo always starts unzoomed.
+  useEffect(() => {
+    resetZoom();
+  }, [selectedIndex, signature, resetZoom]);
+
   const selected = safeMedia[Math.min(selectedIndex, safeMedia.length - 1)];
   // Only real photos can be zoomed; a generated placeholder has no detail to inspect.
-  const zoomable = safeMedia.filter((item) => Boolean(resolveImageUrl(item.src)) && !failedKeys.has(item.key));
-  const selectedZoomIndex = zoomable.findIndex((item) => item.key === selected.key);
+  const canZoom = Boolean(resolveImageUrl(selected.src)) && !failedKeys.has(selected.key);
+  const bn = locale === "bn";
 
   return (
     <section className="product-gallery" aria-label={`${name} product images`}>
-      <div className="product-gallery__stage">
+      <div
+        className={`product-gallery__stage${canZoom ? " product-gallery__stage--zoomable" : ""}${canZoom && zoom.zoomed ? " product-gallery__stage--zoomed" : ""}`}
+        ref={zoom.stage}
+        {...(canZoom ? zoom.handlers : {})}
+      >
         <ProductImage
           key={selected.key}
           src={selected.src}
@@ -383,23 +396,24 @@ export function ProductGallery({ media, name, category }: ProductGalleryProps) {
           alt={selected.alt}
           sourceKind={selected.kind}
           verified={selected.verified}
-          sizes="(max-width: 900px) calc(100vw - 48px), 430px"
+          sizes={canZoom && zoom.zoomed ? "1440px" : "(max-width: 900px) calc(100vw - 48px), 430px"}
           priority
           onFailed={() => setFailedKeys((previous) => new Set(previous).add(selected.key))}
+          assetStyle={canZoom ? zoom.style : undefined}
         />
-        {selectedZoomIndex >= 0 ? (
-          <button
-            className="product-gallery__zoom"
-            type="button"
-            onClick={() => setLightboxOpen(true)}
-            aria-label={locale === "bn" ? `${name} ছবি বড় করে দেখুন` : `Zoom ${name} image`}
-          >
-            <span aria-hidden>⤢ {locale === "bn" ? "জুম" : "Zoom"}</span>
-          </button>
+        {canZoom ? (
+          <div className="product-gallery__zoom" role="group" aria-label={bn ? "ছবি জুম" : "Image zoom"}>
+            <button type="button" onClick={zoom.zoomOut} disabled={!zoom.zoomed} aria-label={bn ? "ছোট করুন" : "Zoom out"}>−</button>
+            <button type="button" onClick={zoom.zoomIn} disabled={!zoom.canZoomIn} aria-label={bn ? "বড় করুন" : "Zoom in"}>+</button>
+          </div>
         ) : null}
       </div>
-      {lightboxOpen && selectedZoomIndex >= 0 ? (
-        <ProductLightbox media={zoomable} name={name} startIndex={selectedZoomIndex} onClose={() => setLightboxOpen(false)} />
+      {canZoom ? (
+        <p className="product-gallery__hint" aria-live="polite">
+          {zoom.zoomed
+            ? (bn ? `${Math.round(zoom.scale * 100)}% · ছবি টেনে সরান, ডাবল-ক্লিকে আগের মাপ` : `${Math.round(zoom.scale * 100)}% · drag to move, double-click to reset`)
+            : (bn ? "+ চাপুন বা ছবিতে ডাবল-ক্লিক করে বড় করুন" : "Press + or double-click the photo to zoom")}
+        </p>
       ) : null}
       <div className="product-gallery__footer">
         <span>{safeMedia.length} image{safeMedia.length === 1 ? "" : "s"}</span>

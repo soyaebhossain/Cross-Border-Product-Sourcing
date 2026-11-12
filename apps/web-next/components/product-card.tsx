@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { Route } from "next";
 import type { Product } from "../lib/api";
 import { getProductMedia } from "../lib/api";
 import { useLocale } from "../lib/locale-context";
@@ -25,6 +26,9 @@ export function ProductCard({ product, imagePriority, selectable, selected, onSe
   const origins = market?.countries?.length ? market.countries.join(", ") : "";
   const eta = market?.min_delivery_days;
   const hasVariant = product.variants.length > 0;
+  const orderVariantId = product.default_variant_id ?? product.variants[0]?.id;
+  // Straight to the full cost for the smallest order this product allows.
+  const orderHref = `/quote?variant=${orderVariantId}&qty=${market?.min_moq || 1}&country=${market?.countries?.[0] || "CN"}&auto=1` as Route;
 
   return <article className="product-card">
     {selectable ? <label className="compare-check"><input type="checkbox" checked={selected} onChange={() => onSelect?.(product.id)} /> {locale === "bn" ? "তুলনা" : "Compare"}</label> : null}
@@ -52,8 +56,9 @@ export function ProductCard({ product, imagePriority, selectable, selected, onSe
       <div className="product-card__footer">
         <span className="product-card__variant-count">{product.variants.length} {locale === "bn" ? "ভ্যারিয়েন্ট" : `variant${product.variants.length === 1 ? "" : "s"}`}</span>
         <div className="product-card__actions">
+          {hasVariant ? <Link className="button card-action card-action--primary card-action--order" href={orderHref}>{locale === "bn" ? "এখনই অর্ডার করুন" : "Order now"}</Link> : null}
           <Link className="button card-action card-action--secondary" href={`/products/${product.slug}`}>{sourcingText(locale, "viewProduct")}</Link>
-          <button className="button card-action card-action--primary" type="button" disabled={!hasVariant} onClick={() => addProduct(product)}>{sourcingText(locale, "addToQuote")}</button>
+          <button className="button card-action card-action--secondary" type="button" disabled={!hasVariant} onClick={() => addProduct(product)}>{sourcingText(locale, "addToQuote")}</button>
         </div>
       </div>
     </div>

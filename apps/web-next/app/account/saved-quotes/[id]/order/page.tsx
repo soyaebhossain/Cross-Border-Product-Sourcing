@@ -10,6 +10,7 @@ import {
 } from "../../../../../lib/customer-api";
 import { formatBdt, formatDateTime } from "../../../../../lib/format";
 import { useLocale } from "../../../../../lib/locale-context";
+import { OrderSteps } from "../../../../../components/order-steps";
 
 export default function CreateOrderFromQuotePage() {
   const params = useParams<{ id: string }>();
@@ -91,6 +92,7 @@ export default function CreateOrderFromQuotePage() {
   const addressReady = Boolean(defaultShipping && defaultBilling);
   return (
       <section className="account-page">
+        <OrderSteps current={3} />
         <div className="section__header">
           <div><p className="eyebrow">{bn ? "অর্ডার checkout" : "Order checkout"}</p><h1>{bn ? "সোর্সিং অর্ডার নিশ্চিত করুন" : "Confirm sourcing order"}</h1><p>{bn ? `কোট #${quote.id} · মেয়াদ ${formatDateTime(quote.expires_at, intlLocale)}` : `Quote #${quote.id} · expires ${formatDateTime(quote.expires_at, intlLocale)}`}</p></div>
         </div>

@@ -182,7 +182,7 @@ test("basket explains authentication recovery without discarding items", async (
   });
   await expect(recovery).toContainText("Your basket remains saved in this browser.");
   await expect(recovery.getByRole("link", { name: "Sign in to save the quote" }))
-    .toHaveAttribute("href", "/login");
+    .toHaveAttribute("href", "/login?next=%2Fsourcing-basket");
   await expect(page.getByRole("heading", { name: product.name })).toBeVisible();
   expect(quotedQuantity).toBe(2);
 
