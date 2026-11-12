@@ -26,6 +26,7 @@ from ...auth import (
     complete_password_reset,
     find_unique_user_by_identifier,
     get_or_create_social_user,
+    get_current_user,
     get_current_user_detail,
     refresh_access_token,
     restart_mfa_enrollment,
@@ -600,6 +601,29 @@ def logout(
     response.delete_cookie("sourceai_access", path="/")
     response.delete_cookie("sourceai_refresh", path="/api/auth/")
     return {"ok": True}
+
+
+@router.get("/api/auth/session/")
+def session_state(request: Request, session: Session = Depends(get_session)) -> dict[str, Any]:
+    """Report sign-in state with a 200 so signed-out pages do not log errors.
+
+    can_refresh tells the browser whether calling /api/auth/refresh/ can work;
+    the refresh cookie is HttpOnly, so scripts cannot check it themselves.
+    """
+
+    can_refresh = bool(request.cookies.get("sourceai_refresh"))
+    authorization = request.headers.get("authorization", "")
+    bearer = authorization[7:].strip() if authorization.lower().startswith("bearer ") else None
+    token = bearer or request.cookies.get("sourceai_access")
+    if token:
+        try:
+            current_user = get_current_user(request, token, session)
+            user = get_current_user_detail(current_user, session)
+        except HTTPException:
+            user = None
+        if user is not None:
+            return {"authenticated": True, "can_refresh": can_refresh, "user": user}
+    return {"authenticated": False, "can_refresh": can_refresh, "user": None}
 
 
 @router.get("/api/auth/me/")

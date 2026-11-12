@@ -58,7 +58,7 @@ export type Product = {
   category: Category;
   variants: ProductVariant[];
   default_variant_id: number | null;
-  market?: { min_price?: number; currency?: string; max_rating?: number; min_delivery_days?: number; risk_level?: string; supplier_count?: number; countries?: string[]; recommended_score?: number };
+  market?: { min_price?: number; min_price_bdt?: number; currency?: string; max_rating?: number; min_delivery_days?: number; max_delivery_days?: number; min_moq?: number; risk_level?: string; supplier_count?: number; countries?: string[]; recommended_score?: number };
   catalog_source?: "snapshot";
 };
 
@@ -259,6 +259,7 @@ export type RecommendationItem = {
   stale_price_components?: string[];
   country_risk?: CountryRisk | null;
   fx_outlook?: FxOutlook | null;
+  estimated_product_bdt?: string;
   estimated_shipping_bdt: string;
   estimated_duty_vat_bdt: string;
   estimated_service_fee_bdt: string;
@@ -646,7 +647,34 @@ export function requestPasswordReset(identifier: string) {
 export function confirmPasswordReset(token: string, password: string) {
   return postJson<{ message: string }>("/api/auth/password-reset/confirm/", { token, password });
 }
-export function getCurrentUser() { return fetchJson<CurrentUser>("/api/auth/me/"); }
+type SessionState = { authenticated: boolean; can_refresh: boolean; user: CurrentUser | null };
+
+async function readSessionState(): Promise<SessionState | null> {
+  try {
+    const response = await fetch(`${getRequestBase()}/api/auth/session/`, { cache: "no-store", credentials: "include" });
+    if (!response.ok) return null;
+    const state = await response.json() as SessionState;
+    return typeof state?.authenticated === "boolean" ? state : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve the signed-in user. Being signed out is a normal state: the session
+ * endpoint answers 200 and a refresh is attempted only when the server says a
+ * refresh cookie exists, so signed-out pages make no failing requests.
+ */
+export async function getCurrentUser(): Promise<CurrentUser> {
+  let state = typeof window === "undefined" ? null : await readSessionState();
+  // An API without the session endpoint falls back to the original behaviour.
+  if (!state) return fetchJson<CurrentUser>("/api/auth/me/");
+  if (!state.authenticated && state.can_refresh && await refreshSession()) {
+    state = await readSessionState();
+  }
+  if (state?.authenticated && state.user) return state.user;
+  throw new ApiError("Authentication required", { status: 401, code: "unauthenticated" });
+}
 export async function getAuthServiceStatus(timeoutMs = 5000): Promise<AuthServiceStatus> {
   const controller = new AbortController();
   const timeout = window.setTimeout(() => controller.abort(), timeoutMs);
@@ -763,6 +791,12 @@ export async function getCategories() {
   if (!catalogSnapshotFallbackEnabled) throw liveError;
   const { getSnapshotCategories } = await import("./public-catalog");
   return getSnapshotCategories();
+}
+
+export type SourcingLane = { code: string; name: string; offers: number; products: number; eta_min_days: number | null; eta_max_days: number | null };
+
+export function getSourcingLanes() {
+  return fetchJson<SourcingLane[]>("/api/sourcing-lanes/");
 }
 
 export function getLiveCountries() {

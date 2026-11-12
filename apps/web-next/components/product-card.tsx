@@ -22,7 +22,7 @@ export function ProductCard({ product, imagePriority, selectable, selected, onSe
   const market = product.market;
   const { addProduct } = useSourcingBasket();
   const { locale } = useLocale();
-  const origin = market?.countries?.[0];
+  const origins = market?.countries?.length ? market.countries.join(", ") : "";
   const eta = market?.min_delivery_days;
   const hasVariant = product.variants.length > 0;
 
@@ -43,9 +43,9 @@ export function ProductCard({ product, imagePriority, selectable, selected, onSe
       <p className="meta">{product.model || (locale === "bn" ? "মডেল উল্লেখ নেই" : "Model not specified")}</p>
       <div className="product-card__price-row"><PriceDisplay amount={market?.min_price} currency={market?.currency} /><RiskBadge level={market?.risk_level} /></div>
       <dl className="product-card__facts">
-        <div><dt>{sourcingText(locale, "origin")}</dt><dd>{origin || sourcingText(locale, "confirmSupplier")}</dd></div>
-        <div><dt>{locale === "bn" ? "ডেলিভারি" : "Delivery"}</dt><dd>{eta ? `${eta}–${eta + 7} ${locale === "bn" ? "দিন" : "days"}` : sourcingText(locale, "confirmSupplier")}</dd></div>
-        <div><dt>{sourcingText(locale, "moq")}</dt><dd>{sourcingText(locale, "confirmSupplier")}</dd></div>
+        <div><dt>{sourcingText(locale, "origin")}</dt><dd>{origins || sourcingText(locale, "confirmSupplier")}</dd></div>
+        <div><dt>{locale === "bn" ? "ডেলিভারি" : "Delivery"}</dt><dd>{eta ? (market?.max_delivery_days ? `${eta}–${market.max_delivery_days} ${locale === "bn" ? "দিন" : "days"}` : `${eta}+ ${locale === "bn" ? "দিন" : "days"}`) : sourcingText(locale, "confirmSupplier")}</dd></div>
+        <div><dt>{sourcingText(locale, "moq")}</dt><dd>{market?.min_moq ? (locale === "bn" ? `${market.min_moq} টি থেকে` : `From ${market.min_moq} ${market.min_moq === 1 ? "unit" : "units"}`) : sourcingText(locale, "confirmSupplier")}</dd></div>
         <div><dt>{locale === "bn" ? "রেটিং" : "Rating"}</dt><dd>{market?.max_rating ? `★ ${market.max_rating.toFixed(1)}` : "—"}</dd></div>
       </dl>
       <p className="pricing-disclaimer">{sourcingText(locale, "shippingDisclaimer")}</p>

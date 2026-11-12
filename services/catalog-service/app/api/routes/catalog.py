@@ -13,6 +13,7 @@ from ...db import get_session
 from ...serializers import serialize_category, serialize_country, serialize_product
 from ...services.ai_insights import build_ai_insights
 from ...services.catalog import (
+    list_sourcing_lanes,
     browse_products,
     build_market_summaries,
     get_product_by_slug_or_404,
@@ -89,6 +90,11 @@ def readiness_head(
 @router.get("/api/categories/")
 def categories(session: Session = Depends(get_session)) -> list[dict[str, Any]]:
     return [serialize_category(category) for category in list_categories(session)]
+
+
+@router.get("/api/sourcing-lanes/")
+def sourcing_lanes(session: Session = Depends(get_session)) -> list[dict[str, Any]]:
+    return list_sourcing_lanes(session)
 
 
 @router.get("/api/countries/")

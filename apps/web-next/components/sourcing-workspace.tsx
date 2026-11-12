@@ -8,11 +8,13 @@ import { localizedAiItems, localizedAiSummary } from "../lib/ai-explanation-loca
 import { formatBdt } from "../lib/format";
 import { useLocale } from "../lib/locale-context";
 import { localizedRecommendationText } from "../lib/sourcing-copy";
+import { useProductQuantity } from "./product-quantity";
 
 export function SourcingWorkspace({ variantId }: { variantId: number }) {
   const { locale, intlLocale } = useLocale();
   const bn = locale === "bn";
-  const [qty, setQty] = useState(10);
+  // Shared with the request panel above, so both always price the same number of units.
+  const { quantity: qty, setQuantity: setQty } = useProductQuantity();
   const [weights, setWeights] = useState<Record<string, number>>({ price: 35, quality: 20, delivery: 15, reliability: 15, risk: 15 });
   const [data, setData] = useState<CheapestCountryRecommendation | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -122,7 +124,7 @@ export function SourcingWorkspace({ variantId }: { variantId: number }) {
             >
               <div className="supplier-rank">#{item.rank}</div>
               <div><strong>{item.selected_offer.seller_name}</strong><span>{item.country.name} · {item.mode}</span></div>
-              <div><small>{bn ? "ল্যান্ডেড কস্ট" : "Landed cost"}{item.pricing_status === "indicative" ? (bn ? " · আনুমানিক" : " · indicative") : item.pricing_status === "verified" ? (bn ? " · যাচাইকৃত" : " · verified") : ""}</small><strong>{formatBdt(item.estimated_total_bdt, intlLocale)}</strong></div>
+              <div><small>{bn ? `ল্যান্ডেড কস্ট (${qty}টি)` : `Landed cost (${qty} ${qty === 1 ? "unit" : "units"})`}{item.pricing_status === "indicative" ? (bn ? " · আনুমানিক" : " · indicative") : item.pricing_status === "verified" ? (bn ? " · যাচাইকৃত" : " · verified") : ""}</small><strong>{formatBdt(item.estimated_total_bdt, intlLocale)}</strong></div>
               <div><small>{bn ? "ডেলিভারি" : "Delivery"}</small><strong>{item.eta.min_days}–{item.eta.max_days} {bn ? "দিন" : "days"}</strong></div>
               <div><small>{bn ? "স্কোর" : "Score"}</small><strong>{Number(item.score).toFixed(1)}/100</strong></div>
               {item.country_risk ? <div title={item.country_risk.indicators.map((indicator) => `${indicator.name}: ${indicator.score} (${indicator.year})`).join("\n")}><small>{bn ? "দেশের স্থিতিশীলতা" : "Country stability"}</small><strong>{item.country_risk.score.toFixed(0)}/100</strong></div> : null}
@@ -134,15 +136,33 @@ export function SourcingWorkspace({ variantId }: { variantId: number }) {
         </div>
       ) : null}
 
+      {selected && !error ? (
+        <section className="workspace-breakdown" aria-labelledby="workspace-breakdown-title">
+          <h3 id="workspace-breakdown-title">
+            {bn
+              ? `${qty}টি পণ্যের খরচের হিসাব: ${selected.country.name}, ${selected.selected_offer.seller_name}`
+              : `Cost breakdown for ${qty} ${qty === 1 ? "unit" : "units"}: ${selected.country.name}, ${selected.selected_offer.seller_name}`}
+          </h3>
+          <dl>
+            {selected.estimated_product_bdt ? <div><dt>{bn ? "পণ্যের দাম" : "Product"}</dt><dd>{formatBdt(selected.estimated_product_bdt, intlLocale)}</dd></div> : null}
+            <div><dt>{bn ? "শিপিং" : "Shipping"}</dt><dd>{formatBdt(selected.estimated_shipping_bdt, intlLocale)}</dd></div>
+            <div><dt>{bn ? "শুল্ক ও VAT" : "Customs duty and VAT"}</dt><dd>{formatBdt(selected.estimated_duty_vat_bdt, intlLocale)}</dd></div>
+            <div><dt>{bn ? "সার্ভিস ফি" : "Service fee"}</dt><dd>{formatBdt(selected.estimated_service_fee_bdt, intlLocale)}</dd></div>
+            <div className="workspace-breakdown__total"><dt>{bn ? "মোট ল্যান্ডেড কস্ট" : "Total landed cost"}</dt><dd>{formatBdt(selected.estimated_total_bdt, intlLocale)}</dd></div>
+            <div><dt>{bn ? "প্রতিটির খরচ" : "Per unit"}</dt><dd>{formatBdt(Number(selected.estimated_total_bdt) / qty, intlLocale)}</dd></div>
+          </dl>
+        </section>
+      ) : null}
+
       {data?.ai_explanation && !error ? (
         <article className="workspace-ai" aria-labelledby="country-ai-title">
           <div className="workspace-ai__header">
             <div>
-              <span className="market-kicker">{bn ? "AI-সহায়িত ব্যাখ্যা" : "AI-assisted explanation"}</span>
+              <span className="market-kicker">{data.ai_metadata?.automation_available ? (bn ? "AI-সহায়িত ব্যাখ্যা" : "AI-assisted explanation") : (bn ? "নিয়মভিত্তিক ব্যাখ্যা" : "Rule-based explanation")}</span>
               <h3 id="country-ai-title">{bn ? "কেন এই দেশটি সুপারিশ করা হয়েছে" : "Why this country is recommended"}</h3>
             </div>
             <span className={`workspace-ai__status${data.ai_metadata?.automation_available ? " workspace-ai__status--active" : ""}`}>
-              {data.ai_metadata?.automation_available ? (bn ? "AI দিয়ে তৈরি" : "AI-generated") : (bn ? "নির্ধারিত fallback" : "Deterministic fallback")}
+              {data.ai_metadata?.automation_available ? (bn ? "AI দিয়ে তৈরি" : "AI-generated") : (bn ? "AI ছাড়া তৈরি" : "Generated without AI")}
             </span>
           </div>
           <p className="workspace-ai__summary">{aiSummary}</p>
@@ -151,7 +171,7 @@ export function SourcingWorkspace({ variantId }: { variantId: number }) {
             <div><strong>{bn ? "ঝুঁকি" : "Risks"}</strong><ul>{aiRisks.map((item) => <li key={item}>{item}</li>)}</ul></div>
             <div><strong>{bn ? "যা যাচাই করবেন" : "Recommended checks"}</strong><ul>{aiRecommendedChecks.map((item) => <li key={item}>{item}</li>)}</ul></div>
           </div>
-          <small>{bn ? "র‍্যাঙ্কিং ও সব আর্থিক হিসাব server-এর deterministic sourcing engine করে; AI শুধু ব্যাখ্যা দেয়।" : "The server's deterministic sourcing engine calculates rankings and all monetary values; AI only explains the result."}{data.ai_explanation.human_review_required ? (bn ? " মানুষের পর্যালোচনা প্রয়োজন।" : " Human review is required.") : ""}</small>
+          <small>{bn ? "র‍্যাঙ্কিং ও সব আর্থিক হিসাব server-এর deterministic sourcing engine করে; AI শুধু ব্যাখ্যা দেয়।" : "The server's deterministic sourcing engine calculates rankings and all monetary values; the explanation only describes that result."}{data.ai_explanation.human_review_required ? (bn ? " মানুষের পর্যালোচনা প্রয়োজন।" : " Human review is required.") : ""}</small>
         </article>
       ) : null}
 

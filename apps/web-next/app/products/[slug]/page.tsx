@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCheapestCountryRecommendation, getProductBySlug, getProductMedia } from "../../../lib/api";
 import { SourcingWorkspace } from "../../../components/sourcing-workspace";
 import { ProductDetailActionPanel } from "../../../components/product-detail-action-panel";
+import { ProductQuantityProvider } from "../../../components/product-quantity";
 import { ProductGallery } from "../../../components/product-image";
 import { formatBdt } from "../../../lib/format";
 
@@ -29,6 +30,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
 
     return (
       <main className="shell shell--narrow">
+        <ProductQuantityProvider>
         <Link href="/" className="back-link">
           Back to catalog
         </Link>
@@ -149,6 +151,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             <button className="market-button" type="button" disabled>Request quote unavailable</button>
           </section>
         ) : null}
+        </ProductQuantityProvider>
       </main>
     );
   } catch {

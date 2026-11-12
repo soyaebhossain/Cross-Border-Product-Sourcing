@@ -39,3 +39,14 @@
 @media (prefers-reduced-motion: no-preference) {
   .lightbox__stage img { transition: transform .08s ease-out; }
 }
+
+/* Cost breakdown under the country recommendation */
+.workspace-breakdown { margin-top: 16px; padding: 16px; border: 1px solid var(--market-border, #e2e8f0); border-radius: 14px; background: #f8fafc; }
+.workspace-breakdown h3 { margin: 0 0 10px; font-size: 1rem; }
+.workspace-breakdown dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 16px; margin: 0; }
+.workspace-breakdown dl > div { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px dashed #dbe3ef; }
+.workspace-breakdown dt { color: #64748b; font-size: 13px; }
+.workspace-breakdown dd { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.workspace-breakdown__total dt, .workspace-breakdown__total dd { color: #0f172a; font-weight: 800; }
+@media (max-width: 900px) { .workspace-breakdown dl { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .workspace-breakdown dl { grid-template-columns: minmax(0, 1fr); } }

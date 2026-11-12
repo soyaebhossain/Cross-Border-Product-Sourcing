@@ -74,9 +74,9 @@ def build_market_summaries(
     }
     rates["BDT"] = 1.0
     eta_by_lane = {
-        (country_id, mode): int(min_days)
-        for country_id, mode, min_days in session.execute(
-            select(ETARule.country_id, ETARule.mode, ETARule.min_days).where(
+        (country_id, mode): (int(min_days), int(max_days))
+        for country_id, mode, min_days, max_days in session.execute(
+            select(ETARule.country_id, ETARule.mode, ETARule.min_days, ETARule.max_days).where(
                 ETARule.delivery_type == "DOOR",
                 ETARule.is_active.is_(True),
             )
@@ -92,6 +92,7 @@ def build_market_summaries(
             Country.code,
             Seller.rating,
             SellerOffer.seller_id,
+            SellerOffer.moq,
         )
         .join(SellerOffer, SellerOffer.variant_id == ProductVariant.id)
         .join(Country, Country.id == SellerOffer.country_id)
@@ -104,23 +105,30 @@ def build_market_summaries(
         )
     ).all()
     seller_sets: dict[int, set[int]] = {item_id: set() for item_id in ids}
-    for product_id, price, currency, mode, country_id, code, rating, seller_id in rows:
+    for product_id, price, currency, mode, country_id, code, rating, seller_id, moq in rows:
         item = summaries[product_id]
         item["countries"].add(code)
         seller_sets[product_id].add(seller_id)
         amount = float(price)
         score = float(rating or 0)
-        delivery = eta_by_lane.get(
+        # Same defaults as sourcing.eta_range when no ETA rule is configured.
+        delivery, delivery_max = eta_by_lane.get(
             (country_id, mode),
-            7 if mode == "LOCAL" else 15,
+            (7, 14) if mode == "LOCAL" else (15, 30),
         )
         normalized_price = amount * rates.get(str(currency).upper(), float("inf"))
         if normalized_price < float(item.get("_min_price_bdt", float("inf"))):
             item["_min_price_bdt"] = normalized_price
             item["min_price"] = amount
             item["currency"] = currency
+            if normalized_price != float("inf"):
+                item["min_price_bdt"] = round(normalized_price, 2)
         item["max_rating"] = max(float(item.get("max_rating", score)), score)
-        item["min_delivery_days"] = min(int(item.get("min_delivery_days", delivery)), delivery)
+        # Delivery is the configured range of the fastest lane, never a derived guess.
+        if delivery < int(item.get("min_delivery_days", 10**6)):
+            item["min_delivery_days"] = delivery
+            item["max_delivery_days"] = delivery_max
+        item["min_moq"] = min(int(item.get("min_moq", moq)), int(moq))
 
     for product_id, item in summaries.items():
         item.pop("_min_price_bdt", None)
@@ -184,3 +192,44 @@ def get_product_by_slug_or_404(session: Session, slug: str) -> Product:
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")
     return product
+
+
+def list_sourcing_lanes(session: Session) -> list[dict[str, object]]:
+    """Origin countries that have active offers, with their configured door-delivery ETA."""
+
+    counts = session.execute(
+        select(
+            Country.id,
+            Country.code,
+            Country.name,
+            func.count(SellerOffer.id),
+            func.count(func.distinct(ProductVariant.product_id)),
+        )
+        .join(SellerOffer, SellerOffer.country_id == Country.id)
+        .join(ProductVariant, ProductVariant.id == SellerOffer.variant_id)
+        .join(Seller, Seller.id == SellerOffer.seller_id)
+        .where(SellerOffer.is_active.is_(True), Seller.is_active.is_(True), ProductVariant.is_active.is_(True))
+        .group_by(Country.id, Country.code, Country.name)
+    ).all()
+    eta = {
+        country_id: (int(min_days), int(max_days))
+        for country_id, min_days, max_days in session.execute(
+            select(ETARule.country_id, ETARule.min_days, ETARule.max_days).where(
+                ETARule.mode == "LOCAL",
+                ETARule.delivery_type == "DOOR",
+                ETARule.is_active.is_(True),
+            )
+        ).all()
+    }
+    lanes = [
+        {
+            "code": code,
+            "name": name,
+            "offers": int(offers),
+            "products": int(products),
+            "eta_min_days": eta.get(country_id, (None, None))[0],
+            "eta_max_days": eta.get(country_id, (None, None))[1],
+        }
+        for country_id, code, name, offers, products in counts
+    ]
+    return sorted(lanes, key=lambda lane: (-int(lane["products"]), str(lane["code"])))

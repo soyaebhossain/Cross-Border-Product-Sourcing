@@ -2,12 +2,13 @@ import Link from "next/link";
 import { AppIcon } from "../components/app-icon";
 import { CategoryIcon } from "../components/category-icon";
 import { ProductCard } from "../components/product-card";
-import { browseProducts, getCategories } from "../lib/api";
+import { browseProducts, getCategories, getSourcingLanes } from "../lib/api";
 
 export default async function HomePage() {
-  const [catalog, categories] = await Promise.all([
+  const [catalog, categories, allLanes] = await Promise.all([
     browseProducts({ pageSize: 60 }).catch(() => null),
     getCategories().catch(() => []),
+    getSourcingLanes().catch(() => []),
   ]);
   const popularProducts = (() => {
     if (!catalog) return [];
@@ -60,12 +61,14 @@ export default async function HomePage() {
   });
   const featuredCategories = priorityCategories;
 
-  const lanes = [
-    { code: "CN", name: "China → Bangladesh", eta: "7–14 days", badge: "Best value" },
-    { code: "IN", name: "India → Bangladesh", eta: "5–9 days", badge: "Regional value" },
-    { code: "SG", name: "Singapore → Bangladesh", eta: "4–8 days", badge: "Fastest" },
-    { code: "TH", name: "Thailand → Bangladesh", eta: "6–12 days", badge: "Low risk" },
-  ];
+  // Lanes come from the live catalog: only origins with active offers, with their configured ETA.
+  const lanes = allLanes.slice(0, 4).map((lane) => ({
+    code: lane.code,
+    name: `${lane.name} → Bangladesh`,
+    eta: lane.eta_min_days && lane.eta_max_days ? `${lane.eta_min_days}–${lane.eta_max_days} days by air` : "ETA on request",
+    badge: `${lane.products} products`,
+  }));
+  const otherOrigins = allLanes.slice(4).map((lane) => lane.name);
 
   return (
     <main className="market-shell">
@@ -89,7 +92,7 @@ export default async function HomePage() {
         <div className="lane-board-new">
           <div className="lane-title"><span>Featured sourcing lanes</span><strong>Decision snapshot</strong></div>
           {lanes.map((lane) => <div className="lane-item" key={lane.code}><b>{lane.code}</b><div><strong>{lane.name}</strong><span>{lane.eta}</span></div><em>{lane.badge}</em></div>)}
-          <p>Catalog origins also include Malaysia, Turkey and Vietnam. Scores combine cost, quality, reliability, delivery and risk.</p>
+          <p>{otherOrigins.length ? `Catalog origins also include ${otherOrigins.join(", ")}. ` : ""}{lanes.length ? "Scores combine cost, quality, reliability, delivery and risk." : "Live lane data is temporarily unavailable."}</p>
         </div>
       </section>
 
