@@ -2,6 +2,8 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { resolveImageUrl, type ProductMediaKind, type ResolvedProductMedia } from "../lib/api";
+import { useLocale } from "../lib/locale-context";
+import { ProductLightbox } from "./product-lightbox";
 
 type CategoryVisual = {
   accent: string;
@@ -265,6 +267,7 @@ type ProductImageProps = {
   sizes?: string;
   priority?: boolean;
   showLabel?: boolean;
+  onFailed?: () => void;
 };
 
 function imageLabel(kind: ProductMediaKind, verified: boolean) {
@@ -286,6 +289,7 @@ export function ProductImage({
   sizes = "(max-width: 620px) 112px, (max-width: 960px) 50vw, 25vw",
   priority = false,
   showLabel = true,
+  onFailed,
 }: ProductImageProps) {
   const fallback = fallbackDataUrl(category);
   const preferred = resolveImageUrl(src);
@@ -323,6 +327,7 @@ export function ProductImage({
         onError={() => {
           if (!usingFallback) {
             setFailed(true);
+            onFailed?.();
           }
         }}
       />
@@ -354,12 +359,18 @@ export function ProductGallery({ media, name, category }: ProductGalleryProps) {
       }];
   const signature = safeMedia.map((item) => item.key).join("|");
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [failedKeys, setFailedKeys] = useState<Set<string>>(new Set());
+  const { locale } = useLocale();
 
   useEffect(() => {
     setSelectedIndex(0);
   }, [signature]);
 
   const selected = safeMedia[Math.min(selectedIndex, safeMedia.length - 1)];
+  // Only real photos can be zoomed; a generated placeholder has no detail to inspect.
+  const zoomable = safeMedia.filter((item) => Boolean(resolveImageUrl(item.src)) && !failedKeys.has(item.key));
+  const selectedZoomIndex = zoomable.findIndex((item) => item.key === selected.key);
 
   return (
     <section className="product-gallery" aria-label={`${name} product images`}>
@@ -374,8 +385,22 @@ export function ProductGallery({ media, name, category }: ProductGalleryProps) {
           verified={selected.verified}
           sizes="(max-width: 900px) calc(100vw - 48px), 430px"
           priority
+          onFailed={() => setFailedKeys((previous) => new Set(previous).add(selected.key))}
         />
+        {selectedZoomIndex >= 0 ? (
+          <button
+            className="product-gallery__zoom"
+            type="button"
+            onClick={() => setLightboxOpen(true)}
+            aria-label={locale === "bn" ? `${name} ছবি বড় করে দেখুন` : `Zoom ${name} image`}
+          >
+            <span aria-hidden>⤢ {locale === "bn" ? "জুম" : "Zoom"}</span>
+          </button>
+        ) : null}
       </div>
+      {lightboxOpen && selectedZoomIndex >= 0 ? (
+        <ProductLightbox media={zoomable} name={name} startIndex={selectedZoomIndex} onClose={() => setLightboxOpen(false)} />
+      ) : null}
       <div className="product-gallery__footer">
         <span>{safeMedia.length} image{safeMedia.length === 1 ? "" : "s"}</span>
         <span>Photos are labeled by source</span>

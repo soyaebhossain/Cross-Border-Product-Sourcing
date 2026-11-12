@@ -1,0 +1,41 @@
+/* Product cards: on narrow screens the image sits on top at a fixed ratio
+   instead of stretching into a tall, narrow column beside the text. */
+@media (max-width: 720px) {
+  .product-card { display: flex !important; flex-direction: column !important; }
+  .product-card__visual { order: 0; width: 100% !important; min-height: 0 !important; max-height: none !important; height: auto !important; aspect-ratio: 16 / 10; flex: none; }
+  .product-card__visual .product-image, .product-card__media-link { display: block; width: 100%; height: 100%; }
+  .product-card__copy { width: 100%; }
+}
+.product-card__visual .product-image__asset { object-fit: cover; }
+.product-card__visual .product-image--fallback .product-image__asset { object-fit: contain; }
+
+/* Gallery zoom trigger */
+.product-gallery__zoom { position: absolute; inset: 0; z-index: 2; display: flex; align-items: flex-start; justify-content: flex-end; padding: 12px; border: 0; background: transparent; cursor: zoom-in; }
+.product-gallery__zoom span { display: inline-flex; align-items: center; gap: 6px; padding: 7px 11px; border-radius: 999px; background: rgba(15, 23, 42, .78); color: #fff; font-size: 12px; font-weight: 700; }
+.product-gallery__zoom:focus-visible { outline: 3px solid rgba(37, 99, 235, .45); outline-offset: -3px; border-radius: 20px; }
+
+/* Lightbox */
+.lightbox { position: fixed; inset: 0; z-index: 1000; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; background: rgba(8, 12, 22, .96); color: #fff; }
+.lightbox__bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; }
+.lightbox__title { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.lightbox__tools { display: flex; align-items: center; gap: 6px; flex: none; }
+.lightbox__tools button, .lightbox__nav { min-width: 40px; height: 40px; padding: 0 12px; border: 1px solid rgba(255, 255, 255, .22); border-radius: 10px; background: rgba(255, 255, 255, .08); color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; }
+.lightbox__tools button:hover:not(:disabled), .lightbox__nav:hover { background: rgba(255, 255, 255, .18); }
+.lightbox__tools button:disabled { opacity: .4; cursor: default; }
+.lightbox__tools button:focus-visible, .lightbox__nav:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; }
+.lightbox__tools output { min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; font-size: 13px; }
+.lightbox__stage { position: relative; display: grid; place-items: center; overflow: hidden; touch-action: none; cursor: zoom-in; user-select: none; }
+.lightbox__stage--zoomed { cursor: grab; }
+.lightbox__stage--zoomed:active { cursor: grabbing; }
+.lightbox__stage img { position: absolute; inset: 0; width: 100% !important; height: 100% !important; object-fit: contain; transform-origin: center; will-change: transform; pointer-events: none; }
+.lightbox__nav { position: absolute; top: 50%; transform: translateY(-50%); font-size: 26px; }
+.lightbox__nav--prev { left: 12px; }
+.lightbox__nav--next { right: 12px; }
+.lightbox__hint { margin: 0; padding: 8px 14px 12px; text-align: center; color: rgba(255, 255, 255, .65); font-size: 12px; }
+@media (max-width: 560px) {
+  .lightbox__tools button { min-width: 36px; height: 36px; padding: 0 9px; }
+  .lightbox__hint { font-size: 11px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .lightbox__stage img { transition: transform .08s ease-out; }
+}

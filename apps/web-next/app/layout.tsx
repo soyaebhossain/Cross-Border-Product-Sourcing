@@ -8,6 +8,7 @@ import "./header-layout.css";
 import "./account-profile.css";
 import "./account-saved-quotes.css";
 import "./pricing-provenance.css";
+import "./product-media.css";
 import { Header } from "./Header";
 import { Footer } from "./Footer";
 import { LocaleProvider, type AppLocale } from "../lib/locale-context";
