@@ -183,3 +183,17 @@ def test_risk_assessment_country_levels() -> None:
     assert base == ("Low", Decimal("0"), [])
     assert medium[1] == Decimal("0.10") and medium[2] == ["country risk is moderate"]
     assert high[0] == "Medium" and high[1] == Decimal("0.35")
+
+
+def test_recommended_sort_mixes_categories_and_keeps_order_within_one() -> None:
+    from types import SimpleNamespace
+
+    from app.services.catalog import _interleave_categories
+
+    ranked = [SimpleNamespace(name=name, category_id=category) for name, category in (
+        ("m1", 1), ("m2", 1), ("m3", 1), ("o1", 2), ("o2", 2), ("k1", 3),
+    )]
+
+    mixed = [item.name for item in _interleave_categories(ranked)]
+
+    assert mixed == ["m1", "o1", "k1", "m2", "o2", "m3"]

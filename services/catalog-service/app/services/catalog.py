@@ -148,6 +148,27 @@ def build_market_summaries(
     return summaries
 
 
+def _interleave_categories(products: list[Product]) -> list[Product]:
+    """Round-robin across categories, keeping each category's own order.
+
+    Scores are close across the catalog, so a pure score sort fills the first
+    page with one category. Taking the best remaining product of each category
+    in turn keeps the ranking within a category and mixes the page.
+    """
+
+    queues: dict[int, list[Product]] = {}
+    for product in products:
+        queues.setdefault(product.category_id, []).append(product)
+    ordered: list[Product] = []
+    position = 0
+    while len(ordered) < len(products):
+        for queue in queues.values():
+            if position < len(queue):
+                ordered.append(queue[position])
+        position += 1
+    return ordered
+
+
 def browse_products(session: Session, q: str = "", category: str = "", page: int = 1,
                     page_size: int = 24, sort: str = "name", country: str = "",
                     min_price: float | None = None, max_price: float | None = None,
@@ -168,7 +189,10 @@ def browse_products(session: Session, q: str = "", category: str = "", page: int
     elif sort == "cheapest": products.sort(key=lambda item: float(summaries[item.id].get("min_price", float("inf"))))
     elif sort == "fastest": products.sort(key=lambda item: int(summaries[item.id].get("min_delivery_days", 999)))
     elif sort == "highest_rated": products.sort(key=lambda item: float(summaries[item.id].get("max_rating", 0)), reverse=True)
-    elif sort == "recommended": products.sort(key=lambda item: float(summaries[item.id].get("recommended_score", 0)), reverse=True)
+    elif sort == "recommended":
+        products.sort(key=lambda item: float(summaries[item.id].get("recommended_score", 0)), reverse=True)
+        if not category:
+            products = _interleave_categories(products)
     else: products.sort(key=lambda item: item.name.lower())
     total = len(products); start = (page - 1) * page_size
     return products[start:start + page_size], total, summaries

@@ -31,7 +31,7 @@
       "columns": 17,
       "purpose": "Formula-label price regression tutorial",
       "rows": 560,
-      "sha256": "69767b908fb9e707765555e13b678e359c0b05d58a4a79a062835e445b81504c"
+      "sha256": "3210059dd14fe9db216bce5c224c9bbfc5b263e85b408007b14dfbb7f9c5dfdc"
     },
     "product_countries.csv": {
       "columns": 7,
@@ -69,7 +69,7 @@
     },
     {
       "path": "services/catalog-service/app/seed_data/general_goods_v1.json",
-      "sha256": "8a9b26c4b3a54053649ddba92f46bd4eed32e8b39a1bcb61a4c0f2aaf82cf4a3",
+      "sha256": "4cf96f67d02a47065858cb814d27f2db360eca5df44ce52d66a80d99f231eaa8",
       "source_revision": "general-goods-v2-media-2026-07-30"
     }
   ],

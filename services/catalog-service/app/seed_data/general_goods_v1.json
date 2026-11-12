@@ -53,13 +53,13 @@
     }
   ],
   "supplier_profiles": [
-    {"country_code": "CN", "name": "China General Goods Demo Hub", "rating": "4.61", "note": "Synthetic demo supplier profile; buyer verification and source validation are required."},
-    {"country_code": "IN", "name": "India General Goods Demo Desk", "rating": "4.57", "note": "Synthetic demo supplier profile; buyer verification and source validation are required."},
-    {"country_code": "SG", "name": "Singapore General Goods Demo Desk", "rating": "4.69", "note": "Synthetic demo supplier profile; buyer verification and source validation are required."},
-    {"country_code": "TH", "name": "Thailand General Goods Demo Hub", "rating": "4.54", "note": "Synthetic demo supplier profile; buyer verification and source validation are required."},
-    {"country_code": "MY", "name": "Malaysia General Goods Demo Hub", "rating": "4.63", "note": "Synthetic demo supplier profile; buyer verification and source validation are required."},
-    {"country_code": "TR", "name": "Turkey General Goods Demo Hub", "rating": "4.58", "note": "Synthetic demo supplier profile; buyer verification and source validation are required."},
-    {"country_code": "VN", "name": "Vietnam General Goods Demo Hub", "rating": "4.60", "note": "Synthetic demo supplier profile; buyer verification and source validation are required."}
+    {"country_code": "CN", "name": "China General Goods Demo Hub", "rating": "4.45", "note": "Synthetic demo supplier profile; buyer verification and source validation are required."},
+    {"country_code": "IN", "name": "India General Goods Demo Desk", "rating": "4.10", "note": "Synthetic demo supplier profile; buyer verification and source validation are required."},
+    {"country_code": "SG", "name": "Singapore General Goods Demo Desk", "rating": "4.80", "note": "Synthetic demo supplier profile; buyer verification and source validation are required."},
+    {"country_code": "TH", "name": "Thailand General Goods Demo Hub", "rating": "3.95", "note": "Synthetic demo supplier profile; buyer verification and source validation are required."},
+    {"country_code": "MY", "name": "Malaysia General Goods Demo Hub", "rating": "4.25", "note": "Synthetic demo supplier profile; buyer verification and source validation are required."},
+    {"country_code": "TR", "name": "Turkey General Goods Demo Hub", "rating": "3.70", "note": "Synthetic demo supplier profile; buyer verification and source validation are required."},
+    {"country_code": "VN", "name": "Vietnam General Goods Demo Hub", "rating": "4.05", "note": "Synthetic demo supplier profile; buyer verification and source validation are required."}
   ],
   "offer_strategy": [
     {"origin_index": 0, "mode": "LOCAL", "price_multiplier": "1.00", "stock": 120, "moq": 1},

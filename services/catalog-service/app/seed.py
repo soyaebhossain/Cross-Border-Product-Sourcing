@@ -709,6 +709,18 @@ def _ensure_reference_data(
     return countries
 
 
+# Demo supplier ratings published before the wider spread below. A seeded row
+# that still holds its old demo value is moved to the new one; a rating an
+# administrator has edited is left alone.
+_PREVIOUS_DEMO_RATINGS = {"Shenzhen Prime Hub": "4.80", "Guangzhou SourceLink": "4.55", "Bangkok Trade Bridge": "4.49", "Shenzhen Medical Supply Hub": "4.78", "India Care Instruments": "4.66", "Jaipur Jewelry Sourcing Studio": "4.70", "Singapore Gem Trade Desk": "4.76", "Shenzhen Jewelry Components Hub": "4.58"}
+
+
+def _refresh_demo_rating(seller: Seller, rating: str) -> None:
+    previous = _PREVIOUS_DEMO_RATINGS.get(seller.name)
+    if previous is not None and Decimal(seller.rating or 0) == Decimal(previous):
+        seller.rating = Decimal(rating)
+
+
 def _supplier_rating(row: dict[str, str]) -> Decimal:
     defect_rate = _decimal_from_row(row, "Defect rates", "0")
     inspection = (row.get("Inspection results") or "").strip().lower()
@@ -856,15 +868,17 @@ def _ensure_sellers_and_offers(session: Session, countries: dict[str, Country]) 
     }
 
     seller_specs = [
-        ("Shenzhen Prime Hub", "CN", "4.80"),
-        ("Guangzhou SourceLink", "CN", "4.55"),
+        ("Shenzhen Prime Hub", "CN", "4.70"),
+        ("Guangzhou SourceLink", "CN", "3.90"),
         ("Lion City Retail Export", "SG", "4.72"),
-        ("Bangkok Trade Bridge", "TH", "4.49"),
+        ("Bangkok Trade Bridge", "TH", "3.60"),
     ]
     for name, country_code, rating in seller_specs:
         if name not in sellers:
             sellers[name] = Seller(country=countries[country_code], name=name, rating=Decimal(rating))
             session.add(sellers[name])
+        else:
+            _refresh_demo_rating(sellers[name], rating)
 
     session.flush()
 
@@ -908,6 +922,54 @@ def _ensure_sellers_and_offers(session: Session, countries: dict[str, Country]) 
         )
 
     session.add_all(offers)
+
+
+# DEMO DATA. Indicative wholesale unit prices in USD, chosen so that relative
+# prices are plausible (a bandage roll costs less than a stethoscope). They are
+# not supplier quotations. Prices were previously generated from the product's
+# position in the list, which made consumables dearer than instruments.
+_MEDICAL_DEMO_UNIT_PRICE_USD = {
+    "Digital Clinical Thermometer": "2.80",
+    "Infrared Forehead Thermometer": "9.50",
+    "Fingertip Pulse Oximeter": "7.20",
+    "Automatic Blood Pressure Monitor": "15.50",
+    "Aneroid Blood Pressure Kit": "9.80",
+    "Dual-Head Stethoscope": "6.50",
+    "Blood Glucose Monitoring Kit": "12.00",
+    "Glucose Test Strip Pack": "8.50",
+    "Portable Compressor Nebulizer": "21.00",
+    "Personal Steam Inhaler": "9.00",
+    "Comprehensive First Aid Kit": "11.50",
+    "Cotton Bandage Roll": "0.45",
+    "Adhesive Bandage Assortment": "1.80",
+    "Sterile Gauze Pad Pack": "2.20",
+    "Medical Adhesive Tape": "0.90",
+    "Elastic Crepe Bandage": "0.85",
+    "Adjustable Knee Support": "4.80",
+    "Compression Ankle Support": "3.20",
+    "Wrist Support Brace": "3.60",
+    "Lumbar Support Belt": "7.50",
+    "Soft Cervical Collar": "4.20",
+    "Adjustable Arm Sling": "3.40",
+    "Aluminum Underarm Crutches": "14.00",
+    "Height-Adjustable Walking Cane": "6.80",
+    "Foldable Walking Frame": "24.00",
+    "Lightweight Manual Wheelchair": "95.00",
+    "Adjustable Shower Chair": "22.00",
+    "Portable Commode Chair": "34.00",
+    "Safety Bed Rail": "28.00",
+    "Anti-Decubitus Air Mattress": "38.00",
+    "Reusable Hot and Cold Pack": "1.90",
+    "Electric Heating Pad": "9.50",
+    "Reusable Ice Bag": "2.40",
+    "Disposable Adult Face Mask": "1.60",
+    "Disposable Child Face Mask": "1.80",
+    "Protective Face Shield": "1.10",
+    "Nitrile Examination Gloves": "4.80",
+    "Latex Examination Gloves": "3.90",
+    "Touchless Sanitizer Dispenser": "13.50",
+    "Weekly Pill Organizer": "1.70",
+}
 
 
 def _ensure_medical_catalog(session: Session, countries: dict[str, Country]) -> None:
@@ -1042,8 +1104,8 @@ def _ensure_medical_catalog(session: Session, countries: dict[str, Country]) -> 
         medical_variants.append((index, variant))
 
     seller_specs = [
-        ("Shenzhen Medical Supply Hub", "CN", "4.78"),
-        ("India Care Instruments", "IN", "4.66"),
+        ("Shenzhen Medical Supply Hub", "CN", "4.30"),
+        ("India Care Instruments", "IN", "4.05"),
         ("Singapore Clinical Supply", "SG", "4.84"),
     ]
     sellers_by_key = {
@@ -1060,6 +1122,8 @@ def _ensure_medical_catalog(session: Session, countries: dict[str, Country]) -> 
                 note="Medical-accessory sourcing supplier; buyer verification required for regulated items.",
             )
             session.add(sellers_by_key[key])
+        else:
+            _refresh_demo_rating(sellers_by_key[key], rating)
     session.flush()
 
     existing_offers = {
@@ -1073,10 +1137,11 @@ def _ensure_medical_catalog(session: Session, countries: dict[str, Country]) -> 
         ("SG", "Singapore Clinical Supply", "LOCAL", Decimal("1.14"), 1),
     ]
     for index, variant in medical_variants:
+        demo_price = _MEDICAL_DEMO_UNIT_PRICE_USD.get(variant.product.name)
         base_price = (
-            Decimal("3.50")
-            + Decimal(index) * Decimal("1.85")
-            + Decimal(variant.weight_kg) * Decimal("8.00")
+            Decimal(demo_price)
+            if demo_price is not None
+            else Decimal("3.50") + Decimal(index) * Decimal("1.85") + Decimal(variant.weight_kg) * Decimal("8.00")
         ).quantize(Decimal("0.01"))
         for country_code, seller_name, mode, multiplier, moq in offer_specs:
             country = countries[country_code]
@@ -1261,9 +1326,9 @@ def _ensure_precious_catalog(session: Session, countries: dict[str, Country]) ->
         precious_variants.append((index, variant))
 
     seller_specs = [
-        ("Jaipur Jewelry Sourcing Studio", "IN", "4.70"),
-        ("Singapore Gem Trade Desk", "SG", "4.76"),
-        ("Shenzhen Jewelry Components Hub", "CN", "4.58"),
+        ("Jaipur Jewelry Sourcing Studio", "IN", "4.15"),
+        ("Singapore Gem Trade Desk", "SG", "4.60"),
+        ("Shenzhen Jewelry Components Hub", "CN", "3.85"),
     ]
     sellers_by_key = {
         (seller.name, seller.country.code): seller
@@ -1282,6 +1347,8 @@ def _ensure_precious_catalog(session: Session, countries: dict[str, Country]) ->
                 ),
             )
             session.add(sellers_by_key[key])
+        else:
+            _refresh_demo_rating(sellers_by_key[key], rating)
     session.flush()
 
     existing_offers = {
