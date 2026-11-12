@@ -11,6 +11,7 @@ import {
 import { formatBdt, formatDateTime } from "../../../../../lib/format";
 import { useLocale } from "../../../../../lib/locale-context";
 import { OrderSteps } from "../../../../../components/order-steps";
+import { freightLabel } from "../../../../../lib/sourcing-copy";
 
 export default function CreateOrderFromQuotePage() {
   const params = useParams<{ id: string }>();
@@ -100,7 +101,7 @@ export default function CreateOrderFromQuotePage() {
         <div className="quote-summary">
           <div><strong>{bn ? "পণ্য" : "Product"}</strong><span>{quote.product_name}</span></div>
           <div><strong>{bn ? "ভ্যারিয়েন্ট / পরিমাণ" : "Variant / quantity"}</strong><span>{quote.variant_name} · {new Intl.NumberFormat(intlLocale).format(quote.qty)}</span></div>
-          <div><strong>{bn ? "সোর্স" : "Source"}</strong><span>{quote.country_id} · {quote.mode}</span></div>
+          <div><strong>{bn ? "সোর্স" : "Source"}</strong><span>{quote.country_id} · {freightLabel(locale, quote.mode)}</span></div>
           <div><strong>{bn ? "মোট locked মূল্য" : "Locked total"}</strong><span>{formatBdt(breakdown?.total_bdt, intlLocale)}</span></div>
           <div><strong>{bn ? "প্রয়োজনীয় অগ্রিম" : "Advance required"}</strong><span>{formatBdt(breakdown?.advance_bdt, intlLocale)}</span></div>
           <div><strong>{bn ? "বাকি" : "Remaining"}</strong><span>{formatBdt(breakdown?.remaining_bdt, intlLocale)}</span></div>

@@ -11,7 +11,7 @@ export function Footer() {
       <div className="footer-grid">
         <div>
           <div className="footer-brand">
-            <span className="brand-mark">S</span>Source<strong>AI</strong>
+            <span className="brand-mark">S</span><span>Source<strong>AI</strong></span>
           </div>
           <p>
             {bn

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { getMyOrders, type OrderSummary } from "../../../lib/api";
 import { formatBdt, formatDateTime } from "../../../lib/format";
 import { useLocale } from "../../../lib/locale-context";
+import { freightLabel } from "../../../lib/sourcing-copy";
 
 const statuses = ["", "PENDING", "CONFIRMED", "PURCHASED", "IN_TRANSIT", "CUSTOMS", "LOCAL_DISPATCH", "DELIVERED", "CANCELLED"];
 
@@ -64,7 +65,7 @@ export default function OrdersPage() {
           const decision = order.manual_payment?.decision || (order.manual_payment?.verified ? "APPROVED" : "PENDING");
           return <article key={order.id} className="account-order-card">
             <div className="account-order-card__top">
-              <div><small>{formatDateTime(order.created_at, intlLocale)}</small><h2>{bn ? "অর্ডার" : "Order"} #{order.id}</h2><p>{order.country_id || "—"} · {order.mode || "—"} · {order.delivery_type || "—"}</p></div>
+              <div><small>{formatDateTime(order.created_at, intlLocale)}</small><h2>{bn ? "অর্ডার" : "Order"} #{order.id}</h2><p>{order.country_id || "—"} · {freightLabel(locale, order.mode)} · {order.delivery_type || "—"}</p></div>
               <strong>{formatBdt(order.total_bdt, intlLocale)}</strong>
             </div>
             <div className="account-order-card__status">

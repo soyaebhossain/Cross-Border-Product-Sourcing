@@ -8,6 +8,7 @@ import { deleteSavedQuote, getQuotePdfUrl, getSavedQuotes, updateSavedQuoteStatu
 import { localizedAiItems, localizedAiSummary } from "../../../lib/ai-explanation-locale";
 import { formatBdt, formatDateTime } from "../../../lib/format";
 import { useLocale } from "../../../lib/locale-context";
+import { freightLabel } from "../../../lib/sourcing-copy";
 
 function isExpired(quote: SavedQuote) {
   return Boolean(quote.expires_at && new Date(quote.expires_at).getTime() < Date.now());
@@ -130,7 +131,7 @@ export default function SavedQuotesPage() {
             <div className="comparison-card__top"><label className="comparison-select"><input type="checkbox" checked={selected.has(quote.id)} disabled={!selected.has(quote.id) && selected.size >= 3} onChange={event => setSelected(current => { const next = new Set(current); if (event.target.checked) next.add(quote.id); else next.delete(quote.id); return next; })} /><span>{bn ? "তুলনা করুন" : "Compare"}</span></label><div>{best ? <span className="badge">{bn ? "সেরা মূল্য" : "Best value"}</span> : null}<span className={`admin-status admin-status--${expired ? "expired" : (quote.status || "requested").toLowerCase()}`}>{expired ? "EXPIRED" : (quote.status || "requested").toUpperCase()}</span></div></div>
             <small>{bn ? "কোট" : "Quote"} #{quote.id} · {formatDateTime(quote.created_at, intlLocale)}</small>
             <h2>{quote.product_name}</h2><p>{quote.variant_name || "Standard"} · {bn ? "পরিমাণ" : "Qty"} {new Intl.NumberFormat(intlLocale).format(quote.qty)}</p>
-            <span className="badge">{quote.country_id} · {quote.mode}</span>
+            <span className="badge">{quote.country_id} · {freightLabel(locale, quote.mode)}</span>
             <div className="comparison-cost"><small>{bn ? "মোট ল্যান্ডেড কস্ট" : "Total landed cost"}</small><strong>{formatBdt(cost?.total_bdt, intlLocale)}</strong></div>
             <dl className="comparison-breakdown">
               <div><dt>{bn ? "পণ্য" : "Product"}</dt><dd>{formatBdt(cost?.product_cost_bdt || cost?.origin_price_bdt, intlLocale)}</dd></div>

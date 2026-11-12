@@ -253,8 +253,8 @@ export default function QuotePage() {
                 onChange={(event) => setForm((prev) => ({ ...prev, mode: event.target.value }))}
                 className="input-field"
               >
-                <option value="LOCAL">Local (air)</option>
-                <option value="BULK">Bulk (sea)</option>
+                <option value="LOCAL">{bn ? "আকাশপথ (দ্রুত)" : "Air freight (faster)"}</option>
+                <option value="BULK">{bn ? "সমুদ্রপথ (কম খরচ, বেশি সময়)" : "Sea freight (cheaper, slower)"}</option>
               </select>
             </div>
 

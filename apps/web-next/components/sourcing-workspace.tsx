@@ -7,7 +7,7 @@ import { getCheapestCountryRecommendationWithAi, type CheapestCountryRecommendat
 import { localizedAiItems, localizedAiSummary } from "../lib/ai-explanation-locale";
 import { formatBdt } from "../lib/format";
 import { useLocale } from "../lib/locale-context";
-import { localizedRecommendationText } from "../lib/sourcing-copy";
+import { freightLabel, localizedRecommendationText } from "../lib/sourcing-copy";
 import { useProductQuantity } from "./product-quantity";
 
 export function SourcingWorkspace({ variantId }: { variantId: number }) {
@@ -123,7 +123,7 @@ export function SourcingWorkspace({ variantId }: { variantId: number }) {
               key={`${item.country.code}-${item.mode}`}
             >
               <div className="supplier-rank">#{item.rank}</div>
-              <div><strong>{item.selected_offer.seller_name}</strong><span>{item.country.name} · {item.mode}</span></div>
+              <div><strong>{item.selected_offer.seller_name}</strong><span>{item.country.name} · {freightLabel(locale, item.mode)}</span></div>
               <div><small>{bn ? `ল্যান্ডেড কস্ট (${qty}টি)` : `Landed cost (${qty} ${qty === 1 ? "unit" : "units"})`}{item.pricing_status === "indicative" ? (bn ? " · আনুমানিক" : " · indicative") : item.pricing_status === "verified" ? (bn ? " · যাচাইকৃত" : " · verified") : ""}</small><strong>{formatBdt(item.estimated_total_bdt, intlLocale)}</strong></div>
               <div><small>{bn ? "ডেলিভারি" : "Delivery"}</small><strong>{item.eta.min_days}–{item.eta.max_days} {bn ? "দিন" : "days"}</strong></div>
               <div><small>{bn ? "স্কোর" : "Score"}</small><strong>{Number(item.score).toFixed(1)}/100</strong></div>

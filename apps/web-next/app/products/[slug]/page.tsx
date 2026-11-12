@@ -57,16 +57,12 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                 <strong>{product.model || "N/A"}</strong>
               </div>
               <div>
-                <span>Slug</span>
-                <strong>{product.slug}</strong>
-              </div>
-              <div>
                 <span>Variants</span>
                 <strong>{product.variants.length}</strong>
               </div>
             </div>
 
-            <ProductDetailActionPanel product={product} />
+            <ProductDetailActionPanel product={product} landedCostAvailable={Boolean(primaryVariantId) && !catalogPreview} />
 
             <div className="variant-list">
               {product.variants.map((variant) => (

@@ -103,3 +103,14 @@ const recommendationTextBn: Record<string, string> = {
 export function localizedRecommendationText(locale: AppLocale, value: string) {
   return locale === "bn" ? recommendationTextBn[value] || value : value;
 }
+
+/**
+ * Customer-facing name for the internal shipping mode. The quote engine prices
+ * LOCAL with the air rate card and BULK with the sea rate card.
+ */
+export function freightLabel(locale: AppLocale, mode: string | null | undefined) {
+  const value = (mode || "").toUpperCase();
+  if (value === "LOCAL") return locale === "bn" ? "আকাশপথ (Air freight)" : "Air freight";
+  if (value === "BULK") return locale === "bn" ? "সমুদ্রপথ (Sea freight)" : "Sea freight";
+  return mode || "—";
+}
