@@ -3,11 +3,15 @@
 import { useLocale } from "../lib/locale-context";
 import { sourcingText } from "../lib/sourcing-copy";
 
-export function PriceDisplay({ amount, currency = "USD", compact = false }: { amount: number | null | undefined; currency?: string; compact?: boolean }) {
+export function PriceDisplay({ amount, currency = "USD", compact = false, amountBdt }: { amount: number | null | undefined; currency?: string; compact?: boolean; amountBdt?: number | null }) {
   const { locale } = useLocale();
   if (amount === null || amount === undefined) return <span className="price-display price-display--pending">{locale === "bn" ? "মূল্য কোটে জানানো হবে" : "Price on request"}</span>;
   const formatted = new Intl.NumberFormat(locale === "bn" ? "bn-BD" : "en-US", { style: "currency", currency, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(amount);
-  return <span className={compact ? "price-display price-display--compact" : "price-display"}><small>{sourcingText(locale, "from")}</small> {formatted}</span>;
+  // The BDT figure uses the same exchange-rate table as the quote engine.
+  const bdt = amountBdt && currency !== "BDT"
+    ? new Intl.NumberFormat(locale === "bn" ? "bn-BD" : "en-US", { maximumFractionDigits: 0 }).format(amountBdt)
+    : null;
+  return <span className={compact ? "price-display price-display--compact" : "price-display"}><small>{sourcingText(locale, "from")}</small> {formatted}{bdt ? <span className="price-display__bdt">≈ ৳{bdt}</span> : null}</span>;
 }
 
 export function RiskBadge({ level }: { level: string | null | undefined }) {

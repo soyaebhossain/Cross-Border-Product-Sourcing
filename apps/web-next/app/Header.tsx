@@ -13,6 +13,7 @@ export function Header() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const [compact, setCompact] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { locale, toggleLocale } = useLocale();
@@ -20,6 +21,14 @@ export function Header() {
 
   useEffect(() => { getCurrentUser().then(setCurrentUser).catch(() => setCurrentUser(null)); }, [pathname]);
   useEffect(() => setOpen(false), [pathname]);
+  // Past the first screenful the header shrinks to one compact bar. The two
+  // thresholds stop it flickering when the page sits right at the boundary.
+  useEffect(() => {
+    const onScroll = () => setCompact(previous => (previous ? window.scrollY > 40 : window.scrollY > 120));
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
@@ -41,7 +50,7 @@ export function Header() {
     : [["/products", bn ? "পণ্য" : "Products", "package"], ["/categories", bn ? "ক্যাটাগরি" : "Categories", "grid"], ["/account/orders", bn ? "আমার অর্ডার" : "My orders", "orders"]];
   const accountHref: Route = isPrivileged ? "/admin" : "/account";
 
-  return <div className="header-stack"><header className={currentUser ? "site-header site-header--authenticated" : "site-header"}>
+  return <div className={`header-stack${compact ? " header-stack--compact" : ""}${pathname === "/" ? " header-stack--home" : ""}`}><header className={currentUser ? "site-header site-header--authenticated" : "site-header"}>
     <div className="site-header__brand"><Link href="/"><span className="brand-mark">S</span><span>Source<strong>AI</strong><small>{bn ? "সোর্সিং সিদ্ধান্তের মার্কেটপ্লেস" : "Decision-support marketplace"}</small></span></Link></div>
     <form className="global-search" onSubmit={submit} role="search"><span className="search-icon"><AppIcon name="search" size={18} /></span><input aria-label={bn ? "মার্কেটপ্লেসে খুঁজুন" : "Search marketplace"} value={search} onChange={(event) => setSearch(event.target.value)} placeholder={bn ? "পণ্য, মডেল বা ক্যাটাগরি খুঁজুন…" : "Search products, models, categories…"} /><button type="submit" aria-label={bn ? "পণ্য খুঁজুন" : "Search products"}><AppIcon name="search" size={17} /><span>{bn ? "খুঁজুন" : "Search"}</span></button></form>
     <button className="mobile-menu" type="button" aria-label={open ? (bn ? "নেভিগেশন বন্ধ করুন" : "Close navigation") : (bn ? "নেভিগেশন খুলুন" : "Open navigation")} aria-expanded={open} aria-controls="primary-navigation" onClick={() => setOpen((value) => !value)}><AppIcon name={open ? "close" : "menu"} size={22} /></button>

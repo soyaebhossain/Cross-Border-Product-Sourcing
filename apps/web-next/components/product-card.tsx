@@ -45,7 +45,7 @@ export function ProductCard({ product, imagePriority, selectable, selected, onSe
       <p className="eyebrow">{localizedCatalogLabel(locale, product.category.name)}</p>
       <h3><Link className="product-card__title-link" href={`/products/${product.slug}`}>{product.name}</Link></h3>
       <p className="meta">{product.model || (locale === "bn" ? "মডেল উল্লেখ নেই" : "Model not specified")}</p>
-      <div className="product-card__price-row"><PriceDisplay amount={market?.min_price} currency={market?.currency} /><RiskBadge level={market?.risk_level} /></div>
+      <div className="product-card__price-row"><PriceDisplay amount={market?.min_price} currency={market?.currency} amountBdt={market?.min_price_bdt} /><RiskBadge level={market?.risk_level} /></div>
       <dl className="product-card__facts">
         <div><dt>{sourcingText(locale, "origin")}</dt><dd>{origins || sourcingText(locale, "confirmSupplier")}</dd></div>
         <div><dt>{locale === "bn" ? "ডেলিভারি" : "Delivery"}</dt><dd>{eta ? (market?.max_delivery_days ? `${eta}–${market.max_delivery_days} ${locale === "bn" ? "দিন" : "days"}` : `${eta}+ ${locale === "bn" ? "দিন" : "days"}`) : sourcingText(locale, "confirmSupplier")}</dd></div>

@@ -25,7 +25,7 @@ export function ProductDetailActionPanel({ product, landedCostAvailable = false 
   const eta = market?.min_delivery_days;
   return <aside className="product-action-panel" aria-labelledby="product-action-title">
     <OrderSteps current={1} />
-    <div className="product-action-panel__heading"><div><span>{sourcingText(locale, "estimatedUnitPrice")}</span><PriceDisplay amount={product.market?.min_price} currency={product.market?.currency} /></div><RiskBadge level={product.market?.risk_level} /></div>
+    <div className="product-action-panel__heading"><div><span>{sourcingText(locale, "estimatedUnitPrice")}</span><PriceDisplay amount={product.market?.min_price} currency={product.market?.currency} amountBdt={product.market?.min_price_bdt} /></div><RiskBadge level={product.market?.risk_level} /></div>
     <h2 id="product-action-title">{locale === "bn" ? "আপনার সোর্সিং অনুরোধ তৈরি করুন" : "Build your sourcing request"}</h2>
     <div className="product-action-panel__fields">
       <label>{sourcingText(locale, "variant")}<select value={variantId} onChange={(event) => setVariantId(Number(event.target.value))}>{product.variants.map((variant) => <option key={variant.id} value={variant.id}>{variant.variant_name || variant.sku || `Variant ${variant.id}`}</option>)}</select></label>

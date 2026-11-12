@@ -57,3 +57,25 @@
 .product-card__actions .card-action--order { grid-column: 1 / -1; }
 .form-actions__note { flex-basis: 100%; color: #64748b; font-size: 12px; }
 .basket-summary__orders { display: grid; gap: 8px; margin-top: 10px; }
+
+/* Price in both currencies */
+.price-display__bdt { display: block; margin-top: 2px; color: #64748b; font-size: 12px; font-weight: 600; }
+
+/* Header: one compact bar after scrolling, one search box on the home page */
+.header-stack--compact .trust-strip { display: none !important; }
+.header-stack--compact .site-header { min-height: 0 !important; padding-block: 8px !important; }
+.header-stack--compact .site-header__brand small { display: none; }
+.header-stack--home:not(.header-stack--compact) .site-header .global-search { visibility: hidden; }
+@media (max-width: 620px) {
+  /* The hero search already fills the first screen of the home page. */
+  .header-stack--home:not(.header-stack--compact) .site-header .global-search { display: none !important; }
+  .header-stack--compact .site-header { grid-template-columns: auto minmax(0, 1fr) 44px !important; gap: 8px !important; }
+  .header-stack--compact .site-header__brand a > span:not(.brand-mark) { display: none; }
+  .header-stack--compact .site-header .global-search { grid-column: 2 !important; grid-row: 1 !important; margin: 0 !important; }
+  .header-stack--compact .global-search button span { display: none; }
+  .header-stack--compact .site-header .mobile-menu { position: static !important; grid-column: 3 !important; grid-row: 1 !important; }
+  .header-stack--home:not(.header-stack--compact) .site-header { row-gap: 0 !important; }
+  /* Two trust points fit a phone without clipping; the rest stay on wider screens. */
+  .trust-strip { justify-content: center !important; overflow: hidden !important; white-space: nowrap; }
+  .trust-strip span:nth-child(n + 3) { display: none; }
+}

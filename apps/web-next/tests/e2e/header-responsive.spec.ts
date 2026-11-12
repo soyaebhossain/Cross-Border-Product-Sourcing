@@ -145,7 +145,7 @@ test("@public authenticated header uses intentional responsive rows without over
 
   for (const width of desktopWidths) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.goto("/products", { waitUntil: "domcontentloaded" });
     await expect(page.locator(".site-header--authenticated")).toBeVisible();
     await expectDesktopControls(page);
 
@@ -180,7 +180,7 @@ test("@public compact header keeps search and accessible navigation on mobile", 
 
   for (const width of mobileWidths) {
     await page.setViewportSize({ width, height: 900 });
-    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.goto("/products", { waitUntil: "domcontentloaded" });
     const header = page.locator(".site-header--authenticated");
     await expect(header).toBeVisible();
     await expect(header.getByRole("search")).toBeVisible();
@@ -219,4 +219,20 @@ test("@public compact header keeps search and accessible navigation on mobile", 
     expect.soft(audit.clippedControls, `${width}px mobile clipped controls`).toEqual([]);
     expect.soft(audit.rowCount, `${width}px brand/search/navigation rows`).toBe(3);
   }
+});
+
+test("@public home page keeps a single search box until the visitor scrolls", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === "mobile-chromium", "Runs once in the desktop project");
+  await mockAuthenticatedAdmin(page);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/", { waitUntil: "domcontentloaded" });
+
+  const headerSearch = page.locator(".site-header .global-search");
+  await expect(page.locator(".hero-search input")).toBeVisible();
+  await expect(headerSearch).toBeHidden();
+  await expect(page.locator(".trust-strip")).toBeVisible();
+
+  await page.mouse.wheel(0, 900);
+  await expect(headerSearch).toBeVisible();
+  await expect(page.locator(".trust-strip")).toBeHidden();
 });
