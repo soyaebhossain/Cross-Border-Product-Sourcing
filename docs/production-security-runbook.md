@@ -258,6 +258,14 @@ customer, support or audit data. Keep
 products, set it to `0` and redeploy Vercel; live catalog data will then be the
 only source.
 
+The same snapshot file is the development seed source: the seed reads
+`market.min_price` as the air-freight price and creates the sea-freight offer
+at a 10% discount. Do not replace the committed file with an export from a
+database that was itself seeded from it. That export carries the discounted
+price as `min_price`, so the next seed would lower every price again, and
+product ids would change. To bring ratings or demo prices up to date, refresh
+those `market` fields only and regenerate the ML dataset pack.
+
 ## Backup and restore
 
 - Create a consistent SQLite or PostgreSQL custom-format backup plus checksum
