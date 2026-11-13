@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 export type AppLocale = "en" | "bn";
@@ -29,6 +30,7 @@ export function LocaleProvider({
   initialLocale?: AppLocale;
 }) {
   const [locale, setLocaleState] = useState<AppLocale>(initialLocale);
+  const router = useRouter();
 
   useEffect(() => {
     const stored = window.localStorage.getItem(STORAGE_KEY);
@@ -37,11 +39,16 @@ export function LocaleProvider({
       : initialLocale;
     setLocaleState(nextLocale);
     persistLocale(nextLocale);
-  }, [initialLocale]);
+    // The server rendered this page from the cookie; if the browser's saved
+    // choice differs, ask for the page again in the right language.
+    if (nextLocale !== initialLocale) router.refresh();
+  }, [initialLocale, router]);
 
   const setLocale = (nextLocale: AppLocale) => {
     setLocaleState(nextLocale);
     persistLocale(nextLocale);
+    // Server-rendered pages read the language from the cookie just written.
+    router.refresh();
   };
 
   const value = useMemo<LocaleContextValue>(() => ({

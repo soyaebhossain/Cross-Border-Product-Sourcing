@@ -68,3 +68,32 @@ test("crawler and install metadata routes are available", async ({ request }) =>
   expect(manifest.ok()).toBeTruthy();
   expect((await manifest.json()).short_name).toBe("SourceAI");
 });
+
+test("@public choosing Bangla translates the home, catalog, category and product pages", async ({ page }) => {
+  await page.reload();
+  const heading = page.locator("main h1");
+  await expect(heading).toHaveText("Make every global sourcing decision with confidence.");
+
+  // On a phone the language button sits inside the navigation menu.
+  const openMenu = page.getByRole("button", { name: "Open navigation" });
+  if (await openMenu.isVisible()) await openMenu.click();
+  await page.locator("button.locale-toggle:visible").first().click();
+
+  // The home page is rendered on the server; it must follow the choice without a reload.
+  await expect(heading).toHaveText("প্রতিটি বৈশ্বিক সোর্সিং সিদ্ধান্ত নিন আত্মবিশ্বাসের সাথে।");
+  await expect(page.getByText("লাইভ ক্যাটালগ", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "মার্কেটপ্লেসে খুঁজুন" })).toBeVisible();
+  await expect(page.getByText("Popular products")).toHaveCount(0);
+
+  await page.goto("/products");
+  await expect(heading).toHaveText(/^সঠিক পণ্য ও .+ খুঁজে নিন$/);
+  await expect(page.getByText("বৈশ্বিক সোর্সিং ক্যাটালগ", { exact: true })).toBeVisible();
+  await expect(page.getByText("Find the right product and supplier")).toHaveCount(0);
+
+  await page.goto("/categories");
+  await expect(heading).toHaveText(/^ক্যাটাগরি .+ পণ্য দেখুন$/);
+
+  await page.goto("/products/iphone-14");
+  await expect(page.getByRole("link", { name: "ক্যাটালগে ফিরে যান" })).toBeVisible();
+  await expect(page.getByText("Back to catalog")).toHaveCount(0);
+});

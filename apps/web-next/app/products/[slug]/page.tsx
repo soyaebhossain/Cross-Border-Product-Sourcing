@@ -6,6 +6,7 @@ import { ProductDetailActionPanel } from "../../../components/product-detail-act
 import { ProductQuantityProvider } from "../../../components/product-quantity";
 import { ProductGallery } from "../../../components/product-image";
 import { formatBdt } from "../../../lib/format";
+import { getServerLocale } from "../../../lib/server-locale";
 
 type ProductDetailPageProps = {
   params: Promise<{ slug: string }>;
@@ -13,6 +14,7 @@ type ProductDetailPageProps = {
 
 export default async function ProductDetailPage({ params }: ProductDetailPageProps) {
   const { slug } = await params;
+  const bn = (await getServerLocale()) === "bn";
 
   try {
     const product = await getProductBySlug(slug);
@@ -32,12 +34,12 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
       <main className="shell shell--narrow">
         <ProductQuantityProvider>
         <Link href="/" className="back-link">
-          Back to catalog
+          {bn ? "ক্যাটালগে ফিরে যান" : "Back to catalog"}
         </Link>
         {catalogPreview ? (
           <div className="catalog-preview-notice" role="status">
-            <strong>Catalog preview</strong>
-            <span>This product is available to browse. Live recommendations, quotes and ordering are temporarily unavailable.</span>
+            <strong>{bn ? "ক্যাটালগ প্রিভিউ" : "Catalog preview"}</strong>
+            <span>{bn ? "এই পণ্যটি দেখা যাচ্ছে। লাইভ সুপারিশ, কোট ও অর্ডার সাময়িকভাবে বন্ধ আছে।" : "This product is available to browse. Live recommendations, quotes and ordering are temporarily unavailable."}</span>
           </div>
         ) : null}
 
@@ -49,15 +51,15 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
           <div className="detail__copy">
             <p className="eyebrow">{product.category.name}</p>
             <h1>{product.name}</h1>
-            <p className="lede">{product.description || "No description has been migrated for this product yet."}</p>
+            <p className="lede">{product.description || (bn ? "এই পণ্যের বিবরণ এখনো যোগ করা হয়নি।" : "No description has been migrated for this product yet.")}</p>
 
             <div className="detail__meta">
               <div>
-                <span>Model</span>
+                <span>{bn ? "মডেল" : "Model"}</span>
                 <strong>{product.model || "N/A"}</strong>
               </div>
               <div>
-                <span>Variants</span>
+                <span>{bn ? "ভ্যারিয়েন্ট" : "Variants"}</span>
                 <strong>{product.variants.length}</strong>
               </div>
             </div>
@@ -70,7 +72,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
                   <div>
                     <strong>{variant.variant_name || variant.sku || `Variant ${variant.id}`}</strong>
                     <p>
-                      SKU: {variant.sku || "N/A"} | Weight: {variant.weight_kg} kg
+                      SKU: {variant.sku || "N/A"} | {bn ? "ওজন" : "Weight"}: {variant.weight_kg} kg
                     </p>
                   </div>
                   <span>
@@ -140,11 +142,11 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
         {primaryVariantId && !catalogPreview ? <SourcingWorkspace variantId={primaryVariantId} /> : catalogPreview ? (
           <section className="workspace catalog-preview-workspace">
             <div>
-              <span className="market-kicker">Live sourcing temporarily unavailable</span>
-              <h2>Quote and order services are starting</h2>
-              <p>You can review the catalog now. Supplier recommendations, saved quotes and checkout will be enabled when the secure service is online.</p>
+              <span className="market-kicker">{bn ? "লাইভ সোর্সিং সাময়িকভাবে বন্ধ" : "Live sourcing temporarily unavailable"}</span>
+              <h2>{bn ? "কোট ও অর্ডার সেবা চালু হচ্ছে" : "Quote and order services are starting"}</h2>
+              <p>{bn ? "এখন ক্যাটালগ দেখতে পারেন। নিরাপদ সেবা চালু হলে সাপ্লায়ার সুপারিশ, সেভড কোট ও চেকআউট পাওয়া যাবে।" : "You can review the catalog now. Supplier recommendations, saved quotes and checkout will be enabled when the secure service is online."}</p>
             </div>
-            <button className="market-button" type="button" disabled>Request quote unavailable</button>
+            <button className="market-button" type="button" disabled>{bn ? "কোট এখন বন্ধ" : "Request quote unavailable"}</button>
           </section>
         ) : null}
         </ProductQuantityProvider>

@@ -5,8 +5,11 @@ import Link from "next/link";
 import { AppIcon } from "../../components/app-icon";
 import { CategoryIcon } from "../../components/category-icon";
 import { getCategories, type Category } from "../../lib/api";
+import { useLocale } from "../../lib/locale-context";
 
 export default function CategoriesPage() {
+  const { locale } = useLocale();
+  const bn = locale === "bn";
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,22 +27,22 @@ export default function CategoriesPage() {
       <div className="section">
         <div className="section__header">
           <div>
-            <p className="eyebrow">Categories</p>
-            <h1>Browse catalog segments</h1>
+            <p className="eyebrow">{bn ? "ক্যাটাগরি" : "Categories"}</p>
+            <h1>{bn ? "ক্যাটাগরি অনুযায়ী পণ্য দেখুন" : "Browse catalog segments"}</h1>
           </div>
           <Link href="/quote" className="button button--primary">
-            Request a quote
+            {bn ? "কোট নিন" : "Request a quote"}
           </Link>
         </div>
 
         {loading ? (
-          <div className="empty-state">Loading categories…</div>
+          <div className="empty-state">{bn ? "ক্যাটাগরি লোড হচ্ছে…" : "Loading categories…"}</div>
         ) : error ? (
-          <div className="empty-state">{error}</div>
+          <div className="empty-state">{bn ? "এই মুহূর্তে ক্যাটাগরি লোড করা যাচ্ছে না।" : error}</div>
         ) : categories.length === 0 ? (
           <div className="empty-state">
-            <strong>No categories available yet.</strong>
-            <p>The rebuild API may still be importing product metadata.</p>
+            <strong>{bn ? "এখনো কোনো ক্যাটাগরি নেই।" : "No categories available yet."}</strong>
+            <p>{bn ? "ক্যাটালগের তথ্য এখনো তৈরি হচ্ছে। একটু পরে আবার দেখুন।" : "The rebuild API may still be importing product metadata."}</p>
           </div>
         ) : (
           <div className="category-grid">
@@ -49,14 +52,14 @@ export default function CategoriesPage() {
                   <CategoryIcon name={category.name} />
                   <div className="category-directory-card__copy">
                     <h2>{category.name}</h2>
-                    <p>Explore products, variants, and sourcing routes.</p>
+                    <p>{bn ? "পণ্য, ভ্যারিয়েন্ট ও সোর্সিং রুট দেখুন।" : "Explore products, variants, and sourcing routes."}</p>
                   </div>
                 </div>
                 <Link
                   className="category-directory-card__action"
                   href={`/products?category=${encodeURIComponent(category.slug)}`}
                 >
-                  Browse products <AppIcon name="arrow-right" size={16} />
+                  {bn ? "পণ্য দেখুন" : "Browse products"} <AppIcon name="arrow-right" size={16} />
                 </Link>
               </article>
             ))}

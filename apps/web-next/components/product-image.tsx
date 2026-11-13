@@ -416,8 +416,8 @@ export function ProductGallery({ media, name, category }: ProductGalleryProps) {
         </p>
       ) : null}
       <div className="product-gallery__footer">
-        <span>{safeMedia.length} image{safeMedia.length === 1 ? "" : "s"}</span>
-        <span>Photos are labeled by source</span>
+        <span>{bn ? `${new Intl.NumberFormat("bn-BD").format(safeMedia.length)}টি ছবি` : `${safeMedia.length} image${safeMedia.length === 1 ? "" : "s"}`}</span>
+        <span>{bn ? "প্রতিটি ছবির উৎস লেখা আছে" : "Photos are labeled by source"}</span>
       </div>
       {safeMedia.length > 1 ? (
         <div className="product-gallery__thumbs" aria-label="Choose a product image">
