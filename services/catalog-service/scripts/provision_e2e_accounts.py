@@ -100,14 +100,14 @@ def main() -> int:
             customer = _upsert_test_account(
                 session,
                 username=customer_identifier,
-                email="customer@e2e.invalid",
+                email="customer@e2e.test",
                 password=customer_password,
                 role="customer",
             )
             admin = _upsert_test_account(
                 session,
                 username=admin_identifier,
-                email="admin@e2e.invalid",
+                email="admin@e2e.test",
                 password=admin_password,
                 role="admin",
             )
