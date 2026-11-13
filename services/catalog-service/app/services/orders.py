@@ -188,10 +188,13 @@ def save_quote_record(session: Session, payload: SaveQuoteIn, current_user: Curr
             language=payload.language,
         )
         fallback = fallback_explanation(context)
+        # The explanation comes back from the browser, so it is checked again:
+        # any number that is not in the server-calculated quote is removed.
         explanation = validated_explanation(
             client_explanation,
             fallback,
             language=payload.language,
+            source=context,
         )
         metadata = payload.response.get("ai_metadata")
         metadata = metadata if isinstance(metadata, dict) else {}

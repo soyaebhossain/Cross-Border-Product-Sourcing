@@ -118,6 +118,31 @@ Neither is produced by the AI layer.
   `GET /api/market/fx-outlook/?currency=USD` and
   `GET /api/market/country-risk/`.
 
+## Keeping AI explanations grounded
+
+The explanation model never calculates anything, and it is not trusted to
+quote figures either.
+
+- **Number check.** Every number in a model explanation, in Latin or Bangla
+  digits, must appear in the server-calculated data it was given. An amount of
+  100 or more may be rounded to a whole number and any figure to one or two
+  decimals; nothing else is accepted. A summary that quotes an unsupported
+  number is replaced by the deterministic summary, a list item that does so is
+  removed, and the explanation is marked for human review. The API reports the
+  count as `ai_metadata.unsupported_numbers_removed`.
+- **Applied everywhere.** The check runs when the model answers, again when a
+  quote is saved (the explanation returns from the browser) and again when a
+  saved quote is shown.
+- **Other guards.** Wrong-language text is dropped, Medium and High risk always
+  require human review, indicative prices must be described as such, and any
+  model failure falls back to the deterministic explanation.
+- **Measuring it.** `python -m scripts.evaluate_explanations --sample 50
+  --language both` asks the model to explain real catalog quotes and scores the
+  raw answers before validation: answers with unsupported numbers,
+  wrong-language statements, missing price caveats and missing review flags.
+  It writes JSON and CSV. Each model answer is a billed request. This check
+  covers numbers; it does not detect a false statement that contains no number.
+
 ## Admin ERP modules
 
 The admin sidebar is grouped by business function: Dashboard, Sales,

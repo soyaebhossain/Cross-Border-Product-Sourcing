@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass
+from decimal import ROUND_HALF_EVEN, ROUND_HALF_UP, Decimal, InvalidOperation
 from functools import lru_cache
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -71,6 +73,10 @@ class AutomationResult:
     source: str
     automation_available: bool
     model: str | None = None
+    # Numbers the model wrote that are not in the server-calculated data, before removal.
+    unsupported_numbers: tuple[str, ...] = ()
+    # The model output before validation; kept for evaluation, never sent to clients.
+    raw_explanation: dict[str, Any] | None = None
 
 
 def normalize_explanation_language(value: Any) -> str:
@@ -158,15 +164,107 @@ def fallback_explanation(recommendation: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+_BANGLA_DIGITS = str.maketrans("\u09e6\u09e7\u09e8\u09e9\u09ea\u09eb\u09ec\u09ed\u09ee\u09ef", "0123456789")
+_NUMBER_PATTERN = re.compile(r"\d[\d,]*(?:\.\d+)?")
+
+
+def _numbers_in_text(text: str) -> list[tuple[str, Decimal]]:
+    """Every number written in a text, in Latin or Bangla digits, with its value."""
+
+    found: list[tuple[str, Decimal]] = []
+    for match in _NUMBER_PATTERN.finditer(text.translate(_BANGLA_DIGITS)):
+        token = match.group(0).rstrip(",")
+        try:
+            found.append((token, Decimal(token.replace(",", ""))))
+        except InvalidOperation:
+            continue
+    return found
+
+
+def supported_numbers(source: Any) -> set[Decimal]:
+    """Numeric values an explanation may quote: those present in the server data.
+
+    A figure may also be quoted rounded to two or one decimal places, and an
+    amount of 100 or more to a whole number, so "BDT 12,077" is accepted for a
+    calculated 12077.45.
+    """
+
+    values: set[Decimal] = set()
+
+    def visit(node: Any) -> None:
+        if isinstance(node, bool) or node is None:
+            return
+        if isinstance(node, dict):
+            for item in node.values():
+                visit(item)
+        elif isinstance(node, (list, tuple, set)):
+            for item in node:
+                visit(item)
+        elif isinstance(node, (int, float, Decimal)):
+            add(Decimal(str(node)))
+        elif isinstance(node, str):
+            for _, number in _numbers_in_text(node):
+                add(number)
+
+    def add(number: Decimal) -> None:
+        if not number.is_finite():
+            return
+        values.add(number)
+        # Whole-number rounding is only for amounts (12077.45 -> 12,077). A small
+        # figure such as a 15.38 unit price must not make a bare "15" acceptable.
+        steps = ("0.01", "0.1", "1") if abs(number) >= 100 else ("0.01", "0.1")
+        for places in steps:
+            values.add(number.quantize(Decimal(places), rounding=ROUND_HALF_UP))
+            values.add(number.quantize(Decimal(places), rounding=ROUND_HALF_EVEN))
+
+    visit(source)
+    return values
+
+
+def unsupported_numbers(text: str, allowed: set[Decimal]) -> list[str]:
+    """Numbers in a text that do not appear in the allowed set."""
+
+    return [token for token, number in _numbers_in_text(text) if number not in allowed]
+
+
 def validated_explanation(
     value: Any,
     fallback: dict[str, Any],
     *,
     language: str | None = None,
+    source: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    return check_explanation(value, fallback, language=language, source=source)[0]
+
+
+def check_explanation(
+    value: Any,
+    fallback: dict[str, Any],
+    *,
+    language: str | None = None,
+    source: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], tuple[str, ...]]:
+    """Validate a model explanation and report the unsupported numbers it contained.
+
+    When the server data is given as source, any sentence quoting a number that
+    is not in that data is dropped: the deterministic summary replaces a bad
+    summary and bad list items are removed. A model can therefore never put an
+    invented price, duration or percentage in front of a customer.
+    """
+
     expected_language = normalize_explanation_language(language or fallback.get("language"))
     if not isinstance(value, dict):
-        return fallback
+        return fallback, ()
+    allowed = supported_numbers(source) if source is not None else None
+    rejected: list[str] = []
+
+    def grounded(text: str) -> bool:
+        if allowed is None:
+            return True
+        bad = unsupported_numbers(text, allowed)
+        rejected.extend(bad)
+        return not bad
+
     result = dict(fallback)
     result["language"] = expected_language
     summary = str(result.get("summary") or result.get("summary_bn") or "").strip()[:2000]
@@ -176,6 +274,7 @@ def validated_explanation(
             isinstance(candidate, str)
             and candidate.strip()
             and _matches_explanation_language(candidate.strip(), expected_language)
+            and grounded(candidate.strip())
         ):
             summary = candidate.strip()[:2000]
             break
@@ -185,19 +284,25 @@ def validated_explanation(
         candidate = value.get(key)
         if isinstance(candidate, list):
             source_items = [str(item).strip()[:500] for item in candidate if str(item).strip()]
-            localized_items = [
+            in_language = [
                 item for item in source_items if _matches_explanation_language(item, expected_language)
-            ][:8]
+            ]
+            localized_items = [item for item in in_language if grounded(item)][:8]
             # An explicitly empty list is meaningful. If the model supplied
             # only the wrong language, retain the deterministic localized copy.
-            if not source_items or localized_items:
+            # Items dropped for an invented number are simply removed.
+            if not source_items or localized_items or in_language:
                 result[key] = localized_items
     confidence = value.get("confidence")
     if isinstance(confidence, (int, float)) and 0 <= float(confidence) <= 1:
         result["confidence"] = float(confidence)
     if isinstance(value.get("human_review_required"), bool):
         result["human_review_required"] = value["human_review_required"] or fallback["human_review_required"]
-    return result
+    if rejected:
+        # An explanation that tried to state unsupported figures needs a person to look at it.
+        result["human_review_required"] = True
+        logger.warning("Removed %d unsupported number(s) from a model explanation", len(rejected))
+    return result, tuple(dict.fromkeys(rejected))
 
 
 def explain_recommendation(
@@ -247,11 +352,14 @@ def explain_recommendation(
     except (HTTPError, URLError, OSError, TimeoutError, json.JSONDecodeError, UnicodeDecodeError):
         return AutomationResult(fallback, FALLBACK_SOURCE, False)
     explanation = body.get("explanation", body) if isinstance(body, dict) else body
+    checked, unsupported = check_explanation(explanation, fallback, language=language, source=recommendation)
     return AutomationResult(
-        validated_explanation(explanation, fallback, language=language),
+        checked,
         OLLAMA_SOURCE,
         True,
         settings.automation_model,
+        unsupported,
+        explanation if isinstance(explanation, dict) else None,
     )
 
 
@@ -315,11 +423,14 @@ def _explain_with_claude(
     except json.JSONDecodeError:
         logger.warning("Claude explanation returned invalid JSON; serving deterministic fallback")
         return AutomationResult(fallback, FALLBACK_SOURCE, False)
+    checked, unsupported = check_explanation(explanation, fallback, language=language, source=recommendation)
     return AutomationResult(
-        validated_explanation(explanation, fallback, language=language),
+        checked,
         CLAUDE_SOURCE,
         True,
         model,
+        unsupported,
+        explanation if isinstance(explanation, dict) else None,
     )
 
 

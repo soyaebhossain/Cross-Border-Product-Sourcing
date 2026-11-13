@@ -46,6 +46,7 @@ def quote_ai_explanation(
             "model": automation.model if automation.automation_available else None,
             "prompt_version": "quote-v1",
             "automation_available": automation.automation_available,
+            "unsupported_numbers_removed": len(automation.unsupported_numbers),
             "monetary_calculations_are_deterministic": True,
         },
     }
@@ -103,6 +104,7 @@ def cheapest_country_ai_explanation(
             "source": automation.source,
             "model": automation.model if automation.automation_available else None,
             "automation_available": automation.automation_available,
+            "unsupported_numbers_removed": len(automation.unsupported_numbers),
             "monetary_calculations_are_deterministic": True,
         },
     }

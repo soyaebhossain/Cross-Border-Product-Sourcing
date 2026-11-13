@@ -110,6 +110,7 @@ def serialize_saved_quote(saved_quote: SavedQuote) -> dict[str, Any]:
                 explanation,
                 fallback_explanation(stored_context),
                 language=stored_language,
+                source=stored_context,
             )
         explanation.setdefault(
             "confidence",
