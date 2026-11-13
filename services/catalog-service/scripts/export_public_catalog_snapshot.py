@@ -6,6 +6,7 @@ import json
 import os
 import re
 import sqlite3
+import sys
 from collections import defaultdict
 from decimal import Decimal
 from pathlib import Path
@@ -14,6 +15,12 @@ from typing import Any
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = SERVICE_ROOT.parents[1]
+if str(SERVICE_ROOT) not in sys.path:
+    sys.path.insert(0, str(SERVICE_ROOT))
+
+# The fallback must label supplier risk exactly as the live API does.
+from app.supplier_risk import supplier_risk_label  # noqa: E402
+
 DEFAULT_OUTPUT = (
     REPOSITORY_ROOT
     / "apps"
@@ -167,9 +174,7 @@ def _market_summaries(
         rating = float(summary.get("max_rating", 0))
         delivery_days = int(summary.get("min_delivery_days", 99))
         price = float(summary.get("min_price", 0))
-        risk_level = (
-            "Low" if rating >= 4.5 else "Medium" if rating >= 3.5 else "High"
-        )
+        risk_level = supplier_risk_label(rating)
         item: dict[str, Any] = {
             "countries": sorted(summary["countries"]),
             "supplier_count": len(summary["seller_ids"]),

@@ -13,7 +13,7 @@
       "columns": 32,
       "purpose": "Static catalog features; bootstrap only",
       "rows": 610,
-      "sha256": "0f8ae6a5f36e37ef302fedf6a7a413714b0c1c32940fe5d73eaf91a9fbb7544b"
+      "sha256": "4d9ccf92f956e632b1c44f43c9ae3b47af8e6f27925bd143624f61cded8b08a8"
     },
     "category_text_classification.csv": {
       "columns": 10,
@@ -43,7 +43,7 @@
       "columns": 38,
       "purpose": "Synthetic next-month forecasting tutorial",
       "rows": 23790,
-      "sha256": "8777b00568ba053a069ad73674ab307ed5679feb601b835d10ff50973478dcab"
+      "sha256": "165e53076f8a377faf53869badebc1cd5898f5035fdde93724507c1887fdcece"
     },
     "real_sourcing_outcomes_template.csv": {
       "columns": 34,
@@ -64,7 +64,7 @@
   "sources": [
     {
       "path": "apps/web-next/data/public-catalog.snapshot.json",
-      "sha256": "922089e4eaf0426053619c954f2ec03c4ee95c8bc7eb330003e2d3fcc5983dc4",
+      "sha256": "5807abf2f02c831eb8473c3d20372a8eda2b39df52e79a1ef2bf8b3df9a409ff",
       "source_revision": "20260730_04"
     },
     {

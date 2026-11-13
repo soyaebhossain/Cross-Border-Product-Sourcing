@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from app.supplier_risk import supplier_risk_label
 from scripts.export_public_catalog_snapshot import (
     BANNED_PUBLIC_KEYS,
     build_public_catalog_snapshot,
@@ -219,6 +220,19 @@ def test_exporter_labels_generated_catalog_media_as_illustrative() -> None:
     }
 
 
+def test_exporter_labels_supplier_risk_like_the_live_api() -> None:
+    connection = _fixture_connection()
+    connection.execute("UPDATE sourcing_sellers SET rating = 4.3")
+    try:
+        snapshot = build_public_catalog_snapshot(connection, minimum_products=1)
+    finally:
+        connection.close()
+
+    market = snapshot["products"][0]["market"]
+    assert market["max_rating"] == 4.3
+    assert market["risk_level"] == supplier_risk_label(4.3) == "Low"
+
+
 def test_snapshot_rejects_case_insensitive_duplicate_slugs() -> None:
     connection = _fixture_connection()
     try:
@@ -299,6 +313,11 @@ def test_committed_snapshot_is_complete_and_contains_no_private_scope() -> None:
     )
     assert all(product["description"] is None for product in snapshot["products"])
     assert not (_walk_keys(snapshot) & BANNED_PUBLIC_KEYS)
+    assert all(
+        product["market"]["risk_level"] == supplier_risk_label(product["market"]["max_rating"])
+        for product in snapshot["products"]
+    )
+    assert len({product["market"]["max_rating"] for product in snapshot["products"]}) >= 4
 
     serialized = COMMITTED_SNAPSHOT.read_bytes()
     assert b"http://" not in serialized
