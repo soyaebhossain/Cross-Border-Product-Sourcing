@@ -75,6 +75,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     return () => { active = false; };
   }, [router]);
   useEffect(() => setMenuOpen(false), [pathname]);
+  // The menu scrolls inside the sidebar; keep the current page's link in view.
+  useEffect(() => {
+    if (checking || !user) return;
+    const nav = document.querySelector<HTMLElement>("#admin-navigation nav");
+    const current = nav?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (!nav || !current) return;
+    const navBox = nav.getBoundingClientRect();
+    const box = current.getBoundingClientRect();
+    if (box.top < navBox.top) nav.scrollTop -= navBox.top - box.top + 12;
+    else if (box.bottom > navBox.bottom) nav.scrollTop += box.bottom - navBox.bottom + 12;
+  }, [pathname, checking, user]);
   useEffect(() => {
     if (!menuOpen) {
       if (menuWasOpenRef.current) {

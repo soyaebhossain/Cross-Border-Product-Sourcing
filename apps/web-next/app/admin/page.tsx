@@ -13,7 +13,7 @@ const labels: Record<string, { en: string; bn: string }> = {
   total_orders: { en: "Total orders", bn: "মোট অর্ডার" },
   active_orders: { en: "Active orders", bn: "সক্রিয় অর্ডার" },
   gross_order_value_bdt: { en: "Gross order value", bn: "মোট অর্ডার মূল্য" },
-  verified_advance_bdt: { en: "Verified cash", bn: "যাচাইকৃত অর্থ" },
+  verified_advance_bdt: { en: "Verified advances", bn: "যাচাইকৃত অগ্রিম" },
   verified_cash_bdt: { en: "Verified cash", bn: "যাচাইকৃত অর্থ" },
   outstanding_bdt: { en: "Outstanding", bn: "বকেয়া" },
   refunds_bdt: { en: "Refunds", bn: "রিফান্ড" },

@@ -193,6 +193,31 @@ test.describe("@roles admin ERP modules", () => {
     await expect(finance.getByRole("link", { name: "Order profit & loss" })).toBeVisible();
   });
 
+  test("keeps every menu item reachable on a short laptop screen", async ({ page }) => {
+    const backOffice = createBackOffice();
+    await backOffice.install(page);
+    await page.setViewportSize({ width: 1366, height: 700 });
+
+    await page.goto("/admin/procurement");
+    const nav = page.locator("#admin-navigation nav");
+    await expect(nav.getByRole("link", { name: "Purchase orders" })).toBeVisible();
+    // The grouped menu is taller than the screen, so it scrolls inside the sidebar.
+    const sizes = await nav.evaluate(node => ({ client: node.clientHeight, scroll: node.scrollHeight }));
+    expect(sizes.scroll).toBeGreaterThan(sizes.client);
+
+    const withinMenu = async (name: string) => {
+      const [navBox, linkBox] = await Promise.all([nav.boundingBox(), nav.getByRole("link", { name }).boundingBox()]);
+      return Boolean(navBox && linkBox && linkBox.y >= navBox.y - 1 && linkBox.y + linkBox.height <= navBox.y + navBox.height + 1);
+    };
+    expect(await withinMenu("Settings")).toBe(false);
+
+    // The last item can be reached, and after opening its page it stays in view.
+    await nav.getByRole("link", { name: "Settings" }).click();
+    await expect(page).toHaveURL(/\/admin\/settings$/);
+    await expect(nav.getByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "page");
+    await expect.poll(() => withinMenu("Settings")).toBe(true);
+  });
+
   test("takes a purchase order from the customer order to closed", async ({ page }) => {
     const backOffice = createBackOffice();
     await backOffice.install(page);

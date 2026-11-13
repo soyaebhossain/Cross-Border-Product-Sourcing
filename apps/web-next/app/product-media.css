@@ -85,6 +85,23 @@
 .admin-sidebar__heading { grid-column: 1 / -1; margin: 12px 10px 4px; color: #94a3b8; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .admin-sidebar__group:first-child .admin-sidebar__heading { margin-top: 2px; }
 .admin-sidebar nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+/* The grouped menu is taller than a laptop screen. On desktop it scrolls inside
+   the sidebar, so it must show that more items exist: a thin scrollbar that is
+   always there, and a shadow on whichever edge still hides items. */
+@media (min-width: 821px) {
+  .admin-sidebar nav {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+    scrollbar-gutter: stable;
+    background:
+      linear-gradient(#fff 35%, rgba(255, 255, 255, 0)) center top / 100% 26px no-repeat local,
+      linear-gradient(rgba(255, 255, 255, 0), #fff 65%) center bottom / 100% 26px no-repeat local,
+      radial-gradient(farthest-side at 50% 0, rgba(15, 23, 42, .22), rgba(15, 23, 42, 0)) center top / 100% 9px no-repeat scroll,
+      radial-gradient(farthest-side at 50% 100%, rgba(15, 23, 42, .22), rgba(15, 23, 42, 0)) center bottom / 100% 9px no-repeat scroll;
+  }
+  .admin-sidebar .admin-sidebar__link { padding-block: 7px; }
+  .admin-sidebar .admin-sidebar__heading { margin-top: 10px; }
+}
 .admin-page-header .admin-filter input { width: 150px; height: 40px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; font: inherit; }
 .admin-positive { color: #15803d; }
 .admin-negative { color: #b91c1c; }
