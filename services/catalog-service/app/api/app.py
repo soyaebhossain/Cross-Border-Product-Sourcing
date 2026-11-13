@@ -22,6 +22,7 @@ from .routes.auth import router as auth_router
 from .routes.admin import router as admin_router
 from .routes.admin_analytics import router as admin_analytics_router
 from .routes.admin_operations import router as admin_operations_router
+from .routes.admin_procurement import router as admin_procurement_router
 from .routes.catalog import router as catalog_router
 from .routes.customer import router as customer_router
 from .routes.orders import router as orders_router
@@ -107,6 +108,7 @@ def create_app(app_settings: Settings | None = None) -> FastAPI:
     app.include_router(auth_router)
     app.include_router(admin_router)
     app.include_router(admin_operations_router)
+    app.include_router(admin_procurement_router)
     app.include_router(admin_analytics_router)
     app.include_router(catalog_router)
     app.include_router(customer_router)

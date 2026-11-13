@@ -118,6 +118,36 @@ Neither is produced by the AI layer.
   `GET /api/market/fx-outlook/?currency=USD` and
   `GET /api/market/country-risk/`.
 
+## Admin ERP modules
+
+The admin sidebar is grouped by business function: Dashboard, Sales,
+Procurement, Finance, Customers, Master data and System.
+
+- **Procurement.** A confirmed customer order gets a purchase order (PO) for
+  its supplier, prefilled from the supplier offer the order was priced with.
+  Status flow: `DRAFT -> SENT -> CONFIRMED -> RECEIVED -> CLOSED`, or
+  `CANCELLED` before goods arrive. Confirming a PO moves the customer order to
+  `PURCHASED`. Goods receipts record accepted and rejected units; a rejection
+  needs a quality-check note and flags a quality defect on the order. A PO
+  becomes `RECEIVED` when every ordered unit has been received.
+- **Finance.** Supplier payments are recorded against a PO in the supplier's
+  currency, each with the exchange rate of the day it was paid. Payments are
+  reversed by an administrator, never deleted, and a PO cannot close while a
+  balance is payable. *Supplier payables* lists open balances by age (0-30,
+  31-60, over 60 days). *Order profit and loss* shows revenue, cash collected,
+  supplier cost and margin per order, and says whether supplier cost comes from
+  a PO or from the quote. Freight and duty stay quoted figures until the
+  settled cost is entered on the order, so only then is a realized margin shown.
+- **Controls.** Every change is written to the admin audit log. Operators run
+  procurement and read finance; reversing a supplier payment needs an
+  administrator.
+- **Not included.** Warehouse stock movements, a double-entry general ledger,
+  supplier invoices and tax filing are outside this system.
+
+API: `/api/admin/purchase-orders/`, `/api/admin/orders/{id}/purchase-orders/`,
+`/api/admin/finance/payables/`, `/api/admin/finance/order-pnl/` and
+`/api/admin/erp/summary/`.
+
 ## Run locally on Windows
 
 Install the backend and frontend dependencies once:

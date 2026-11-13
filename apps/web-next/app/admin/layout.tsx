@@ -135,6 +135,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { href: "/admin/notifications", icon: "notifications", en: "Notification outbox", bn: "নোটিফিকেশন আউটবক্স" },
   );
 
+  navigation.push(
+    { href: "/admin/procurement" as Route, icon: "orders", en: "Purchase orders", bn: "Purchase order" },
+    { href: "/admin/finance/payables" as Route, icon: "payments", en: "Supplier payables", bn: "সাপ্লায়ারের পাওনা" },
+    { href: "/admin/finance/pnl" as Route, icon: "audit", en: "Order profit & loss", bn: "Order লাভ-ক্ষতি" },
+  );
+  // ERP modules: the sidebar groups every page under the business function it serves.
+  const modules: Array<{ key: string; en: string; bn: string; pages: string[] }> = [
+    { key: "dashboard", en: "Dashboard", bn: "ড্যাশবোর্ড", pages: ["/admin", "/admin/analytics"] },
+    { key: "sales", en: "Sales", bn: "বিক্রয়", pages: ["/admin/orders", "/admin/quotes", "/admin/ai-reviews"] },
+    { key: "procurement", en: "Procurement", bn: "প্রকিউরমেন্ট", pages: ["/admin/procurement", "/admin/suppliers"] },
+    { key: "finance", en: "Finance", bn: "ফাইন্যান্স", pages: ["/admin/payments", "/admin/finance/payables", "/admin/finance/pnl"] },
+    { key: "crm", en: "Customers", bn: "গ্রাহক সেবা", pages: ["/admin/users", "/admin/support", "/admin/disputes", "/admin/notifications"] },
+    { key: "master", en: "Master data", bn: "মাস্টার ডেটা", pages: ["/admin/catalog", "/admin/rules"] },
+    { key: "system", en: "System", bn: "সিস্টেম", pages: ["/admin/roles", "/admin/audit", "/admin/settings"] },
+  ];
+
   if (checking || !user || (user.role === "operator" && ["/admin/users", "/admin/roles", "/admin/rules", "/admin/audit"].some(path => pathname.startsWith(path)))) {
     return <main className="admin-auth-check" aria-live="polite"><span className="admin-spinner" aria-hidden />{bn ? "অ্যাক্সেস যাচাই করা হচ্ছে…" : "Verifying admin access…"}</main>;
   }
@@ -159,9 +175,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <button ref={closeButtonRef} className="admin-sidebar__close" type="button" aria-label={bn ? "অ্যাডমিন মেনু বন্ধ করুন" : "Close admin menu"} onClick={() => setMenuOpen(false)}><AppIcon name="close" size={20} /></button>
         </div>
         <nav aria-label={bn ? "অ্যাডমিন নেভিগেশন" : "Admin navigation"}>
-          {navigation.filter(item => !item.adminOnly || user.role === "admin").map(item => {
+          {modules.map(module => {
+            const items = module.pages
+              .map(page => navigation.find(item => item.href === page))
+              .filter((item): item is (typeof navigation)[number] => Boolean(item) && (!item!.adminOnly || user.role === "admin"));
+            if (!items.length) return null;
+            return <div className="admin-sidebar__group" key={module.key} role="group" aria-label={bn ? module.bn : module.en}>
+              <p className="admin-sidebar__heading">{bn ? module.bn : module.en}</p>
+              {items.map(item => {
             const active = item.href === "/admin" ? pathname === item.href : pathname.startsWith(item.href);
             return <Link key={item.href} href={item.href} className={active ? "admin-sidebar__link admin-sidebar__link--active" : "admin-sidebar__link"} aria-current={active ? "page" : undefined}><AdminIcon name={item.icon} /><span>{bn ? item.bn : item.en}</span></Link>;
+              })}
+            </div>;
           })}
         </nav>
         <div className="admin-sidebar__footer">

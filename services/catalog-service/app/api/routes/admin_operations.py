@@ -91,6 +91,8 @@ ROLE_CAPABILITIES = {
         "quotes_read",
         "catalog_read",
         "supplier_read",
+        "procurement_operate",
+        "finance_read",
     ],
     "admin": [
         "all_operator_capabilities",
@@ -100,6 +102,7 @@ ROLE_CAPABILITIES = {
         "users_manage",
         "roles_read",
         "audit_read",
+        "finance_manage",
     ],
 }
 

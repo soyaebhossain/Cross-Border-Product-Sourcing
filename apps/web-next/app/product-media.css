@@ -79,3 +79,12 @@
   .trust-strip { justify-content: center !important; overflow: hidden !important; white-space: nowrap; }
   .trust-strip span:nth-child(n + 3) { display: none; }
 }
+
+/* Admin sidebar grouped by ERP module */
+.admin-sidebar__group { display: contents; }
+.admin-sidebar__heading { grid-column: 1 / -1; margin: 12px 10px 4px; color: #94a3b8; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.admin-sidebar__group:first-child .admin-sidebar__heading { margin-top: 2px; }
+.admin-sidebar nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+.admin-page-header .admin-filter input { width: 150px; height: 40px; padding: 0 12px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; font: inherit; }
+.admin-positive { color: #15803d; }
+.admin-negative { color: #b91c1c; }

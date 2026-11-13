@@ -914,3 +914,98 @@ class CountryRiskIndicator(Base):
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     country: Mapped["Country"] = relationship()
+
+
+class PurchaseOrder(Base):
+    """An order placed with a supplier to fulfil one customer order."""
+
+    __tablename__ = "procurement_purchase_orders"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    po_number: Mapped[str | None] = mapped_column(String(30), unique=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders_orders.id"), nullable=False, index=True)
+    seller_id: Mapped[int] = mapped_column(ForeignKey("sourcing_sellers.id"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), default="DRAFT", server_default="DRAFT", nullable=False, index=True)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False)
+    # Exchange rate when the purchase order was raised; each payment records its own rate.
+    fx_rate_to_bdt: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
+    total_origin: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    total_bdt: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    expected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    note: Mapped[str | None] = mapped_column(Text)
+    created_by_user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    order: Mapped["Order"] = relationship()
+    seller: Mapped["Seller"] = relationship()
+    items: Mapped[list["PurchaseOrderItem"]] = relationship(
+        back_populates="purchase_order", cascade="all, delete-orphan"
+    )
+    receipts: Mapped[list["GoodsReceipt"]] = relationship(
+        back_populates="purchase_order", cascade="all, delete-orphan"
+    )
+    payments: Mapped[list["SupplierPayment"]] = relationship(
+        back_populates="purchase_order", cascade="all, delete-orphan"
+    )
+
+
+class PurchaseOrderItem(Base):
+    __tablename__ = "procurement_purchase_order_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    purchase_order_id: Mapped[int] = mapped_column(
+        ForeignKey("procurement_purchase_orders.id"), nullable=False, index=True
+    )
+    variant_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    product_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    variant_name: Mapped[str] = mapped_column(String(200), nullable=False)
+    qty: Mapped[int] = mapped_column(Integer, nullable=False)
+    unit_cost_origin: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+
+    purchase_order: Mapped["PurchaseOrder"] = relationship(back_populates="items")
+
+
+class GoodsReceipt(Base):
+    """Units received against a purchase order, split by quality-check result."""
+
+    __tablename__ = "procurement_goods_receipts"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    purchase_order_id: Mapped[int] = mapped_column(
+        ForeignKey("procurement_purchase_orders.id"), nullable=False, index=True
+    )
+    received_qty: Mapped[int] = mapped_column(Integer, nullable=False)
+    accepted_qty: Mapped[int] = mapped_column(Integer, nullable=False)
+    rejected_qty: Mapped[int] = mapped_column(Integer, nullable=False)
+    qc_note: Mapped[str | None] = mapped_column(Text)
+    received_by_user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    purchase_order: Mapped["PurchaseOrder"] = relationship(back_populates="receipts")
+
+
+class SupplierPayment(Base):
+    """Money paid to a supplier against a purchase order. Reversed, never deleted."""
+
+    __tablename__ = "finance_supplier_payments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    purchase_order_id: Mapped[int] = mapped_column(
+        ForeignKey("procurement_purchase_orders.id"), nullable=False, index=True
+    )
+    amount_origin: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(10), nullable=False)
+    fx_rate_to_bdt: Mapped[Decimal] = mapped_column(Numeric(18, 8), nullable=False)
+    amount_bdt: Mapped[Decimal] = mapped_column(Numeric(14, 2), nullable=False)
+    method: Mapped[str] = mapped_column(String(40), nullable=False)
+    reference: Mapped[str | None] = mapped_column(String(120))
+    paid_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_by_user_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    reversed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reversed_by_user_id: Mapped[int | None] = mapped_column(Integer)
+    reversal_reason: Mapped[str | None] = mapped_column(Text)
+
+    purchase_order: Mapped["PurchaseOrder"] = relationship(back_populates="payments")

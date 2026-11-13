@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { AdminModal } from "../../../../components/admin-modal";
+import { RaisePurchaseOrderButton } from "../../../../components/raise-purchase-order-button";
 import { PaymentProofPreview } from "../../../../components/payment-proof-preview";
 import {
   createAdminRefund,
@@ -146,7 +147,7 @@ export default function AdminOrderDetailPage() {
   return <div className="admin-page">
     <header className="admin-page-header">
       <div><Link className="account-back-link" href="/admin/orders">← {bn ? "অর্ডার তালিকা" : "Order list"}</Link><p className="admin-eyebrow">{bn ? "Dedicated admin detail" : "Dedicated admin detail"}</p><h1>{bn ? "অর্ডার" : "Order"} #{order.id}</h1><p>{formatDateTime(order.created_at, intlLocale)} · {order.country} · {order.mode} · {order.delivery_type}</p></div>
-      <div className="admin-toolbar"><button className="admin-button admin-button--secondary" type="button" onClick={() => window.print()}>{bn ? "প্রিন্ট / PDF" : "Print / PDF"}</button><button className="admin-button admin-button--secondary" type="button" onClick={() => setAction("settlement")}>{bn ? "Settlement / SLA" : "Settlement / SLA"}</button><button className="admin-button admin-button--primary" type="button" disabled={terminalStatus} title={terminalStatus ? (bn ? "Terminal order status আর পরিবর্তন করা যায় না।" : "A terminal order status cannot be changed.") : undefined} onClick={() => { setStatus(order.status); setAction("status"); }}>{bn ? "Status আপডেট" : "Update status"}</button></div>
+      <div className="admin-toolbar"><RaisePurchaseOrderButton orderId={order.id} status={order.status} /><button className="admin-button admin-button--secondary" type="button" onClick={() => window.print()}>{bn ? "প্রিন্ট / PDF" : "Print / PDF"}</button><button className="admin-button admin-button--secondary" type="button" onClick={() => setAction("settlement")}>{bn ? "Settlement / SLA" : "Settlement / SLA"}</button><button className="admin-button admin-button--primary" type="button" disabled={terminalStatus} title={terminalStatus ? (bn ? "Terminal order status আর পরিবর্তন করা যায় না।" : "A terminal order status cannot be changed.") : undefined} onClick={() => { setStatus(order.status); setAction("status"); }}>{bn ? "Status আপডেট" : "Update status"}</button></div>
     </header>
     {error ? <div className="admin-alert admin-alert--error" role="alert"><strong>{bn ? "Action ব্যর্থ" : "Action failed"}</strong><span>{error}</span><button onClick={() => setError("")}>{bn ? "বন্ধ" : "Dismiss"}</button></div> : null}
 
