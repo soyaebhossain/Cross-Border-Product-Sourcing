@@ -533,6 +533,30 @@ test("@public MFA enrollment rotates an exposed QR only after explicit confirmat
   expect(browserStorage).not.toContain("otpauth://");
 });
 
+test("@public a rejected authenticator code is sent once, even with another session in the browser", async ({ page }) => {
+  // Another account's refresh cookie is present, so a session refresh would succeed.
+  let refreshCalls = 0;
+  await page.route("**/api/auth/refresh/", route => {
+    refreshCalls += 1;
+    return route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ user: { id: 3, role: "customer" } }) });
+  });
+  const confirmations: unknown[] = [];
+  await page.route("**/api/auth/mfa/enroll/confirm/", route => {
+    confirmations.push(route.request().postDataJSON());
+    return route.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ detail: "Invalid authentication code" }) });
+  });
+  await openMfaEnrollment(page);
+
+  await page.getByLabel("Six-digit authenticator code").fill("123456");
+  await page.getByRole("button", { name: "Enable and confirm MFA" }).click();
+
+  await expect(page.locator("#mfa-verification-error")).toContainText("That code did not match");
+  await expect(page.locator("#mfa-verification-error")).toContainText("device time is automatic");
+  // Each wrong code counts toward the lockout on the server, so it must not be resent.
+  expect(confirmations).toEqual([{ mfa_token: "e2e-enrollment-token", code: "123456" }]);
+  expect(refreshCalls).toBe(0);
+});
+
 test("@public expired MFA enrollment requires a fresh password-authenticated challenge", async ({ page }) => {
   await mockReadiness(page, true);
   const loginTokens = ["expired-enrollment-token", "fresh-enrollment-token"];

@@ -590,7 +590,12 @@ async function apiFetch(path: string, init: RequestInit): Promise<Response> {
       cause,
     });
   }
-  const authEntryPoint = path === "/api/auth/login/" || path === "/api/auth/register/" || path === "/api/auth/refresh/";
+  // A 401 from these endpoints is about the credential in the request itself
+  // (password, authenticator code, challenge), not about an expired session.
+  // Refreshing and resending would submit a wrong code twice, and the server
+  // counts each one toward the account lockout.
+  const authEntryPoint = path === "/api/auth/login/" || path === "/api/auth/register/" || path === "/api/auth/refresh/"
+    || path.startsWith("/api/auth/mfa/") || path.startsWith("/api/auth/password-reset/");
   if (response.status === 401 && !authEntryPoint && await refreshSession()) {
     response = await fetch(`${getRequestBase()}${path}`, init);
   }
