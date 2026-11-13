@@ -16,8 +16,17 @@ CI runs the public layer with the API unreachable, so the catalog comes from
 the committed snapshot. To reproduce that locally:
 
 ```text
-CI=1 API_BASE_URL=http://127.0.0.1:65534 E2E_EXPECT_CATALOG_SNAPSHOT=1 NEXT_PUBLIC_CATALOG_SNAPSHOT_FALLBACK=1 npm run test:e2e:public
+API_BASE_URL=http://127.0.0.1:65534 NEXT_PUBLIC_CATALOG_SNAPSHOT_FALLBACK=1 npm run build
+CI=1 PLAYWRIGHT_USE_BUILD=1 API_BASE_URL=http://127.0.0.1:65534 E2E_EXPECT_CATALOG_SNAPSHOT=1 NEXT_PUBLIC_CATALOG_SNAPSHOT_FALLBACK=1 npm run test:e2e:public
 ```
+
+`PLAYWRIGHT_USE_BUILD=1` starts the production build (`next start`) instead of
+the development server. CI always does this: on a slow runner the development
+server can serve a page while its manifest is half written and answer with
+"Unexpected end of JSON input", which made the public layer fail at random. The
+API address and the snapshot fallback are fixed at build time, so CI builds
+once for the public layer and once for the role layer. Without the variable,
+Playwright starts the development server, which is quicker while writing tests.
 
 Role-routing tests are skipped with a visible reason unless all required values are provided:
 
