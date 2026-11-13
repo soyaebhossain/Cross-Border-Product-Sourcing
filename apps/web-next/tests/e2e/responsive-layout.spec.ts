@@ -230,3 +230,30 @@ test("@public authenticated account and admin shells stay inside the viewport", 
     }
   }
 });
+
+test("@public desktop navigation is not clipped when the font renders wider", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === "mobile-chromium", "Desktop header contract");
+  // Machines without the design font fall back to wider ones. The menu must
+  // keep its full width there; the search box is what gives way.
+  for (const width of [1321, 1340, 1366, 1400, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/login", { waitUntil: "domcontentloaded" });
+    await expect(page.locator(".site-header")).toBeVisible();
+    await page.addStyleTag({
+      content: '.site-header, .site-header * { font-family: "Courier New", "DejaVu Sans Mono", monospace !important; }',
+    });
+    const audit = await page.evaluate(() => {
+      const nav = document.querySelector<HTMLElement>(".site-header__nav")!;
+      const search = document.querySelector<HTMLElement>(".global-search")!;
+      return {
+        navClient: nav.clientWidth,
+        navScroll: nav.scrollWidth,
+        searchWidth: search.getBoundingClientRect().width,
+        documentOverflow: document.documentElement.scrollWidth - window.innerWidth,
+      };
+    });
+    expect.soft(audit.navScroll, `${width}px navigation clipped`).toBeLessThanOrEqual(audit.navClient + 1);
+    expect.soft(audit.searchWidth, `${width}px search box too small`).toBeGreaterThanOrEqual(190);
+    expect.soft(audit.documentOverflow, `${width}px document overflow`).toBeLessThanOrEqual(1);
+  }
+});

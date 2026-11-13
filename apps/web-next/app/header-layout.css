@@ -23,7 +23,10 @@
   .header-stack .site-header {
     position: relative !important;
     display: grid !important;
-    grid-template-columns: max-content minmax(190px, 400px) minmax(0, 1fr) max-content !important;
+    /* The navigation column is never narrower than its labels. Fonts differ
+       between machines, so when space is tight the search box gives way
+       (down to 190px) instead of the menu being clipped. */
+    grid-template-columns: max-content minmax(190px, 400px) minmax(max-content, 1fr) max-content !important;
     grid-template-rows: minmax(44px, auto) !important;
     align-items: center !important;
     column-gap: clamp(8px, 1vw, 16px) !important;
