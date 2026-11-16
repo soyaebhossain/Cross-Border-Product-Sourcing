@@ -261,6 +261,47 @@ and complete MFA enrollment instead.
   update the exact frontend URL and CORS allowlist. Provider preview domains
   are not the final authenticated-cookie topology.
 
+## Deploy the API on Render (for the Vercel site)
+
+The Vercel site only serves pages. Catalog, quotes, sign-in, orders and the
+admin panel all come from the API, which runs on Render. Production Vercel
+builds always call `https://cross-border-product-sourcing-api.onrender.com`.
+
+1. In Render, choose **New > Blueprint** and select this repository. The
+   blueprint (`render.yaml`) creates the API service
+   `cross-border-product-sourcing-api` and a PostgreSQL database
+   `cross-border-product-sourcing-db`. Keep the service name: the Vercel site
+   calls that exact address.
+2. Fill in the values Render asks for:
+
+   | Variable | Required | Value |
+   |---|---|---|
+   | `CATALOG_MFA_ENCRYPTION_KEY` | yes | output of `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
+   | `CATALOG_ERROR_MONITORING_DSN` | yes | the DSN of a Sentry project (free plan is enough); must start with `https://` |
+   | `CATALOG_PAYMENT_PROOF_ALLOWED_HOSTS` | yes | host names where payment proof images may be stored, comma separated |
+   | `SOURCEAI_ADMIN_USERNAME`, `SOURCEAI_ADMIN_EMAIL`, `SOURCEAI_ADMIN_PASSWORD` | first deploy | the first administrator; remove them after the first admin sign-in |
+   | `CATALOG_ANTHROPIC_API_KEY` | no | enables model-written explanations; without it the rule-based explanation is shown |
+   | email and proxy settings | no | password-reset email and signed proxy identity |
+
+   The API refuses to start in production without the three required values.
+3. On every start the container applies migrations, loads the demo catalog
+   (`CATALOG_SEED_PUBLIC_CATALOG=true`; only missing rows are added) and, if the
+   three admin variables are set, creates that administrator once. Live
+   exchange rates are fetched at start and every 12 hours.
+4. When `https://cross-border-product-sourcing-api.onrender.com/api/ready`
+   answers `ready`, the Vercel site shows the live catalog. Nothing needs to
+   change in Vercel.
+
+Free plan limits: the service sleeps after a period without traffic and takes
+about a minute to wake, so open `/api/ready` a minute before a demonstration.
+Render's free PostgreSQL databases expire after a limited period; check the
+current terms in Render, and export or upgrade before then. The notification
+worker is not part of the blueprint, so emails and messages are not sent.
+
+A full rehearsal of this setup (production mode, a new empty database, 0.1
+CPU and 512 MB like the free plan) became ready in about a minute with 610
+products, live exchange rates, working quotes, sign-up and admin creation.
+
 ## Run with Docker and PostgreSQL
 
 Copy `.env.example` to `.env`, replace every development placeholder, then:

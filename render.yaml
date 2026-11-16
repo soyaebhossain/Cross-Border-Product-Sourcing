@@ -15,6 +15,20 @@ services:
       - key: PORT
         value: "8000"
       - key: CATALOG_DATABASE_URL
+        fromDatabase:
+          name: cross-border-product-sourcing-db
+          property: connectionString
+      # A new database is empty after migrations; load the PII-free demo
+      # catalog. Existing rows are kept, so this is safe on every deploy.
+      - key: CATALOG_SEED_PUBLIC_CATALOG
+        value: "true"
+      # First administrator, created once at startup (free plan has no shell).
+      # Remove these three after the first admin sign-in.
+      - key: SOURCEAI_ADMIN_USERNAME
+        sync: false
+      - key: SOURCEAI_ADMIN_EMAIL
+        sync: false
+      - key: SOURCEAI_ADMIN_PASSWORD
         sync: false
       - key: CATALOG_JWT_SECRET
         generateValue: true
@@ -68,3 +82,12 @@ services:
         value: "1800"
       - key: CATALOG_PAYMENT_PROOF_ALLOWED_HOSTS
         sync: false
+
+databases:
+  - name: cross-border-product-sourcing-db
+    plan: free
+    region: singapore
+    databaseName: cross_border
+    user: sourceai
+    # Only services in this Render workspace can connect.
+    ipAllowList: []
